@@ -7,6 +7,8 @@ One day I came up with an idea to bring the project back to life using the exper
 Initial code was written many years ago with Java 8 and AWT (can be seen in initial commit).
 The goal is to practice vibe coding and give the game a new life.
 
+Game rules and mechanics are described in [Game rules](GameRules.md) file.
+
 #### PREVIEW - gifs from first version of game: 
 1. One player game: 
 
