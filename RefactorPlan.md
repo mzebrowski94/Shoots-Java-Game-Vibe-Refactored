@@ -11,10 +11,10 @@
 > Work clusters top to bottom. Complete *whole* sub-items only. A cluster is `[x]`
 > only once every sub-item under it is `[x]`.
 
-## [ ] 0. Legacy Code Audit (analysis only — no behavioural changes expected)
-- [ ] Walk the existing source tree and record the package/class layout plus each
+## [x] 0. Legacy Code Audit (analysis only — no behavioural changes expected)
+- [x] Walk the existing source tree and record the package/class layout plus each
       class's responsibility in `STATE.md` under "Legacy Code Map".
-- [ ] Note concrete correctness/performance issues found (unbounded allocations,
+- [x] Note concrete correctness/performance issues found (unbounded allocations,
       O(N²) loops, AWT coupling, etc.) as a short backlog in `STATE.md` under
       "Open Decisions" — later clusters resolve these as they migrate the relevant area.
 

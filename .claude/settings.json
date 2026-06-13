@@ -9,12 +9,12 @@
       "Bash(git diff*)",
       "Bash(git log*)",
       "Bash(git add*)",
-      "Bash(git commit*)",
       "Bash(git checkout -- *)"
     ],
     "deny": [
       "Bash(git push*)",
       "Bash(rm -rf*)"
     ]
-  }
+  },
+  "maxTokens": 32000
 }
