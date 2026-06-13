@@ -3,21 +3,12 @@ package pl.mzebrows.shoots.game.main;
 
 import pl.mzebrows.shoots.game.logic.GameLoop;
 
-/**
- * Główny obiekt gry przechowujący funkcję main w której wywoływany jest obiekt typu GameLoop czyli pętla gry
- * @author Mateusz Żebrowski, Nr albumu: 95281
- */
+/** Application entry point: constructs the game loop and starts it on its own thread. */
 public class ProjectShoots {
 
-    /**
-     * Funckja main rozpoczynająca działanie programu
-     * @param args - przyjmuje dodatkowe argument podane przy właczaniu programu
-     */
+    /** Launches the game. */
     public static void main(String[] args) {
-        //MAIN        
-
-        System.out.println("-Run");
-        GameLoop gameLoop = new GameLoop();
-    } 
+        new GameLoop().start();
+    }
 
 }

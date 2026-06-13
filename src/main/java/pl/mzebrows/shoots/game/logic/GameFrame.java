@@ -3,40 +3,38 @@ package pl.mzebrows.shoots.game.logic;
 
 import java.awt.BorderLayout;
 import java.awt.Image;
-import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 
-/**
- * Klasa rozszerzająca JFrame stanowiąca okienko gry
- * @author Mateusz Żebrowski, Nr albumu: 95281
- */
-public class GameFrame extends JFrame { 
+/** Game window: hosts the play screen, top round-timer counter, and side score panel. */
+public class GameFrame extends JFrame {
     GameScreen gameScreen;
     GameCounter gameCounter;
     GamePointer gamePointer;
-    
-    public GameFrame(GameSettings gameSettings)
+
+    /**
+     * @param gameSettings shared game state/config
+     * @param icon         window icon loaded from the classpath cache, or {@code null} if unavailable
+     */
+    public GameFrame(GameSettings gameSettings, Image icon)
     {
-        setTitle("Projekt1");            // Tytuł
-        //centerFrame();
-        //JFRAME GAME MENU
+        setTitle("Project Shooots!");
         gameScreen = new GameScreen(gameSettings);
         gameCounter = new GameCounter(gameSettings);
         gamePointer = new GamePointer(gameSettings);
-              
+
         add(gameScreen, BorderLayout.CENTER);
         add(gameCounter, BorderLayout.NORTH);
         add(gamePointer, BorderLayout.EAST);
         this.setFocusable(true);
         setVisible(true);
         gameScreen.createBufferStrategy(2);
-        setLocationByPlatform(false);                                            // NULL ustawia na środek , TRUE daje wybór systemowy
-        Image icon = new ImageIcon("C:\\Users\\mzebr\\Desktop\\Programowanie\\Shoots-Vibe-Refactor\\Shoots-Vibe-Refactor\\src\\main\\resources\\images\\game.png").getImage();
-        setIconImage(icon);
+        setLocationByPlatform(false);
+        if (icon != null) {
+            setIconImage(icon);
+        }
         addKeyListener(gameSettings.getInputBridge());
-        
-        System.out.println("-MainFrame");
-        setIgnoreRepaint( true );
+
+        setIgnoreRepaint(true);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         pack();
 

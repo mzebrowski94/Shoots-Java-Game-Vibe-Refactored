@@ -32,10 +32,10 @@
       `GameOverState`) driving the top-level loop, and wire pause/menu `GameAction`s
       into its transitions.
 
-## [ ] 3. Game Loop & Renderer
-- [ ] Implement `GameLoop`: fixed-timestep update with accumulator, max-delta clamp,
+## [x] 3. Game Loop & Renderer
+- [x] Implement `GameLoop`: fixed-timestep update with accumulator, max-delta clamp,
       and render-side interpolation between the previous and current state.
-- [ ] Extract `Renderer`: `BufferStrategy` (active rendering), `setIgnoreRepaint(true)`,
+- [x] Extract `Renderer`: `BufferStrategy` (active rendering), `setIgnoreRepaint(true)`,
       image cache via `GraphicsConfiguration.createCompatibleImage()`/`VolatileImage`,
       deliberate `RenderingHints`. Include the round-timer (top panel) and
       score/round side panel from `GameRules.md`.

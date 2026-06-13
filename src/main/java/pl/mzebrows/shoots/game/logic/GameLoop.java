@@ -1,81 +1,110 @@
 // pl/mzebrows/shoots/game/logic/GameLoop.java
 package pl.mzebrows.shoots.game.logic;
 
+import java.awt.GraphicsConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import pl.mzebrows.shoots.loop.FixedTimestep;
+import pl.mzebrows.shoots.render.AwtRenderer;
+import pl.mzebrows.shoots.render.ImageCache;
+import pl.mzebrows.shoots.render.Renderer;
 import pl.mzebrows.shoots.state.GameOverState;
 import pl.mzebrows.shoots.state.GameStateMachine;
 import pl.mzebrows.shoots.state.PausedState;
 import pl.mzebrows.shoots.state.PlayingState;
 
 /**
- * Top-level game loop. Owns the timing mechanism (simple sleep-based, replaced by
- * fixed-timestep accumulator in cluster 3) and drives the {@link GameStateMachine}.
+ * Top-level game loop: fixed-timestep simulation with an accumulator, max-delta clamp, and
+ * render-side interpolation, driving the {@link GameStateMachine} on a dedicated thread.
  */
-public final class GameLoop {
+public final class GameLoop implements Runnable {
 
     private static final Logger log = LoggerFactory.getLogger(GameLoop.class);
 
-    private static final int TARGET_FPS = 120;
-    private static final long OPTIMAL_TIME = 1_000_000_000L / TARGET_FPS;
+    private static final int UPDATES_PER_SECOND = 120;
+    private static final int MAX_CATCH_UP_STEPS = 5;
+    private static final String ICON_RESOURCE = "images/game.png";
 
     private final GameSettings gameSettings = new GameSettings();
+    private final FixedTimestep timestep = FixedTimestep.ofRate(UPDATES_PER_SECOND, MAX_CATCH_UP_STEPS);
+
     private GameFrame gameFrame;
     private GameStateMachine stateMachine;
+    private Renderer renderer;
+    private Thread loopThread;
 
-    private long lastLoopTime = System.nanoTime();
-    private long lastFpsTime = 0;
-
-    /** Entry point: initialises and runs the game loop until the state machine quits. */
+    /** Wires the object graph but does not start the loop; call {@link #start()} to run it. */
     public GameLoop() {
-        log.info("Starting GameLoop");
+        log.info("Initialising GameLoop");
         initializeGraphics();
         initializeLogic();
+    }
+
+    /** Starts the simulation on a dedicated game-loop thread (AWT input still fires on the EDT). */
+    public void start() {
+        loopThread = new Thread(this, "game-loop");
+        loopThread.start();
+    }
+
+    @Override
+    public void run() {
+        log.info("Game loop started (rate {} ups)", UPDATES_PER_SECOND);
+        long previous = System.nanoTime();
 
         while (stateMachine.isRunning()) {
             long now = System.nanoTime();
-            long updateLength = now - lastLoopTime;
-            lastLoopTime = now;
-            lastFpsTime += updateLength;
+            timestep.accumulate(now - previous);
+            previous = now;
 
-            if (lastFpsTime >= OPTIMAL_TIME) {
-                var input = gameSettings.getInputBridge();
+            var input = gameSettings.getInputBridge();
+            boolean stepped = false;
+            while (timestep.consumeStep() && stateMachine.isRunning()) {
                 input.poll();
                 stateMachine.update(input);
-
-                var renderEnum = switch (stateMachine.current()) {
-                    case PlayingState ps -> ps.getRenderRoundEnum();
-                    default -> RoundEnum.ROUND_PAUSED;
-                };
-                gameRenderUpdate(renderEnum);
-
-                lastFpsTime -= OPTIMAL_TIME;
+                stepped = true;
             }
 
-            long sleepTime = (lastLoopTime - System.nanoTime() + OPTIMAL_TIME) / 1_000_000L;
-            if (sleepTime > 0) {
-                try {
-                    Thread.sleep(sleepTime);
-                } catch (InterruptedException e) {
-                    log.error("Game loop interrupted", e);
-                    Thread.currentThread().interrupt();
-                }
+            if (stepped) {
+                renderer.render(currentRoundEnum(), timestep.alpha());
+            } else {
+                parkBriefly();
             }
         }
 
+        renderer.dispose();
         gameFrame.dispose();
-        log.info("GameLoop finished");
+        log.info("Game loop finished");
+    }
+
+    private RoundEnum currentRoundEnum() {
+        return switch (stateMachine.current()) {
+            case PlayingState ps -> ps.getRenderRoundEnum();
+            default -> RoundEnum.ROUND_PAUSED;
+        };
+    }
+
+    private void parkBriefly() {
+        try {
+            Thread.sleep(1L);
+        } catch (InterruptedException e) {
+            log.error("Game loop interrupted", e);
+            Thread.currentThread().interrupt();
+        }
     }
 
     // -------------------------------------------------------------------------
 
     private void initializeGraphics() {
-        gameFrame = new GameFrame(gameSettings);
+        GraphicsConfiguration gc = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment()
+                .getDefaultScreenDevice().getDefaultConfiguration();
+        var imageCache = new ImageCache(gc);
+        gameFrame = new GameFrame(gameSettings, imageCache.icon(ICON_RESOURCE).orElse(null));
+        renderer = new AwtRenderer(gameFrame, imageCache);
     }
 
     private void initializeLogic() {
         var playingState = new PlayingState(gameSettings, gameFrame);
-        var pausedState  = new PausedState(gameSettings, gameFrame.gameScreen, playingState);
+        var pausedState = new PausedState(gameSettings, gameFrame.gameScreen, playingState);
         var gameOverState = new GameOverState(gameSettings, gameFrame.gameScreen, playingState);
 
         playingState.setPausedState(pausedState);
@@ -84,11 +113,5 @@ public final class GameLoop {
         gameSettings.setActualRoundNumber(0);
 
         stateMachine = new GameStateMachine(pausedState);
-    }
-
-    private void gameRenderUpdate(RoundEnum roundState) {
-        gameFrame.gameCounter.drawUpdate(roundState);
-        gameFrame.gamePointer.drawUpdate(roundState);
-        gameFrame.gameScreen.drawUpdate(roundState);
     }
 }
