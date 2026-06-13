@@ -46,7 +46,7 @@ public abstract class GameCanvas extends Canvas {
         gS = gameSettings;
         animationTime = gS.getAnimationTime();
         this.setBackground(gS.getColorScheme().getBackgroudColor());
-        this.addKeyListener(gS.getKeyboard());
+        this.addKeyListener(gS.getInputBridge());
         standardColor = gS.getColorScheme().getStandardColor();
         roundTimeInSeconds = gS.getRoundTime();
         this.setFocusable(true);

@@ -1,6 +1,8 @@
 
 package pl.mzebrows.shoots.game.logic;
 
+import pl.mzebrows.shoots.input.InputBridge;
+
 import java.awt.Font;
 import java.awt.FontFormatException;
 import java.awt.GraphicsEnvironment;
@@ -23,7 +25,7 @@ public class GameSettings {
     PointList pointList;
     ArrayList<Round> roundList;
     int playerNumber;
-    KeyboardInput keyboard;
+    InputBridge inputBridge;
     ColisionCalculator colisionCalculator;
     Font gameFont;
     Font menuFont;
@@ -66,7 +68,7 @@ public class GameSettings {
         this.roundList = new ArrayList<>();
         this.playerList = new ArrayList<Player>();
         this.pointList = new PointList(this);
-        keyboard = new KeyboardInput();       
+        inputBridge = InputBridge.withDefaultKeyMap();
         mapMatrix = new MapMatrix(this);
         colisionCalculator = new ColisionCalculator(this);
         mapMatrix.initializeMap();
@@ -126,12 +128,10 @@ public class GameSettings {
 
     }
 
-    /**
-     * Metoda odpowidzialna za sprawdzanie sygnałów z klawiatury dla poszczególnych graczy
-     */
-    public void checkPlayerInput() {
+    /** Forwards the current input to each player's input handler. */
+    public void checkPlayerInput(InputBridge input) {
         for (int i = 0; i < playerList.size(); i++) {
-            playerList.get(i).checkPlayerInput();
+            playerList.get(i).checkPlayerInput(input);
         }
     }
 
@@ -247,12 +247,12 @@ public class GameSettings {
     }
 
 
-    public KeyboardInput getKeyboard() {
-        return keyboard;
+    public InputBridge getInputBridge() {
+        return inputBridge;
     }
 
-    public void setKeyboard(KeyboardInput keyboard) {
-        this.keyboard = keyboard;
+    public void setInputBridge(InputBridge inputBridge) {
+        this.inputBridge = inputBridge;
     }
 
     public int getPlayerNumber() {

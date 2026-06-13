@@ -33,15 +33,19 @@ public class GameFrame extends JFrame {
         setLocationByPlatform(false);                                            // NULL ustawia na środek , TRUE daje wybór systemowy
         Image icon = new ImageIcon("C:\\Users\\mzebr\\Desktop\\Programowanie\\Shoots-Vibe-Refactor\\Shoots-Vibe-Refactor\\src\\main\\resources\\images\\game.png").getImage();
         setIconImage(icon);
-        addKeyListener(gameSettings.getKeyboard());
+        addKeyListener(gameSettings.getInputBridge());
         
         System.out.println("-MainFrame");
         setIgnoreRepaint( true );
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         pack();
-        
+
         gameScreen.initializeGraphics();
-        gameCounter.initializeGraphics();  
+        gameCounter.initializeGraphics();
         gamePointer.initializeGraphics();
-    }  
+    }
+
+    public GameScreen getGameScreen()   { return gameScreen; }
+    public GameCounter getGameCounter() { return gameCounter; }
+    public GamePointer getGamePointer() { return gamePointer; }
 }

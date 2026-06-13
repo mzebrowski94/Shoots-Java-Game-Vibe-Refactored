@@ -25,10 +25,10 @@
       definitions, etc.) loaded from an external `.properties`/JSON file; remove
       magic numbers from game logic.
 
-## [ ] 2. Input & Game State Machine
-- [ ] Implement a `GameAction` enum and a thread-safe input bridge between the AWT
+## [x] 2. Input & Game State Machine
+- [x] Implement a `GameAction` enum and a thread-safe input bridge between the AWT
       EDT and the game-loop thread (concurrent structures, no raw key codes in game logic).
-- [ ] Implement the Game State Machine (`MenuState`, `PlayingState`, `PausedState`,
+- [x] Implement the Game State Machine (`MenuState`, `PlayingState`, `PausedState`,
       `GameOverState`) driving the top-level loop, and wire pause/menu `GameAction`s
       into its transitions.
 

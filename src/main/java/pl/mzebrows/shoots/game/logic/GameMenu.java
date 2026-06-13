@@ -1,11 +1,13 @@
 
 package pl.mzebrows.shoots.game.logic;
 
+import pl.mzebrows.shoots.input.GameAction;
+import pl.mzebrows.shoots.input.InputBridge;
+
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
-import java.awt.event.KeyEvent;
 
 /**
  * Klasa odpowiadając za interfejs menu gry, zmienę ustawień menu, obsługę
@@ -26,7 +28,6 @@ public class GameMenu {
     MenuEnum menuOption;
     GameSettings gS;
     Font menuFont;
-    KeyboardInput keyboard;
     int iterator = 50;
     boolean textBrighter = true;
     Color winTextColor;
@@ -60,7 +61,6 @@ public class GameMenu {
         menuScoreHigh = 100;
         textPostion = (width / 2) - 50;
         menuFont = gS.getMenuFont().deriveFont(30f);
-        keyboard = gameSettings.getKeyboard();
         winTextColor = gS.getColorScheme().getBackgroundFontColor();
     }
 
@@ -143,45 +143,44 @@ public class GameMenu {
     }
 
     /**
-     * Metoda obsługująca klawiaturę w menu
-     *
-     * @return zwraca aktualnie wybraną opcję w postaci MenuEnum
+     * Reads menu navigation from the input bridge and returns the chosen action.
+     * Game settings (roundTime, playerNumber, roundLimit) are applied directly here
+     * when START_NEW_GAME is confirmed.
      */
-    public MenuEnum checkMenuInput() {
-        MenuEnum choosenOption = MenuEnum.NO_OPTION;
+    public MenuEnum checkMenuInput(InputBridge input) {
+        var choosenOption = MenuEnum.NO_OPTION;
 
-        if (keyboard.keyDownOnce(KeyEvent.VK_DOWN)) {
+        if (input.isJustPressed(GameAction.NAVIGATE_DOWN)) {
             changeMenuOptionDown();
-        } else if (keyboard.keyDownOnce(KeyEvent.VK_UP)) {
+        } else if (input.isJustPressed(GameAction.NAVIGATE_UP)) {
             changeMenuOptionUp();
         }
 
         if (menuOption == MenuEnum.CONTINUE) {
-            if (keyboard.keyDownOnce(KeyEvent.VK_ENTER)) {
+            if (input.isJustPressed(GameAction.CONFIRM)) {
                 choosenOption = MenuEnum.CONTINUE;
             }
         } else if (menuOption == MenuEnum.START_NEW_GAME) {
-            if (keyboard.keyDownOnce(KeyEvent.VK_ENTER)) {
+            if (input.isJustPressed(GameAction.CONFIRM)) {
                 choosenOption = MenuEnum.START_NEW_GAME;
                 gS.setRoundTime(roundTime);
                 gS.setPlayerNumber(playerNumber);
                 gS.setRoundLimit(roundNumber);
-
             }
         } else if (menuOption == MenuEnum.PLAYER_NUMBER_OPTION) {
-            playerNumber = changeNumber(playerNumber, playerLimit, 1);
+            playerNumber = changeNumber(input, playerNumber, playerLimit, 1);
             stringPlayerNumber = "            < " + playerNumber + " >";
             choosenOption = MenuEnum.PLAYER_NUMBER_OPTION;
         } else if (menuOption == MenuEnum.ROUND_TIME_OPTION) {
-            roundTime = changeNumber(roundTime, roundTimeLimit, 5);
+            roundTime = changeNumber(input, roundTime, roundTimeLimit, 5);
             stringRoundTime = "           < " + roundTime + " >";
             choosenOption = MenuEnum.ROUND_TIME_OPTION;
         } else if (menuOption == MenuEnum.ROUND_NUMBER_OPTION) {
-            roundNumber = changeNumber(roundNumber, roundNumberLimit, 4);
+            roundNumber = changeNumber(input, roundNumber, roundNumberLimit, 4);
             stringRoundNumber = "            < " + roundNumber + " >";
             choosenOption = MenuEnum.ROUND_NUMBER_OPTION;
         } else if (menuOption == MenuEnum.QUIT) {
-            if (keyboard.keyDownOnce(KeyEvent.VK_ENTER)) {
+            if (input.isJustPressed(GameAction.CONFIRM)) {
                 choosenOption = MenuEnum.QUIT;
             }
         }
@@ -189,28 +188,28 @@ public class GameMenu {
         return choosenOption;
     }
 
-    /**
-     * Metoda odpiwedzialna za zmianę odpowiednich ustawień gry które zaszły
-     * podczas działania menu
-     *
-     * @param defaultValue początkowa wartość danego ustawienia
-     * @param limit górna granica wartości danego ustawienia
-     * @param multiply mnożnik wykorzystywany przy zmianie wartości ustawień
-     * @return zwraca nową wartość danego ustawienia
-     */
-    public int changeNumber(int defaultValue, int limit, int multiply) {
-        if (keyboard.keyDownOnce(KeyEvent.VK_LEFT)) {
-            defaultValue -= (1 * multiply);
+    /** Current player count selected in the menu. */
+    public int getPlayerNumber() { return playerNumber; }
+
+    /** Current round limit selected in the menu. */
+    public int getRoundNumber() { return roundNumber; }
+
+    /** Current round time (seconds) selected in the menu. */
+    public int getRoundTime() { return roundTime; }
+
+    /** Adjusts a numeric menu option left/right and wraps at the limits. */
+    public int changeNumber(InputBridge input, int defaultValue, int limit, int multiply) {
+        if (input.isJustPressed(GameAction.NAVIGATE_LEFT)) {
+            defaultValue -= multiply;
             if (defaultValue <= 0) {
                 defaultValue = limit;
             }
-        } else if (keyboard.keyDownOnce(KeyEvent.VK_RIGHT)) {
-            defaultValue += (1 * multiply);
+        } else if (input.isJustPressed(GameAction.NAVIGATE_RIGHT)) {
+            defaultValue += multiply;
             if (defaultValue > limit) {
-                defaultValue = 1 * multiply;
+                defaultValue = multiply;
             }
         }
-
         return defaultValue;
     }
 

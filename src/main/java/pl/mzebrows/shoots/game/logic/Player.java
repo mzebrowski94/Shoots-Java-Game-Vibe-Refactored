@@ -5,8 +5,10 @@ import pl.mzebrows.shoots.game.logic.Drawables.Disc;
 import pl.mzebrows.shoots.game.logic.Drawables.PlayerBase;
 import pl.mzebrows.shoots.game.logic.Drawables.PlayerCursor;
 import pl.mzebrows.shoots.game.logic.Drawables.PlayerLaser;
+import pl.mzebrows.shoots.input.GameAction;
+import pl.mzebrows.shoots.input.InputBridge;
+
 import java.awt.Color;
-import java.awt.event.KeyEvent;
 import java.util.ArrayList;
 import java.util.LinkedList;
 
@@ -50,10 +52,9 @@ public class Player {
     double moveUnit;
 
     //KLAWIATURA//
-    KeyboardInput keyboard;
-    int keyLeft;
-    int keyRight;
-    int keyShoot;
+    GameAction rotateLeftAction;
+    GameAction rotateRightAction;
+    GameAction shootAction;
 
     /**
      * Konstruktor obiektu
@@ -71,43 +72,42 @@ public class Player {
             indexPosX = 23;
             indexPosY = 12;
             color = new Color(124, 252, 0);
-            keyLeft = KeyEvent.VK_LEFT;
-            keyRight = KeyEvent.VK_RIGHT;
-            keyShoot = KeyEvent.VK_UP;
+            rotateLeftAction  = GameAction.P1_ROTATE_LEFT;
+            rotateRightAction = GameAction.P1_ROTATE_RIGHT;
+            shootAction       = GameAction.P1_SHOOT;
             moveUnit = -1;
             shootDirection = 180;
         } else if (number == 2) {
             indexPosX = 2;
             indexPosY = 12;
             color = new Color(48, 213, 200);
-            keyLeft = KeyEvent.VK_A;
-            keyRight = KeyEvent.VK_D;
-            keyShoot = KeyEvent.VK_W;
+            rotateLeftAction  = GameAction.P2_ROTATE_LEFT;
+            rotateRightAction = GameAction.P2_ROTATE_RIGHT;
+            shootAction       = GameAction.P2_SHOOT;
             moveUnit = 1;
             shootDirection = 0;
         } else if (number == 3) {
             indexPosX = 12;
             indexPosY = 2;
             color = new Color(252, 3, 0);
-            keyLeft = KeyEvent.VK_NUMPAD4;
-            keyRight = KeyEvent.VK_NUMPAD6;
-            keyShoot = KeyEvent.VK_NUMPAD8;
+            rotateLeftAction  = GameAction.P3_ROTATE_LEFT;
+            rotateRightAction = GameAction.P3_ROTATE_RIGHT;
+            shootAction       = GameAction.P3_SHOOT;
             moveUnit = -1;
             shootDirection = -90;
         } else if (number == 4) {
             indexPosX = 12;
             indexPosY = 23;
             color = new Color(237, 26, 116);
-            keyLeft = KeyEvent.VK_L;
-            keyRight = KeyEvent.VK_J;
-            keyShoot = KeyEvent.VK_I;
+            rotateLeftAction  = GameAction.P4_ROTATE_LEFT;
+            rotateRightAction = GameAction.P4_ROTATE_RIGHT;
+            shootAction       = GameAction.P4_SHOOT;
             moveUnit = 1;
             shootDirection = 90;
         }
 
         positionX = indexPosY * 36;
         positionY = indexPosX * 36;
-        keyboard = gameSettings.getKeyboard();
         points = 0;
         combo = 0;
         cursorRotation = 0;
@@ -121,28 +121,19 @@ public class Player {
         playerLaser = new PlayerLaser(positionX, positionY, this);
     }
 
-    /**
-     * Metoda odpowiadająca za sprawdzenie czy na klawiaturze zostały wciśniętę
-     * odpowienie klawisze dla odpowiedniego gracza, jeśli tak, wywoływane są
-     * odpowiedenie metody
-     */
-    public void checkPlayerInput() {
-
-        if (discsLimit < 3 && keyboard.keyDownOnce(keyShoot)) {
+    /** Reads player-specific {@link GameAction}s from the input bridge for this frame. */
+    public void checkPlayerInput(InputBridge input) {
+        if (discsLimit < 3 && input.isJustPressed(shootAction)) {
             addDisc();
-        } else if (keyboard.keyDown(keyLeft)) {
-            //System.out.println("LEFT, cursor: " + cursorRotation);
+        } else if (input.isHeld(rotateLeftAction)) {
             cursorRotation = (int) playerCursor.setRotation(1, moveUnit);
             playerLaser.setRotation(1, moveUnit);
-
-        } else if (keyboard.keyDown(keyRight)) {
-            //System.out.println("RIGHT, cursor: " + cursorRotation);
+        } else if (input.isHeld(rotateRightAction)) {
             cursorRotation = (int) playerCursor.setRotation(2, moveUnit);
             playerLaser.setRotation(2, moveUnit);
         } else {
             playerLaser.isMoving(false);
         }
-
     }
 
     /**
