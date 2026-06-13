@@ -5,9 +5,10 @@
 > ones. Target: whole file under ~80 lines.
 
 ## Package Map
-_(new code lands here; filled in starting with cluster 1)_
-- Root package: `pl.mzebrows.shoots`. Legacy lives in `...shoots.game.logic` (+ `.Drawables`)
-  and `...shoots.game.main`. Entry point: `main/ProjectShoots`.
+- Root: `pl.mzebrows.shoots`. Legacy in `...game.logic` (+ `.Drawables`) and `...game.main`
+  (entry `main/ProjectShoots`).
+- `...config` — immutable config records + loader (cluster 1, done). Resources:
+  `src/main/resources/game.properties` (tunables), `fonts/`, `images/`.
 
 ## Legacy Code Map
 _(remove an entry once its class is migrated/deleted)_
@@ -31,16 +32,22 @@ _(remove an entry once its class is migrated/deleted)_
   PlayerLaser (trajectory pre-compute), PointField. All allocate Color/Stroke/Transform per draw.
 
 ## Established Contracts
-_(none yet — clusters 2-7 establish these)_
+- **Config = immutable records, AWT-decoupled.** `GameConfig` aggregates `GridConfig`,
+  `DiscConfig`, `CollisionConfig`, `RoundConfig`, `ColorPalette` (+ `RgbColor`). Compact
+  ctors validate ranges. Colours stay as `RgbColor`; convert via `RgbColor.toAwt()` only
+  at the render boundary — never store `java.awt.Color` in config.
+- **`GameConfigLoader`** (static): `load()` / `load(name)` / `fromProperties(Properties)`
+  / `defaults()`. Missing/invalid keys log + fall back per-key to `defaults()`. Later
+  clusters get config via constructor injection — load once at startup, pass `GameConfig`.
 
 ## Open Decisions / Backlog
 _(short, forward-looking; delete once resolved)_
-- **pom.xml is stale**: JUnit 3.8.1 only, no Java-version/compiler config, no Lombok/SLF4j/
-  AssertJ/Mockito. Cluster 1 must rewrite it for Java 25 + deps.
+- **Wire config into legacy logic**: records + loader exist (cluster 1) but legacy classes
+  still hold their own magic numbers. Clusters 3-6 must read from `GameConfig` as they migrate
+  (grid 24/25, ballCollisionSize, UNIT, radii, round timing). Remaining un-externalized: arc
+  angles + UI layout offsets in Drawables/menu → fold into cluster 3 renderer config.
 - **Hard-coded font/image paths** (GameSettings ~110, GameFrame ~34): Windows-absolute paths →
-  load from classpath with graceful fallback (cluster 1 config + cluster 3 renderer).
-- **Magic numbers everywhere** (grid 24/25, ballColisionSize=4, UNIT=36, arc angles, layout
-  offsets, radii) → externalize into config records (cluster 1).
+  load from classpath with graceful fallback (cluster 3 renderer; assets now in resources/).
 - **Loop in GameLoop ctor + Thread.sleep pacing** → replace with fixed-timestep accumulator +
   interpolation (cluster 3). Negative sleepTime risk noted.
 - **O(N²) collision** (GameLoop update, PointList scan) → SpatialCollider grid (cluster 5).

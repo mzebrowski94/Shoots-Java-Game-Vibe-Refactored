@@ -18,10 +18,10 @@
       O(N²) loops, AWT coupling, etc.) as a short backlog in `STATE.md` under
       "Open Decisions" — later clusters resolve these as they migrate the relevant area.
 
-## [ ] 1. Project Setup & Configuration
-- [ ] Update `pom.xml` to Java 25 (enable the finalized language features in the
+## [x] 1. Project Setup & Configuration
+- [x] Update `pom.xml` to Java 25 (enable the finalized language features in the
       compiler plugin) and add: Lombok, SLF4j, JUnit 5, AssertJ, Mockito.
-- [ ] Create immutable config records (`GameConfig`, `EntityStats`, disk/bullet-type
+- [x] Create immutable config records (`GameConfig`, `EntityStats`, disk/bullet-type
       definitions, etc.) loaded from an external `.properties`/JSON file; remove
       magic numbers from game logic.
 
