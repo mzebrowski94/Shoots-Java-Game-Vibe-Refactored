@@ -18,7 +18,8 @@
   `BounceMovementStrategy` (c4); `AimController`, `DiscAttackStrategy`, `LaserPredictor` (cluster 6).
 - `...pool` — `ObjectPool<T>` (cluster 4, done).
 - `...system` — `MovementSystem`, `CombatSystem` (c4); `DiscSystem` (cluster 6).
-- `...spatial` — `SpatialCollider` iface, `UniformGridCollider`, `TileType`, `CollisionResult` (cluster 5, done).
+- `...spatial` — `SpatialCollider`, `UniformGridCollider`, `TileType`, `CollisionResult` (c5); `MapGenerator` (cluster 7).
+- `...score` — `CapturePoint`, `CaptureScoring`, `PlayerScore`, `MatchScorer` (cluster 7).
 
 ## Legacy Code Map
 _(remove an entry once its class is migrated/deleted)_
@@ -67,28 +68,27 @@ _(remove an entry once its class is migrated/deleted)_
   caller-supplied int[] with reflection points (no alloc). `DiscSystem` runs the per-step disc
   lifecycle (snapshot→move→`collider.resolve`→retire spent via `CombatSystem`), reporting
   capture-point hits + retirements through `DiscSystem.DiscEventSink` (NO_OP for headless). All AWT-free.
+- **Game-logic reconciliation (cluster 7), all AWT-free + tested.** `MapGenerator(GridConfig,Random)`
+  -> seedable `TileType[][]` (border/blocks/capture-points/bases) feeding `UniformGridCollider`,
+  replacing `MapMatrix`. `CaptureScoring` indexes `CapturePoint`s by packed tile key; `resolveHit`
+  is O(1) (capture/steal-on-equal/cap-4 in `CapturePoint.tryCapture`), replacing `PointList`'s O(N^2)
+  scan. `MatchScorer(RoundConfig)` over `PlayerScore`s: `finishRound` (bank+award, ties award all),
+  `isMatchOver`, `resolveMatchWinners` (most rounds, points tiebreak) — off the `GameSettings` GOD class.
 
 ## Open Decisions / Backlog
-- **Wire config into logic**: clusters 4-6 must read from `GameConfig` (grid 24/25,
-  ballCollisionSize, UNIT, radii, round timing). `AwtRenderer` still wraps legacy panels as-is;
-  fold panel layout offsets + arc angles into a render config when entities migrate.
-- **Font paths** (GameSettings ~110): Windows-absolute paths → classpath (image path already
-  resolved via `ImageCache`).
-- **Per-frame allocations in all Drawables** → pooling + cached Stroke/Transform (clusters 4-6).
-- **Render interpolation** — `FixedTimestep.alpha()` is plumbed to `Renderer.render(state, alpha)`
-  but unused until entities carry prev/curr state (clusters 4-6).
+- **Render layer (cluster 8)**: `AwtRenderer` still wraps legacy panels; `Drawables` alloc per draw;
+  `FixedTimestep.alpha()` is plumbed but unused until entities carry prev/curr state. Fold panel
+  offsets/arc angles into a render config and pool cached Stroke/Transform during the rewire.
+- **Font paths** (GameSettings ~110): Windows-absolute → classpath (images already via `ImageCache`).
 - **Cluster 8 (wiring+deletion)**: c6/c7 logic is built+tested but not wired; `Player`/`PlayingState`
   still drive legacy `Disc`/`PlayerLaser`/`Colision*`. Rewire panels onto `Entity`/systems, then
   delete legacy `Colision*`/`Disc`/`PlayerLaser`/`MapMatrix`/`PointList` (see Coverage Map below).
 
-## Legacy Logic Coverage Map (drives cluster 7)
+## Legacy Logic Coverage Map (drives cluster 8 wiring/deletion)
 - Disc physics / wall collision / aiming / laser / firing -> `Entity`+`BounceMovementStrategy`+
   `DiscSystem` / `UniformGridCollider` / `AimController` / `LaserPredictor` / `DiscAttackStrategy`
   (built+tested in c6; wiring+legacy deletion = cluster 8).
-- **GAP `MapMatrix`** (walls/blocks/point-fields/bases, random placement) -> no counterpart yet ->
-  cluster 7 `MapGenerator` -> `TileType[][]` (seedable, tested).
-- **GAP `PointList`/`PointField`** (capture rules, steal-on-equal, cap 4; O(N^2) scan) -> no
-  counterpart -> cluster 7 capture-scoring module (tile-indexed, tested).
-- **GAP `Round`/`GameSettings`** win logic (`checkRoundWinner`/`checkGameEnd`; `getPlayer`
-  off-by-one bug) -> no counterpart -> cluster 7 match-scorer (tested, off GOD class).
+- `MapMatrix` -> DONE `spatial.MapGenerator` (c7, tested); legacy delete = c8.
+- `PointList`/`PointField` rules -> DONE `score.CaptureScoring`/`CapturePoint` (c7, tested); delete = c8.
+- `Round`/`GameSettings` win logic -> DONE `score.MatchScorer`/`PlayerScore` (c7, tested); delete = c8.
 - Rendering (`GameScreen`/`Drawables`/panels) -> stays legacy AWT until cluster 8.

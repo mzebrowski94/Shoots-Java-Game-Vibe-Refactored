@@ -73,23 +73,23 @@
 - [ ] Delete legacy `Disc`/`ColisionCalculator`/`ColisionPoint` + rewire
       `GameScreen`/`PointList`/`LightEffect`/`PlayerCursor`/`MapMatrix`. [cluster 8]
 
-## [ ] 7. Game-Logic Reconciliation & Cleanup (no behavioural change; pure logic out of legacy)
+## [x] 7. Game-Logic Reconciliation & Cleanup (no behavioural change; pure logic out of legacy)
 > Reconciliation pass before final integration: confirm every piece of *game logic* in
 > legacy `game.logic` has a home in the refactored model, and extract the remaining
 > AWT-free logic (map generation, capture-point + round/match scoring) into tested,
 > decoupled classes. Rendering/AWT wiring stays in cluster 8. Audit table lives in STATE.md.
-- [ ] **Coverage check**: verify each legacy `game.logic` responsibility maps to a
+- [x] **Coverage check**: verify each legacy `game.logic` responsibility maps to a
       refactored counterpart or an explicit cluster-8 deletion note; record the
       legacy->new map in `STATE.md` so nothing is silently dropped. Confirmed gaps below.
-- [ ] **Map generation -> `spatial`**: extract `MapMatrix` block/point-field/base placement
+- [x] **Map generation -> `spatial`**: extract `MapMatrix` block/point-field/base placement
       into an AWT-free `MapGenerator` producing a `TileType[][]` (seedable `Random` for
       deterministic tests); reuse `GridConfig`/`TileType`, drop the unused `ColisionPoint`
       allocations. JUnit tests for border walls, base carve-outs, and block/point fitting.
-- [ ] **Capture-point scoring -> game-logic module**: extract `PointList`/`PointField`
+- [x] **Capture-point scoring -> game-logic module**: extract `PointList`/`PointField`
       capture rules (`chckIfPointFieldErned`, steal-on-equal, cap at 4) into AWT-free,
       record/Strategy logic keyed by tile index, replacing the O(N^2) per-disc scan.
       JUnit tests for neutral->captured, steal, and cap behaviour.
-- [ ] **Round/match win conditions -> game-logic module**: extract `Round.checkRoundWinner`
+- [x] **Round/match win conditions -> game-logic module**: extract `Round.checkRoundWinner`
       + `GameSettings.checkGameEnd`/`getPlayer` win-logic (and fix the `getPlayer`
       off-by-one) into a tested, AWT-free scorer decoupled from the `GameSettings` GOD class.
       JUnit tests for round winner, match end, and tie handling.
