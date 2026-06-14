@@ -42,4 +42,27 @@ if [ -d "$TOOLS/.m2/repository" ]; then
   OFFLINE_ARGS="-o -Dmaven.repo.local=$TOOLS/.m2/repository"
 fi
 
-exec "$MVN" $OFFLINE_ARGS "$@"
+# --- 4. Redirect target/ off a 9p/virtiofs mount when in the Linux sandbox -----
+# Writing class files onto the Windows<->Linux mount causes silent stale-bytecode
+# and file-lock failures (see tools/AGENT_WORKFLOW.md). When the project lives under
+# a sandbox mount (/sessions/.../mnt/), build to a Linux-local dir instead. Windows /
+# IDE builds never take this branch and keep using ./target unchanged. Honour an
+# explicit -Dbuild.dir / $BUILD_DIR if the caller already set one.
+BUILD_DIR_ARG=""
+case " $* " in
+  *" -Dbuild.dir="*) : ;;                      # caller already chose a build dir
+  *)
+    if [ -n "$BUILD_DIR" ]; then
+      BUILD_DIR_ARG="-Dbuild.dir=$BUILD_DIR"
+    else
+      case "$ROOT" in
+        */mnt/*|/sessions/*)
+          _slug=$(printf '%s' "$ROOT" | tr -c 'A-Za-z0-9' '_')
+          BUILD_DIR_ARG="-Dbuild.dir=${TMPDIR:-/tmp}/mvn-build/$_slug"
+          ;;
+      esac
+    fi
+    ;;
+esac
+
+exec "$MVN" $OFFLINE_ARGS $BUILD_DIR_ARG "$@"

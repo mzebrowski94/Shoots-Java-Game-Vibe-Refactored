@@ -19,6 +19,11 @@
     <junit.version>5.13.4</junit.version>
     <assertj.version>3.27.6</assertj.version>
     <mockito.version>5.20.0</mockito.version>
+
+    <!-- Build output directory. Override with -Dbuild.dir=/some/local/path to keep
+         target/ off a network/9p mount (avoids stale-class + file-lock issues). The
+         mvnw wrapper sets this automatically inside the Linux sandbox. -->
+    <build.dir>${project.basedir}/target</build.dir>
   </properties>
 
   <dependencies>
@@ -67,6 +72,7 @@
   </dependencies>
 
   <build>
+    <directory>${build.dir}</directory>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
