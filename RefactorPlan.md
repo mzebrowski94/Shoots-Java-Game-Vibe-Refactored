@@ -66,14 +66,35 @@
       and `LaserPredictor` reusing cluster-5 reflection math (`SpatialCollider` +
       `BounceMovementStrategy`), all AWT-free and unit-tested.
 - [ ] Wire the above into `Player`/`PlayingState`, replacing legacy
-      `PlayerCursor`/`PlayerLaser` rotation + raw input handling (render layer). [cluster 7]
+      `PlayerCursor`/`PlayerLaser` rotation + raw input handling (render layer). [cluster 8]
 - [x] Pooled disc lifecycle on `ObjectPool`+`Entity`+config: `DiscSystem` (move ->
       collide -> retire to pool, `DiscEventSink` for scoring/audio), built on cluster-1
       `DiscConfig` + cluster-4 `CombatSystem`; unit-tested.
 - [ ] Delete legacy `Disc`/`ColisionCalculator`/`ColisionPoint` + rewire
-      `GameScreen`/`PointList`/`LightEffect`/`PlayerCursor`/`MapMatrix`. [cluster 7]
+      `GameScreen`/`PointList`/`LightEffect`/`PlayerCursor`/`MapMatrix`. [cluster 8]
 
-## [ ] 7. Audio & Final Integration
+## [ ] 7. Game-Logic Reconciliation & Cleanup (no behavioural change; pure logic out of legacy)
+> Reconciliation pass before final integration: confirm every piece of *game logic* in
+> legacy `game.logic` has a home in the refactored model, and extract the remaining
+> AWT-free logic (map generation, capture-point + round/match scoring) into tested,
+> decoupled classes. Rendering/AWT wiring stays in cluster 8. Audit table lives in STATE.md.
+- [ ] **Coverage check**: verify each legacy `game.logic` responsibility maps to a
+      refactored counterpart or an explicit cluster-8 deletion note; record the
+      legacy->new map in `STATE.md` so nothing is silently dropped. Confirmed gaps below.
+- [ ] **Map generation -> `spatial`**: extract `MapMatrix` block/point-field/base placement
+      into an AWT-free `MapGenerator` producing a `TileType[][]` (seedable `Random` for
+      deterministic tests); reuse `GridConfig`/`TileType`, drop the unused `ColisionPoint`
+      allocations. JUnit tests for border walls, base carve-outs, and block/point fitting.
+- [ ] **Capture-point scoring -> game-logic module**: extract `PointList`/`PointField`
+      capture rules (`chckIfPointFieldErned`, steal-on-equal, cap at 4) into AWT-free,
+      record/Strategy logic keyed by tile index, replacing the O(N^2) per-disc scan.
+      JUnit tests for neutral->captured, steal, and cap behaviour.
+- [ ] **Round/match win conditions -> game-logic module**: extract `Round.checkRoundWinner`
+      + `GameSettings.checkGameEnd`/`getPlayer` win-logic (and fix the `getPlayer`
+      off-by-one) into a tested, AWT-free scorer decoupled from the `GameSettings` GOD class.
+      JUnit tests for round winner, match end, and tie handling.
+
+## [ ] 8. Audio & Final Integration
 - [ ] Implement `SoundManager` with a small `javax.sound.sampled` clip pool so
       overlapping SFX (shots, hits, explosions) don't cut each other off.
 - [ ] Final integration pass: wire remaining loose ends, delete dead legacy code,

@@ -74,12 +74,21 @@ _(remove an entry once its class is migrated/deleted)_
   fold panel layout offsets + arc angles into a render config when entities migrate.
 - **Font paths** (GameSettings ~110): Windows-absolute paths → classpath (image path already
   resolved via `ImageCache`).
-- **O(N²) collision**: wall-bounce O(1) via `UniformGridCollider` (c5). Remaining: PointList capture-scan.
 - **Per-frame allocations in all Drawables** → pooling + cached Stroke/Transform (clusters 4-6).
 - **Render interpolation** — `FixedTimestep.alpha()` is plumbed to `Renderer.render(state, alpha)`
   but unused until entities carry prev/curr state (clusters 4-6).
-- **Wire new logic into the loop + delete legacy (cluster 7)**: cluster-6 logic (`AimController`/
-  `DiscAttackStrategy`/`LaserPredictor`/`DiscSystem`) is built + tested but NOT yet wired into
-  `Player`/`PlayingState`, which still drive legacy `Disc`/`PlayerLaser`/`ColisionCalculator`/
-  `ColisionPoint`. Cluster 7: rewire `GameScreen`/`PointList`/`LightEffect`/`PlayerCursor`/`MapMatrix`
-  onto `Entity`+`DiscSystem`, then delete the legacy "Colision*"/`Disc`/`PlayerLaser` classes.
+- **Cluster 8 (wiring+deletion)**: c6/c7 logic is built+tested but not wired; `Player`/`PlayingState`
+  still drive legacy `Disc`/`PlayerLaser`/`Colision*`. Rewire panels onto `Entity`/systems, then
+  delete legacy `Colision*`/`Disc`/`PlayerLaser`/`MapMatrix`/`PointList` (see Coverage Map below).
+
+## Legacy Logic Coverage Map (drives cluster 7)
+- Disc physics / wall collision / aiming / laser / firing -> `Entity`+`BounceMovementStrategy`+
+  `DiscSystem` / `UniformGridCollider` / `AimController` / `LaserPredictor` / `DiscAttackStrategy`
+  (built+tested in c6; wiring+legacy deletion = cluster 8).
+- **GAP `MapMatrix`** (walls/blocks/point-fields/bases, random placement) -> no counterpart yet ->
+  cluster 7 `MapGenerator` -> `TileType[][]` (seedable, tested).
+- **GAP `PointList`/`PointField`** (capture rules, steal-on-equal, cap 4; O(N^2) scan) -> no
+  counterpart -> cluster 7 capture-scoring module (tile-indexed, tested).
+- **GAP `Round`/`GameSettings`** win logic (`checkRoundWinner`/`checkGameEnd`; `getPlayer`
+  off-by-one bug) -> no counterpart -> cluster 7 match-scorer (tested, off GOD class).
+- Rendering (`GameScreen`/`Drawables`/panels) -> stays legacy AWT until cluster 8.
