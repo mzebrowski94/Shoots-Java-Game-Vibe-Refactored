@@ -6,11 +6,13 @@ import pl.mzebrows.shoots.game.logic.GameFrame;
 import pl.mzebrows.shoots.game.logic.GamePointer;
 import pl.mzebrows.shoots.game.logic.GameScreen;
 import pl.mzebrows.shoots.game.logic.RoundEnum;
+import pl.mzebrows.shoots.world.PlayWorld;
 
 /**
  * AWT/{@code BufferStrategy} renderer. Owns active rendering: it disables passive repaints on every
  * canvas and drives the three game panels — main play screen, top round-timer counter, and the side
- * score/round pointer — through their {@code drawUpdate} each frame.
+ * score/round pointer — through their {@code drawUpdate} each frame, feeding the play screen and side
+ * panel the live {@link PlayWorld} so they render the new model rather than legacy state.
  */
 public final class AwtRenderer implements Renderer {
 
@@ -34,9 +36,9 @@ public final class AwtRenderer implements Renderer {
     }
 
     @Override
-    public void render(RoundEnum roundState, double alpha) {
-        // alpha is reserved for entity-level interpolation once entities migrate (clusters 4-6);
-        // the legacy panel renderers below still draw from current state.
+    public void render(RoundEnum roundState, double alpha, PlayWorld world) {
+        screen.setWorld(world, alpha);
+        pointer.setWorld(world);
         counter.drawUpdate(roundState);
         pointer.drawUpdate(roundState);
         screen.drawUpdate(roundState);

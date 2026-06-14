@@ -12,6 +12,7 @@ import pl.mzebrows.shoots.state.GameOverState;
 import pl.mzebrows.shoots.state.GameStateMachine;
 import pl.mzebrows.shoots.state.PausedState;
 import pl.mzebrows.shoots.state.PlayingState;
+import pl.mzebrows.shoots.world.PlayWorld;
 
 /**
  * Top-level game loop: fixed-timestep simulation with an accumulator, max-delta clamp, and
@@ -65,7 +66,7 @@ public final class GameLoop implements Runnable {
             }
 
             if (stepped) {
-                renderer.render(currentRoundEnum(), timestep.alpha());
+                renderer.render(currentRoundEnum(), timestep.alpha(), currentWorld());
             } else {
                 parkBriefly();
             }
@@ -81,6 +82,11 @@ public final class GameLoop implements Runnable {
             case PlayingState ps -> ps.getRenderRoundEnum();
             default -> RoundEnum.ROUND_PAUSED;
         };
+    }
+
+    /** The live simulation when playing, else {@code null} (paused/menu/game-over). */
+    private PlayWorld currentWorld() {
+        return stateMachine.current() instanceof PlayingState ps ? ps.getWorld() : null;
     }
 
     private void parkBriefly() {

@@ -1,29 +1,39 @@
 
 package pl.mzebrows.shoots.game.logic;
 
-import pl.mzebrows.shoots.game.logic.Drawables.PointField;
-import pl.mzebrows.shoots.game.logic.Drawables.Block;
-import pl.mzebrows.shoots.game.logic.Drawables.Drawable;
-import pl.mzebrows.shoots.game.logic.Drawables.DrawableEffect;
+import pl.mzebrows.shoots.entity.Entity;
+import pl.mzebrows.shoots.score.CapturePoint;
+import pl.mzebrows.shoots.spatial.TileType;
+import pl.mzebrows.shoots.world.PlayWorld;
 
+import java.awt.BasicStroke;
+import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
-import java.util.ArrayList;
+import java.awt.geom.Area;
+import java.awt.geom.Ellipse2D;
 
 /**
- * Klasa rozrzeszająca klasę abstrakcyjną GameCanvas, jest to głowny ekran gry w
- * którym rysowana jest aktualnie obywająca się rozgrywka
- *
- * @author Mateusz Żebrowski, Nr albumu: 95281
+ * Main play-field panel. Renders the live {@link PlayWorld} model (walls, capture points, pooled
+ * discs, and the aiming laser) directly each frame — no legacy {@code Drawable} allocations and no
+ * reads of the superseded {@code Player}/{@code Disc}/{@code PointList} model.
  */
 public class GameScreen extends GameCanvas {
 
-    MapMatrix matrixMap;
-    private ArrayList<Drawable> drawList = null;
-    private ArrayList<DrawableEffect> effectList;
-    int playerIterator;
-    GameMenu menuLayout;
+    private static final Color WALL_COLOR = new Color(25, 25, 25);
+    private static final int MAX_LASER_POINTS = 16;
+
+    private GameMenu menuLayout;
+
+    /** Live simulation pushed by the renderer each frame (null when not playing). */
+    private PlayWorld world;
+    private double alpha;
+
+    /** Reusable laser-polyline scratch buffers, sized once to avoid per-frame allocation. */
+    private final int[] laserX = new int[MAX_LASER_POINTS];
+    private final int[] laserY = new int[MAX_LASER_POINTS];
+    private float dashPhase = 0f;
 
     GameScreen(GameSettings gameSettings) {
         super(gameSettings);
@@ -32,15 +42,14 @@ public class GameScreen extends GameCanvas {
         hight = gS.getDEFAULT_HIGHT();
         menuLayout = new GameMenu(gS);
 
-        System.out.println("-GameScreen");
         setPreferredSize(new Dimension(width, hight));
-
-        matrixMap = gS.getMapMatrix();
-        playerIterator = 0;
-        drawList = new ArrayList<>();
-        effectList = new ArrayList<>();
-
         animatedElementLenght = width / 2;
+    }
+
+    /** Receives the live model + interpolation factor for this frame from the renderer. */
+    public void setWorld(PlayWorld world, double alpha) {
+        this.world = world;
+        this.alpha = alpha;
     }
 
     @Override
@@ -56,134 +65,28 @@ public class GameScreen extends GameCanvas {
 
     @Override
     public void drawUpdate(RoundEnum roundState) {
-
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        //g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-        //RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
                 RenderingHints.VALUE_INTERPOLATION_BICUBIC);
 
         if (roundState == RoundEnum.ROUND_PAUSED) {
             drawRoundPaused();
             menuLayout.drawMenu(g2d);
-
-        } else if (roundState != RoundEnum.ROUND_PAUSED) {
+        } else {
             drawRoundContinues();
-
             if (roundState == RoundEnum.ROUND_BEGIN) {
                 drawRoundBegining();
-
             } else if (roundState == RoundEnum.ROUND_ENDS) {
                 drawRoundEnding();
-
             }
         }
         strategy.show();
-    }
-
-    /**
-     * Metoda odpowiedzialna za dodanie obiektu do listy rysowanych obiektów
-     *
-     * @param drawable pobiera obiekt rozszerzający interfejs typu Drawable
-     * @return zwraca listę rysowanych obiektów
-     */
-    public boolean addGameObject(Drawable drawable) {
-        return drawList.add(drawable);
-    }
-
-    /**
-     * etoda odpowiedzialna za usunięcie obiektu z listy rysowanych obiektów
-     *
-     * @param drawable pobiera obiekt rozszerzający interfejs typu Drawable
-     * @return zwraca listę rysowanych obiektów
-     */
-    public boolean removeGameObject(Drawable drawable) {
-        return drawList.remove(drawable);
-    }
-
-    /**
-     * Metoda służaca do ponownego rozmieszczenia elemtnów gry na mapie gry
-     */
-    public void reInitializeMapPanel() {
-        playerIterator = 0;
-        drawList.clear();
-        effectList.clear();
-        initiailizeMapPanel();
-    }
-
-    /**
-     * Metoda służaca do odczytania z tablicy położenia poszególnych elementów
-     * gry oraz rozmieszczenia ich na mapie gry
-     */
-    private void initiailizeMapPanel() {
-        for (int i = 0; i < matrixMap.getLength(); i++) {
-            for (int j = 0; j < matrixMap.getLength(); j++) {
-                if (matrixMap.mapMatrix[i][j] == 1) {
-                    addBlock(i * 36, j * 36);
-                } else if (matrixMap.mapMatrix[i][j] == 2) {
-                    addPointField(i, j);
-                } else if (matrixMap.mapMatrix[i][j] == 3) {
-                    addPlayerBase();
-                }
-            }
-        }
-
-    }
-
-    private void addPlayerBase() {
-        drawList.add(gS.getPlayer(playerIterator).getPlayerBase());
-        drawList.add(gS.getPlayer(playerIterator).getPlayerCursor());
-        playerIterator++;
-        if (playerIterator == 4) {
-            playerIterator = 0;
-        }
-    }
-
-    /**
-     * Metoda zmieniająca stan obiektu typu PointField w zależoności czy udało
-     * się przejąć dany punkt w grze
-     *
-     * @param colisionPoint przyjmuje wartości dotyczące punktu biorącego udział
-     * w kolizji
-     * @param player pobiera informacje o graczu
-     * @param colisionTimes zawiera informację o tym ile razy obiekt typu Disc
-     * uległ kolizji zanim zetknął się z obiektem PointField
-     * @return zwraca wartość boolean informującą czy udało się przejąć dany punkt
-     */
-    public boolean setPointField(ColisionPoint colisionPoint, Player player, int colisionTimes) {
-        return gS.getActualRound().getPointList().checkPointFiledErned(colisionPoint, player, colisionTimes);
-    }
-
-    public GameSettings getGameSettings() {
-        return gS;
-    }
-
-    public void setGameSettings(GameSettings gS) {
-        this.gS = gS;
-    }
-
-    private void addBlock(int x, int y) {
-        drawList.add(new Block(x, y));
-    }
-
-    private void addPointField(int x, int y) {
-        gS.getActualRound().getPointList().getPointFields().add(new PointField(x, y));
-    }
-
-    public ArrayList<Drawable> getDrawList() {
-        return drawList;
-    }
-
-    public ArrayList<DrawableEffect> getEffectList() {
-        return effectList;
     }
 
     @Override
     public void drawRoundPaused() {
         g2d.setColor(gS.getColorScheme().getMenuStandardColor());
         g2d.fillRect(0, 0, width, hight);
-        //g2d.setColor(gS.getColorScheme().getBackgroundFontColor());
-        //g2d.drawString("PAUSED", gS.getDEFAULT_WIDTH()/2 + textOffset, gS.getDEFAULT_HIGHT()/2);
         g2d.setColor(gS.getColorScheme().getDeadLineColor());
         g2d.setFont(textFont);
     }
@@ -192,45 +95,94 @@ public class GameScreen extends GameCanvas {
     public void drawRoundContinues() {
         g2d.setColor(gS.getColorScheme().getBackgroudColor());
         g2d.fillRect(0, 0, width, hight);
-        //OtherDrawables
-        if (drawList != null) {
-            for (Drawable shape : drawList) {
-                shape.draw(g2d);
-            }
+        if (world == null) {
+            return;
         }
+        drawWalls(world);
+        drawCapturePoints(world);
+        drawLasers(world);
+        drawDiscs(world);
+    }
 
-        //Lasers
-        if (gS.getPlayerList() != null) {
-            for (int i = 0; i < gS.getPlayerList().size(); i++) {
-                gS.getPlayerList().get(i).getPlayerLaser().draw(g2d);
-            }
-        }
-
-        //PointFields
-        if (gS.getActualRound().getPointList().getPointFields() != null) {
-            for (Drawable shape : gS.getActualRound().getPointList().getPointFields()) {
-                shape.draw(g2d);
-            }
-        }
-
-        //Discs
-        if (gS.getPlayerList() != null) {
-            for (int i = 0; i < gS.getPlayerList().size(); i++) {
-                for (int j = 0; j < gS.getPlayerList().get(i).getPlayerDiscs().size(); j++) {
-                    gS.getPlayerList().get(i).getPlayerDiscs().get(j).draw(g2d);
+    /** Draws wall tiles as solid squares; tile (i,j) occupies pixel (i*unit, j*unit). */
+    private void drawWalls(PlayWorld world) {
+        int unit = world.unit();
+        TileType[][] tiles = world.tiles();
+        g2d.setColor(WALL_COLOR);
+        g2d.setStroke(new BasicStroke());
+        for (int i = 0; i < tiles.length; i++) {
+            for (int j = 0; j < tiles[i].length; j++) {
+                if (tiles[i][j] == TileType.WALL) {
+                    g2d.fillRect(i * unit, j * unit, unit, unit);
                 }
             }
         }
+    }
 
-        //Effects
-        if (effectList != null) {
-            for (int i = 0; i < effectList.size(); i++) {
-                if (effectList.get(i) != null && effectList.get(i).isEffect()) {
-                    effectList.get(i).draw(g2d);
-                } else {
-                    effectList.remove(i);
+    /** Draws each capture point: neutral as a marker, captured tinted in the owner's colour by level. */
+    private void drawCapturePoints(PlayWorld world) {
+        int unit = world.unit();
+        dashPhase += 0.12f;
+        var dashed = new BasicStroke(2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND,
+                5.0f, new float[]{6f}, dashPhase);
+        g2d.setStroke(dashed);
+        for (CapturePoint point : world.scoring().points()) {
+            int px = point.getTileX() * unit;
+            int py = point.getTileY() * unit;
+            if (point.isCaptured() && point.getOwnerId() >= 0) {
+                Color owner = world.playerColor(point.getOwnerId());
+                int level = Math.max(1, point.getLevel());
+                g2d.setColor(owner);
+                int arcCount = Math.min(level, 4);
+                for (int k = 0; k < 4; k++) {
+                    g2d.setColor(k < arcCount ? owner : owner.darker().darker());
+                    g2d.fillArc(px + 4, py + 4, unit - 8, unit - 8, 55 + k * 90, 70);
                 }
+                g2d.setColor(Color.gray);
+                g2d.fillOval(px + unit / 2 - 7, py + unit / 2 - 7, 14, 14);
+                g2d.setColor(owner.darker().darker());
+                g2d.drawOval(px + 2, py + 2, unit - 4, unit - 4);
+            } else {
+                g2d.setColor(Color.black);
+                g2d.drawRoundRect(px + 2, py + 2, unit - 4, unit - 4, 10, 10);
+                g2d.drawLine(px + 4, py + 4, px + unit - 4, py + unit - 4);
+                g2d.drawLine(px + 4, py + unit - 4, px + unit - 4, py + 4);
             }
+        }
+    }
+
+    /** Draws each player's predicted aiming laser as a dashed polyline in the player colour. */
+    private void drawLasers(PlayWorld world) {
+        var dashed = new BasicStroke(2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND,
+                5.0f, new float[]{6f}, dashPhase);
+        g2d.setStroke(dashed);
+        for (int p = 0; p < world.playerCount(); p++) {
+            int n = world.predictLaser(p, laserX, laserY);
+            if (n >= 2) {
+                g2d.setColor(world.playerColor(p));
+                g2d.drawPolyline(laserX, laserY, Math.min(n, MAX_LASER_POINTS));
+            }
+        }
+    }
+
+    /** Draws each active disc as a ring in its owner's colour, interpolated by the loop alpha. */
+    private void drawDiscs(PlayWorld world) {
+        int big = world.config().disc().bigRadius();
+        int small = world.config().disc().smallRadius();
+        int halfBig = big / 2;
+        int halfSmall = small / 2;
+        var discs = world.discs();
+        for (int i = 0, n = discs.size(); i < n; i++) {
+            Entity disc = discs.get(i);
+            if (!disc.isActive()) {
+                continue;
+            }
+            double dx = disc.interpolatedX(alpha);
+            double dy = disc.interpolatedY(alpha);
+            Area outer = new Area(new Ellipse2D.Double(dx - halfBig, dy - halfBig, big, big));
+            outer.subtract(new Area(new Ellipse2D.Double(dx - halfSmall, dy - halfSmall, small, small)));
+            g2d.setColor(world.playerColor(disc.getOwnerId()));
+            g2d.fill(outer);
         }
     }
 
@@ -250,8 +202,6 @@ public class GameScreen extends GameCanvas {
     @Override
     public void drawRoundEnding() {
         g2d.setColor(gS.getColorScheme().getStandardColor());
-        //System.out.println(animatedElementElapsed);
-        //System.out.println(animatedElementLenght);
         g2d.fillRect(0, 0, animatedElementElapsed, hight);
         g2d.fillRect(width - animatedElementElapsed, 0, animatedElementElapsed, hight);
         g2d.fillRect(0, 0, width, animatedElementElapsed);
@@ -264,7 +214,6 @@ public class GameScreen extends GameCanvas {
 
     @Override
     public void initializeLayout() {
-
     }
 
     public GameMenu getMenuLayout() {
@@ -275,4 +224,11 @@ public class GameScreen extends GameCanvas {
         this.menuLayout = menuLayout;
     }
 
+    public GameSettings getGameSettings() {
+        return gS;
+    }
+
+    public void setGameSettings(GameSettings gS) {
+        this.gS = gS;
+    }
 }

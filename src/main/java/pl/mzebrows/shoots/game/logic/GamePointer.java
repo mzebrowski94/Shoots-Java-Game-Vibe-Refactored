@@ -1,7 +1,12 @@
 
 package pl.mzebrows.shoots.game.logic;
 
+import pl.mzebrows.shoots.score.CapturePoint;
+import pl.mzebrows.shoots.world.MatchFlow;
+import pl.mzebrows.shoots.world.PlayWorld;
+
 import java.awt.BasicStroke;
+import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics2D;
@@ -39,6 +44,9 @@ public class GamePointer extends GameCanvas {
     ArrayList<Integer> playerPointBarsList;
     ArrayList<Integer> playerPointBarElapsed;
 
+    /** Live model pushed by the renderer each frame (null when paused/menu). */
+    private PlayWorld world;
+
     GamePointer(GameSettings gameSettings) {
         super(gameSettings);
         fontSize = 25;
@@ -60,6 +68,56 @@ public class GamePointer extends GameCanvas {
         textFont = gS.getGameFont();
         standardColor = gS.getColorScheme().getStandardColor();
         roundTimeInSeconds = gS.getRoundTime();
+    }
+
+    /** Receives the live model for this frame from the renderer. */
+    public void setWorld(PlayWorld world) {
+        this.world = world;
+    }
+
+    /** Number of players to render stats for (new model when playing, else legacy list). */
+    private int playerCount() {
+        return world != null ? world.playerCount() : gS.getPlayerList().size();
+    }
+
+    /** Current-round points controlled by a 0-based player. */
+    private int currentPoints(int p) {
+        return world != null ? world.matchFlow().scoreOf(p).getCurrentPoints()
+                             : gS.getPlayerList().get(p).getPoints();
+    }
+
+    /** Rounds won by a 0-based player. */
+    private int roundsWon(int p) {
+        return world != null ? world.matchFlow().scoreOf(p).getRoundsWon()
+                             : gS.getPlayerList().get(p).getRoundsWon();
+    }
+
+    /** Previous round's banked points for a 0-based player (0 when unavailable). */
+    private int previousPoints(int p) {
+        if (world != null) {
+            var s = world.matchFlow().scoreOf(p);
+            return s.getTotalPoints() - s.getCurrentPoints();
+        }
+        return gS.getPreviousRound() != null ? gS.getPreviousRound().getPlayerPointsList().get(p) : 0;
+    }
+
+    /** Player display colour for a 0-based player. */
+    private Color playerColor(int p) {
+        return world != null ? world.playerColor(p) : gS.getPlayerList().get(p).getColor();
+    }
+
+    /** Player display name for a 0-based player. */
+    private String playerName(int p) {
+        return world != null ? "P" + (p + 1) : gS.getPlayerList().get(p).getName();
+    }
+
+    /** Bar denominator: total capturable points on the map (new model) or legacy max. */
+    private int maxPoints() {
+        if (world != null) {
+            int pts = world.scoring().points().size() * CapturePoint.MAX_LEVEL;
+            return Math.max(1, pts);
+        }
+        return maxPointAmount;
     }
 
     /**
@@ -100,7 +158,6 @@ public class GamePointer extends GameCanvas {
             drawPlayerStats(g2d, roundState);
             drawRoundCounterBlocks(g2d, roundState);
             drawAuthor(g2d);
-            gS.getPointList().setChanged(false);
         }
 
         strategy.show();
@@ -150,24 +207,25 @@ public class GamePointer extends GameCanvas {
      */
     public void drawPlayerStats(Graphics2D g2d, RoundEnum roundState) {
 
-        for (int i = 0; i < gS.getPlayerList().size(); i++) {
+        for (int i = 0; i < playerCount(); i++) {
             actualPlayerIndex = i;
             actualLeftWidth = statsStartPosiotionWidth + borderSize;
             int actualRightWidth = width - (4 * borderSize);
             actualHight = statsStartPosiotionHight + freeSpace + (i * 3 * freeSpace);
-            pointPercent = (double) gS.getPlayerList().get(i).getPoints() / maxPointAmount;
+            pointPercent = (double) currentPoints(i) / maxPoints();
             playerPointBarsList.set(i, (int) (pointBarSize * pointPercent));
 
-            g2d.setColor(gS.getPlayerList().get(i).getColor());
-            g2d.drawString(gS.getPlayerList().get(i).getName(), statsStartPosiotionWidth + textOffset, actualHight + textOffset);
+            g2d.setColor(playerColor(i));
+            g2d.drawString(playerName(i), statsStartPosiotionWidth + textOffset, actualHight + textOffset);
             g2d.setColor(standardColor);
-            g2d.drawString(gS.getPlayerList().get(i).getName(), statsStartPosiotionWidth, actualHight);
+            g2d.drawString(playerName(i), statsStartPosiotionWidth, actualHight);
 
             g2d.fillRect(actualLeftWidth, actualHight + freeSpace, frameWidth, 16);
             g2d.fillRect(actualRightWidth, actualHight + freeSpace, frameWidth, 16);
 
-            if (gS.getPreviousRound() != null) {
-                double prevoiusPointPercent = (double) gS.getPreviousRound().getPlayerPointsList().get(i) / maxPointAmount;
+            int prev = previousPoints(i);
+            if (prev > 0) {
+                double prevoiusPointPercent = (double) prev / maxPoints();
                 g2d.setColor(gS.getColorScheme().getBackgroundPointBarColor());
                 g2d.fillRect(actualLeftWidth + frameWidth, actualHight + freeSpace + 3, (int) (pointBarSize * prevoiusPointPercent), 10);
             }
@@ -191,16 +249,15 @@ public class GamePointer extends GameCanvas {
     public void drawRoundCounterBlocks(Graphics2D g2d, RoundEnum roundState) {
 
        
-            for (int i = 0; i < gS.getPlayerList().size(); i++) {
-               
+            for (int i = 0; i < playerCount(); i++) {
 
                     g2d.setColor(gS.getColorScheme().getWinBlockColor());
                     g2d.fillRect((width / 2) - winBlockSize / 2, winBlockPositionHight + (i * (freeSpace + 10)), winBlockSize, winBlockSize);
                     g2d.setColor(standardColor);
                     g2d.setStroke(new BasicStroke(borderSize / 2));
                     g2d.drawRect((width / 2) - winBlockSize / 2, winBlockPositionHight + (i * (freeSpace + 10)), winBlockSize, winBlockSize);
-                    g2d.setColor(gS.getPlayerList().get(i).getColor().darker());
-                    g2d.drawString(""+gS.getPlayerList().get(i).getRoundsWon(), (width / 2) - winBlockSize / 4 , winBlockPositionHight + winBlockSize - 5 + (i*winBlockSize + i*10));
+                    g2d.setColor(playerColor(i).darker());
+                    g2d.drawString(""+roundsWon(i), (width / 2) - winBlockSize / 4 , winBlockPositionHight + winBlockSize - 5 + (i*winBlockSize + i*10));
                     
             }
         
@@ -210,7 +267,7 @@ public class GamePointer extends GameCanvas {
     public void tick() {
         timeElapsed += 0.012;
 
-        for (int i = 0; i < gS.getPlayerList().size(); i++) {
+        for (int i = 0; i < playerCount(); i++) {
             playerPointBarElapsed.set(i, (int) (playerPointBarsList.get(i) * (timeElapsed * 1f / animationTime * 1f)));
             if (timeElapsed > animationTime) {
                 animationEnd = true;
@@ -242,9 +299,9 @@ public class GamePointer extends GameCanvas {
     @Override
     public void drawRoundContinues() {
         ///POINT BAR
-        g2d.setColor(gS.getPlayerList().get(actualPlayerIndex).getColor().darker());
+        g2d.setColor(playerColor(actualPlayerIndex).darker());
         g2d.fillRect(actualLeftWidth + frameWidth, actualHight + freeSpace + 3 + pointBarOffset, playerPointBarsList.get(actualPlayerIndex) + pointBarOffset, 10);
-        g2d.setColor(gS.getPlayerList().get(actualPlayerIndex).getColor());
+        g2d.setColor(playerColor(actualPlayerIndex));
         g2d.fillRect(actualLeftWidth + frameWidth, actualHight + freeSpace + 3, playerPointBarsList.get(actualPlayerIndex), 10);
     }
 
@@ -257,9 +314,9 @@ public class GamePointer extends GameCanvas {
     @Override
     public void drawRoundEnding() {
         //System.out.println("ROUND STATS END");
-        g2d.setColor(gS.getPlayerList().get(actualPlayerIndex).getColor().darker());
+        g2d.setColor(playerColor(actualPlayerIndex).darker());
         g2d.fillRect(actualLeftWidth + frameWidth, actualHight + freeSpace + 3 + pointBarOffset, playerPointBarsList.get(actualPlayerIndex) - playerPointBarElapsed.get(actualPlayerIndex) + pointBarOffset, 10);
-        g2d.setColor(gS.getPlayerList().get(actualPlayerIndex).getColor());
+        g2d.setColor(playerColor(actualPlayerIndex));
         g2d.fillRect(actualLeftWidth + frameWidth, actualHight + freeSpace + 3, playerPointBarsList.get(actualPlayerIndex) - playerPointBarElapsed.get(actualPlayerIndex), 10);
     }
 

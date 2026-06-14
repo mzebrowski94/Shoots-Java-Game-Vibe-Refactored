@@ -10,7 +10,8 @@
 - `...input` — `GameAction` enum + `InputBridge` (c2).
 - `...state` — `GameState`, `GameStateMachine`, `PlayingState`, `PausedState`, `GameOverState` (c2);
   `PlayingState` now drives `world.PlayWorld` (c8).
-- `...loop` — `FixedTimestep` (c3). `...render` — `Renderer`, `AwtRenderer`, `ImageCache` (c3).
+- `...loop` — `FixedTimestep` (c3). `...render` — `Renderer`/`AwtRenderer`/`ImageCache` (c3); render now reads
+  `PlayWorld` (c10): `render(RoundEnum, alpha, PlayWorld)`.
 - `...entity` — `Entity`, `EntityType`, `MovementStrategy`/`AttackStrategy`/`AiStrategy`, `EntitySpawner`,
   `BounceMovementStrategy` (c4); `AimController`, `DiscAttackStrategy`, `LaserPredictor` (c6).
 - `...pool` — `ObjectPool<T>` (c4). `...system` — `MovementSystem`, `CombatSystem` (c4); `DiscSystem` (c6).
@@ -21,7 +22,8 @@
 ## Legacy Code Map
 _(remove an entry once its class is migrated/deleted)_
 - **GameSettings/Round** — GOD CLASS + round timing still used; win/score flow SUPERSEDED by `MatchFlow` (c9); delete=c11.
-- **GameFrame/GameCanvas/GameScreen/GameCounter/GamePointer/GameMenu** — AWT panels; still rendered; migrate=c10, delete=c11.
+- **GameFrame/GameCanvas/GameCounter/GameMenu** — AWT panels (kept). **GameScreen/GamePointer** now draw
+  `PlayWorld`/`MatchFlow` (c10); legacy `Disc`/`PlayerLaser`/`PointField` draw paths removed.
 - **Player** — legacy stats/`Disc`/`PlayerLaser`/`PlayerCursor`; no longer drives sim (PlayWorld does); delete=c11.
 - **Disc/ColisionCalculator/ColisionPoint/MapMatrix/PointList/PointField** — SUPERSEDED; no live callers; delete=c11.
 - **PlayerLaser/PlayerCursor** — rotation paths dead (AimController/LaserPredictor); draw stubs remain; delete=c11.
@@ -53,20 +55,24 @@ _(remove an entry once its class is migrated/deleted)_
   `PlayWorld.step()` syncs current points from `CaptureScoring`. `PlayingState` ENDS phase calls
   `world.finishRound()` then `world.isMatchOver()`/`resolveMatchWinners()`; restart calls `world.resetMatch()`.
   Replaces legacy `Round.checkRoundWinner`+`GameSettings.checkGameEnd` for all win decisions.
+- **Rendering = AWT panels draw from `PlayWorld` (c10).** `Renderer.render(RoundEnum, alpha, PlayWorld)`;
+  `GameLoop` passes the live world (null off-play). `AwtRenderer` pushes it via `GameScreen.setWorld(world,
+  alpha)` + `GamePointer.setWorld(world)`. `GameScreen` draws walls (`tiles()`), capture points
+  (`scoring().points()`), discs (`discs()`, interpolated ring), lasers (`predictLaser` into reused arrays).
+  `GamePointer` reads `matchFlow().scoreOf(p)` for points/roundsWon, `playerColor(p)` for colour
+  (legacy fallback only when world==null, i.e. paused/menu). Render helpers on `PlayWorld`: `config()`,
+  `unit()`, `playerColor(0-based)`. NOTE coordinate convention: tile[i][j] draws at pixel (i*unit, j*unit).
 
 ## Open Decisions / Backlog
-- **AUDIT (this session)**: refactor NOT complete — plan re-scoped. Logic is migrated+tested, but never
-  wired: (1) live render `AwtRenderer→GameScreen/GamePointer` still draws the LEGACY model every frame
-  (`Player.getPlayerDiscs/getPlayerLaser`, `PointList.getPointFields`, legacy `Player` points) while
-  `PlayingState` steps `PlayWorld` → rendered model is STALE (correctness gap, not dead code);
-  (2) `MatchScorer`/`PlayerScore` (c7, tested) never wired — round/win flow still uses legacy
-  `Round.checkRoundWinner`+`GameSettings.checkGameEnd`. Old c9 (pure delete) could not compile.
-  Re-scoped: **9 round/match-flow wiring [DONE, 133 tests] → 10 render migration → 11 deletion → 12 audio.**
+- **AUDIT (resolved)**: original "c9 = pure delete" couldn't compile — render + win-flow still on legacy.
+  Re-scoped & done: **9 round/win wiring [DONE] + 10 render migration [DONE] → 11 deletion → 12 audio**
+  (134 tests). Legacy `game.logic` classes are now unreferenced by the live sim/render; c11 removes them.
 - **BUILD ENV**: `./mvnw` auto-detects the vendored offline toolchain in `tools/` (JDK 26 +
   Maven 3.9 + pre-seeded `.m2`) and builds fully offline IN THE SANDBOX. Always run `./mvnw test`
   from the project root to verify — do NOT assume it can't run. (System `java` is 11; ignore it.)
-- Carryover: `FixedTimestep.alpha()` plumbed but unused until panels interpolate `Entity` prev/curr.
-  Font paths in `GameSettings.initializeFont()` still Windows-absolute (externalize in c10/c12).
+- Carryover: `GameScreen` now interpolates discs with `alpha`. Font paths in `GameSettings.initializeFont()`
+  still Windows-absolute (externalize in c12). `GamePointer` ctor still reads legacy `getPointList()` max
+  (harmless; removed with the legacy model in c11).
 
 ## Legacy Logic Coverage Map (drives cluster 11 deletion)
 - Disc physics/bounce/aim/laser/fire -> DONE `world.PlayWorld`(+`Entity`/`DiscSystem

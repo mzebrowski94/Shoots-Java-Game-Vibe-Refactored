@@ -218,6 +218,17 @@ public final class PlayWorld {
     /** Live round/match score driver, the queryable contract for the render layer. */
     public MatchFlow matchFlow() { return matchFlow; }
 
+    /** The game configuration (read by the render layer for geometry/colours). */
+    public GameConfig config() { return config; }
+
+    /** Tile/grid unit size in pixels. */
+    public int unit() { return config.grid().unit(); }
+
+    /** AWT colour for a 0-based player id, from the configured palette. */
+    public java.awt.Color playerColor(int playerId) {
+        return config.palette().playerColor(playerId + 1).toAwt();
+    }
+
     public TileType[][] tiles() { return tiles; }
 
     public List<Entity> discs() { return discs; }

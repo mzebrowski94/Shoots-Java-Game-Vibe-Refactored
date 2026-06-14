@@ -119,16 +119,16 @@
       expose per-player round + match totals as a queryable contract for the render layer.
       JUnit tests for the wired flow. **[DONE — `world.MatchFlow`, 133 tests green.]**
 
-## [ ] 10. Render Migration (draw the live game from PlayWorld, not the legacy model)
+## [x] 10. Render Migration (draw the live game from PlayWorld, not the legacy model)
 > AUDIT FINDING: `AwtRenderer → GameScreen/GamePointer` still render the LEGACY model every frame
 > (`Player.getPlayerDiscs()`/`getPlayerLaser()`, `PointList.getPointFields()`, legacy `Player` points),
 > while `PlayingState` steps `PlayWorld`. The rendered model is therefore stale — a correctness gap,
 > not just dead code. This cluster repoints rendering at the new model so deletion (c11) becomes a
 > pure no-op removal.
-- [ ] Migrate `GameScreen.drawRoundContinues` to render from `PlayWorld` (pooled discs, capture
+- [x] Migrate `GameScreen.drawRoundContinues` to render from `PlayWorld` (pooled discs, capture
       points/`CaptureScoring`, predicted laser via `LaserPredictor`, blocks via `MapGenerator`/tiles)
       with no per-frame allocations; drop the `LightEffect`/`ColisionPoint` coupling.
-- [ ] Migrate `GamePointer` (side score panel) + round timer to read the c9 scorer (`world.MatchFlow`) /
+- [x] Migrate `GamePointer` (side score panel) + round timer to read the c9 scorer (`world.MatchFlow`) /
       `PlayWorld` state instead of `GameSettings.getPointList()` and legacy `Player` points; keep the panel layout.
 
 ## [ ] 11. Legacy Deletion (remove superseded classes once nothing references them)

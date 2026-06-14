@@ -204,4 +204,14 @@ class PlayWorldTest {
         assertThat(world.matchFlow().scoreOf(0).getTotalPoints()).isZero();
         assertThat(world.totalActiveDiscs()).isZero();
     }
+
+    @Test
+    void exposesRenderHelpersForTheRenderLayer() {
+        var world = world(2);
+        assertThat(world.unit()).isEqualTo(36);
+        assertThat(world.config()).isNotNull();
+        // Player colours come from the configured palette (0-based id -> 1-based palette entry).
+        assertThat(world.playerColor(0)).isEqualTo(new java.awt.Color(124, 252, 0, 255));
+        assertThat(world.playerColor(1)).isEqualTo(new java.awt.Color(48, 213, 200, 255));
+    }
 }

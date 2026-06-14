@@ -173,7 +173,6 @@ public class GameSettings {
 
         actualRound.getPointList().updatePlayerPoints();
         mapMatrix.reInitializeMap();
-        gameScreen.reInitializeMapPanel();
     }
 
     /**
