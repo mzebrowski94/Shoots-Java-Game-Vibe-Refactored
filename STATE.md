@@ -14,6 +14,10 @@
   `GameOverState` (cluster 2, done).
 - `...loop` — `FixedTimestep` accumulator (cluster 3, done).
 - `...render` — `Renderer` iface, `AwtRenderer`, `ImageCache` (cluster 3, done).
+- `...entity` — `Entity` (pooled, reset()-able), `EntityType`, `MovementStrategy`/`AttackStrategy`/
+  `AiStrategy`, `EntitySpawner`, `BounceMovementStrategy` (cluster 4, done).
+- `...pool` — `ObjectPool<T>` (cluster 4, done).
+- `...system` — `MovementSystem`, `CombatSystem` (cluster 4, done).
 
 ## Legacy Code Map
 _(remove an entry once its class is migrated/deleted)_
@@ -50,6 +54,12 @@ _(remove an entry once its class is migrated/deleted)_
   (AWT-free) does `accumulate(dt)` → `consumeStep()` loop → `alpha()` interp factor; built via
   `ofRate(ups, maxCatchUp)`. `Renderer.render(RoundEnum, alpha)` is the only render entry; AWT
   impl `AwtRenderer` owns active rendering. Images load once via classpath `ImageCache`.
+- **Entity = Strategy composition (cluster 4).** Single mutable `Entity` (Lombok
+  `@Getter/@Setter` + `reset()`, primitive pos/vel, `prevX/Y` for interp, `EntityType` tag) — NOT a
+  component-array ECS. Behaviour injected via `MovementStrategy`/`AttackStrategy`/`AiStrategy`.
+  `ObjectPool<T>` (array-backed, `acquire()`/`release()`, no `new` in hot loop). `CombatSystem`
+  implements `EntitySpawner`, spawns/retires discs from a pool using `DiscConfig`; `MovementSystem`
+  dispatches per-entity strategies via index loop + `snapshot()`.
 
 ## Open Decisions / Backlog
 - **Wire config into logic**: clusters 4-6 must read from `GameConfig` (grid 24/25,
@@ -63,4 +73,8 @@ _(remove an entry once its class is migrated/deleted)_
 - **Render interpolation** — `FixedTimestep.alpha()` is plumbed to `Renderer.render(state, alpha)`
   but unused until entities carry prev/curr state (clusters 4-6).
 - **"Colision" misspelling** throughout legacy API — rename to "Collision" when migrating.
-- **Strategy-vs-ECS** for cluster 4: plan recommends Strategy-based composition; confirm there.
+- **Strategy-vs-ECS** for cluster 4: RESOLVED → Strategy-based composition (see contract above).
+- **Wire cluster-4 systems into the loop** (cluster 6): `PlayingState`/`Player` still use legacy
+  `Disc`/`ColisionCalculator`; migrate onto `Entity` + `ObjectPool` + `MovementSystem`/`CombatSystem`.
+- **`BounceMovementStrategy` reflection** relies on the collider flipping `directionX/Y`; cluster 5's
+  `SpatialCollider` must set those on the `Entity` (replacing legacy `ColisionPoint`).

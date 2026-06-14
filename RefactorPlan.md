@@ -40,8 +40,8 @@
       deliberate `RenderingHints`. Include the round-timer (top panel) and
       score/round side panel from `GameRules.md`.
 
-## [ ] 4. ECS Core, Object Pooling & DI ⚠️ highest-leverage cluster — its contracts drive clusters 5-7
-- [ ] Define the mutable, `reset()`-able entity base plus behaviour-injection
+## [x] 4. ECS Core, Object Pooling & DI ⚠️ highest-leverage cluster — its contracts drive clusters 5-7
+- [x] Define the mutable, `reset()`-able entity base plus behaviour-injection
       interfaces (`MovementStrategy`, `AttackStrategy`, optionally `AiStrategy`),
       fully decoupled from AWT/`Graphics2D`.
       - *Default direction*: given the project's size (a handful of entity
@@ -50,7 +50,7 @@
         ECS** — it still satisfies "composition over inheritance" and "runtime-
         swappable behaviour" with far less machinery. Record the final choice in
         `STATE.md` as a binding contract.
-- [ ] Implement `ObjectPool<T>` (pre-allocated, array-backed, `acquire()`/`release()`,
+- [x] Implement `ObjectPool<T>` (pre-allocated, array-backed, `acquire()`/`release()`,
       zero `new` in hot paths) and wire it into constructor-injected systems
       (`MovementSystem`, `CombatSystem`).
 
