@@ -61,11 +61,17 @@
       queries, verifying deterministic results without a graphics context.
 
 ## [ ] 6. Migrate Player, Disks & Enemies
-- [ ] Migrate `Player`/base behaviour onto the new systems: aiming + shooting via
-      injected strategies, laser-prediction reusing the reflection math validated
-      in cluster 5.
-- [ ] Migrate legacy disk/bullet and enemy classes onto `ObjectPool` + the config
-      records from cluster 1; delete the old classes once migrated.
+- [x] Decoupled aiming + shooting + laser-prediction logic: `AimController` (clamped
+      rotation -> shot angle), `DiscAttackStrategy` (`AttackStrategy`, per-owner disc cap),
+      and `LaserPredictor` reusing cluster-5 reflection math (`SpatialCollider` +
+      `BounceMovementStrategy`), all AWT-free and unit-tested.
+- [ ] Wire the above into `Player`/`PlayingState`, replacing legacy
+      `PlayerCursor`/`PlayerLaser` rotation + raw input handling (render layer). [cluster 7]
+- [x] Pooled disc lifecycle on `ObjectPool`+`Entity`+config: `DiscSystem` (move ->
+      collide -> retire to pool, `DiscEventSink` for scoring/audio), built on cluster-1
+      `DiscConfig` + cluster-4 `CombatSystem`; unit-tested.
+- [ ] Delete legacy `Disc`/`ColisionCalculator`/`ColisionPoint` + rewire
+      `GameScreen`/`PointList`/`LightEffect`/`PlayerCursor`/`MapMatrix`. [cluster 7]
 
 ## [ ] 7. Audio & Final Integration
 - [ ] Implement `SoundManager` with a small `javax.sound.sampled` clip pool so

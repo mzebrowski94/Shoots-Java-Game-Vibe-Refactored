@@ -22,4 +22,9 @@ public enum TileType {
     public boolean isSolid() {
         return this == WALL;
     }
+
+    /** Whether this tile is a capturable scoring target. */
+    public boolean isCapturePoint() {
+        return this == CAPTURE_POINT;
+    }
 }
