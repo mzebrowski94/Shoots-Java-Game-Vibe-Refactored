@@ -3,17 +3,18 @@ package pl.mzebrows.shoots.state;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import pl.mzebrows.shoots.game.logic.ColisionPoint;
+import pl.mzebrows.shoots.config.GameConfig;
+import pl.mzebrows.shoots.config.GameConfigLoader;
 import pl.mzebrows.shoots.game.logic.GameCounter;
 import pl.mzebrows.shoots.game.logic.GameFrame;
 import pl.mzebrows.shoots.game.logic.GamePointer;
 import pl.mzebrows.shoots.game.logic.GameScreen;
 import pl.mzebrows.shoots.game.logic.GameSettings;
-import pl.mzebrows.shoots.game.logic.Player;
 import pl.mzebrows.shoots.game.logic.RoundEnum;
-import pl.mzebrows.shoots.game.logic.Drawables.LightEffect;
 import pl.mzebrows.shoots.input.GameAction;
 import pl.mzebrows.shoots.input.InputBridge;
+import pl.mzebrows.shoots.world.PlayInput;
+import pl.mzebrows.shoots.world.PlayWorld;
 
 /**
  * Active gameplay state: manages the ROUND_BEGIN → ROUND_CONTINUES → ROUND_ENDS cycle.
@@ -31,6 +32,9 @@ public final class PlayingState implements GameState {
     private final GameCounter counter;
     private final GamePointer pointer;
 
+    /** Headless simulation of the new model (aiming, pooled discs, bounces, capture scoring). */
+    private final PlayWorld world;
+
     private GameState pausedState;
     private GameState gameOverState;
 
@@ -44,10 +48,21 @@ public final class PlayingState implements GameState {
     private boolean restartRequested = false;
 
     public PlayingState(GameSettings settings, GameFrame frame) {
+        this(settings, frame, new PlayWorld(GameConfigLoader.load()));
+    }
+
+    /** Constructor allowing a pre-built {@link PlayWorld} (used by tests with a seeded map). */
+    public PlayingState(GameSettings settings, GameFrame frame, PlayWorld world) {
         this.settings = settings;
         this.screen  = frame.getGameScreen();
         this.counter = frame.getGameCounter();
         this.pointer = frame.getGamePointer();
+        this.world   = world;
+    }
+
+    /** The headless simulation backing this state, exposed for rendering and tests. */
+    public PlayWorld getWorld() {
+        return world;
     }
 
     /** Must be called after construction to complete the object graph. */
@@ -109,6 +124,7 @@ public final class PlayingState implements GameState {
             } else {
                 settings.startNewRound(screen);
             }
+            world.resetRound();
             phaseJustEntered = false;
         }
         screen.tick();
@@ -135,10 +151,10 @@ public final class PlayingState implements GameState {
             tickRoundSecond();
         }
 
-        updateGameLogic();
         if (settings.isPlayerKeyboardAvailable()) {
-            settings.checkPlayerInput(input);
+            PlayInput.apply(input, world);
         }
+        world.step();
         if (requestNextPhase) {
             phase = Phase.ENDS;
             phaseJustEntered = true;
@@ -184,36 +200,8 @@ public final class PlayingState implements GameState {
         }
     }
 
-    private void updateGameLogic() {
-        for (int i = 0; i < settings.getPlayerList().size(); i++) {
-            Player player = settings.getPlayerList().get(i);
-            player.getPlayerLaser().moveLaser();
-            for (int j = 0; j < player.getPlayerDiscs().size(); j++) {
-                player.getPlayerDiscs().get(j).moveDisc();
-                ColisionPoint cp = player.getPlayerDiscs().get(j).checkCollision();
-                if (cp.isColision()) {
-                    if (player.getPlayerDiscs().get(j).checkColisionsNumber()) {
-                        player.removeDisc(j);
-                    } else if (cp.getColisionType() == 0) {
-                        if (screen.setPointField(cp, player,
-                                player.getPlayerDiscs().get(j).getColisionTimes())) {
-                            player.removeDisc(j);
-                        }
-                    } else {
-                        screen.getEffectList().add(
-                                new LightEffect(player.getColor(), cp));
-                    }
-                }
-            }
-        }
-    }
-
     private int countActiveDiscs() {
-        int count = 0;
-        for (int i = 0; i < settings.getPlayerList().size(); i++) {
-            count += settings.getPlayerList().get(i).getPlayerDiscs().size();
-        }
-        return count;
+        return world.totalActiveDiscs();
     }
 
     private boolean animationsEnded() {

@@ -60,18 +60,18 @@
 - [x] JUnit 5 + AssertJ tests for disk-bounce reflection math and grid/collision
       queries, verifying deterministic results without a graphics context.
 
-## [ ] 6. Migrate Player, Disks & Enemies
+## [x] 6. Migrate Player, Disks & Enemies (decoupled logic only — wiring split to clusters 8-9)
+> The AWT-free logic for player aiming, shooting, laser prediction, and the pooled disc
+> lifecycle is built and unit-tested here. Wiring it into the live game and deleting the
+> superseded legacy classes were split out into clusters 8 (wiring) and 9 (deletion) so each
+> stays small and independently verifiable.
 - [x] Decoupled aiming + shooting + laser-prediction logic: `AimController` (clamped
       rotation -> shot angle), `DiscAttackStrategy` (`AttackStrategy`, per-owner disc cap),
       and `LaserPredictor` reusing cluster-5 reflection math (`SpatialCollider` +
       `BounceMovementStrategy`), all AWT-free and unit-tested.
-- [ ] Wire the above into `Player`/`PlayingState`, replacing legacy
-      `PlayerCursor`/`PlayerLaser` rotation + raw input handling (render layer). [cluster 8]
 - [x] Pooled disc lifecycle on `ObjectPool`+`Entity`+config: `DiscSystem` (move ->
       collide -> retire to pool, `DiscEventSink` for scoring/audio), built on cluster-1
       `DiscConfig` + cluster-4 `CombatSystem`; unit-tested.
-- [ ] Delete legacy `Disc`/`ColisionCalculator`/`ColisionPoint` + rewire
-      `GameScreen`/`PointList`/`LightEffect`/`PlayerCursor`/`MapMatrix`. [cluster 8]
 
 ## [x] 7. Game-Logic Reconciliation & Cleanup (no behavioural change; pure logic out of legacy)
 > Reconciliation pass before final integration: confirm every piece of *game logic* in
@@ -94,7 +94,26 @@
       off-by-one) into a tested, AWT-free scorer decoupled from the `GameSettings` GOD class.
       JUnit tests for round winner, match end, and tie handling.
 
-## [ ] 8. Audio & Final Integration
+## [x] 8. Render & Input Wiring (drive the live game from the cluster 4-7 model)
+> Wire the AWT-free model built in clusters 4-7 into the running game without yet deleting the
+> superseded legacy classes (that is cluster 9). Introduce a headless `PlayWorld` facade owning
+> the new systems so the whole wired simulation stays unit-testable without a graphics context.
+- [x] Build a headless `world.PlayWorld` facade owning per-player `AimController` +
+      `DiscAttackStrategy`, the pooled disc list, `UniformGridCollider` (from `MapGenerator`),
+      `MovementSystem`/`CombatSystem`/`DiscSystem`, and `CaptureScoring` — exposing
+      `applyInput`/`step`/queryable state. JUnit tests for fire-cap, bounce-retire, and capture.
+- [x] Wire `PlayingState` onto `PlayWorld` (per-frame `applyInput` + `step`), replacing the
+      legacy `Player`/`Disc`/`PlayerLaser`/`ColisionPoint` drive in `updateGameLogic` and the
+      raw rotation/shoot input path; keep legacy render panels reading the new state.
+
+## [ ] 9. Legacy Deletion (remove superseded classes once nothing references them)
+> Pure removal pass: delete the legacy game-logic classes the cluster 4-8 model replaced, after
+> confirming no production reference remains. No behavioural change.
+- [ ] Delete legacy `Disc`/`ColisionCalculator`/`ColisionPoint`/`MapMatrix`/`PointList`/
+      `PointField` + the now-dead `PlayerLaser`/`PlayerCursor` rotation paths, rewiring any
+      remaining `GameScreen`/`LightEffect` references onto the new model. Verify clean compile + tests.
+
+## [ ] 10. Audio & Final Integration
 - [ ] Implement `SoundManager` with a small `javax.sound.sampled` clip pool so
       overlapping SFX (shots, hits, explosions) don't cut each other off.
 - [ ] Final integration pass: wire remaining loose ends, delete dead legacy code,
