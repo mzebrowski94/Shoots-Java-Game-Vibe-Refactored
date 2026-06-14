@@ -18,6 +18,7 @@
   `AiStrategy`, `EntitySpawner`, `BounceMovementStrategy` (cluster 4, done).
 - `...pool` — `ObjectPool<T>` (cluster 4, done).
 - `...system` — `MovementSystem`, `CombatSystem` (cluster 4, done).
+- `...spatial` — `SpatialCollider` iface, `UniformGridCollider`, `TileType`, `CollisionResult` (cluster 5, done).
 
 ## Legacy Code Map
 _(remove an entry once its class is migrated/deleted)_
@@ -31,7 +32,8 @@ _(remove an entry once its class is migrated/deleted)_
 - **GameMenu** — refactored: `checkMenuInput(InputBridge)` replaces raw KeyEvent checks.
 - **KeyboardInput** — DEAD (no longer referenced; delete with cluster 3 cleanup).
 - **Player** — uses `GameAction` fields instead of raw key codes; `checkPlayerInput(InputBridge)`.
-- **ColisionCalculator/ColisionPoint** — grid collision + reflection; hard-coded grid bound 24.
+- **ColisionCalculator/ColisionPoint** — SUPERSEDED by `spatial.UniformGridCollider`; still wired
+  into legacy `PlayingState`/`Player`. Delete when cluster 6 migrates discs onto `Entity`+collider.
 - **MapMatrix** — int[][] grid builder; allocates unused ColisionPoint.
 - **PointList/PointField/Round** — capture-point scoring + round timing; O(N²) scan in PointList.
 - **ColorScheme/PSConst/MenuEnum/RoundEnum** — palette holder; const enum (UNIT=36,TABLESIZE=25).
@@ -60,6 +62,12 @@ _(remove an entry once its class is migrated/deleted)_
   `ObjectPool<T>` (array-backed, `acquire()`/`release()`, no `new` in hot loop). `CombatSystem`
   implements `EntitySpawner`, spawns/retires discs from a pool using `DiscConfig`; `MovementSystem`
   dispatches per-entity strategies via index loop + `snapshot()`.
+- **`SpatialCollider` (cluster 5).** Broad-phase iface: `tileAt(x,y)` (OOB→WALL) + `resolve(Entity)
+  →CollisionResult`. `UniformGridCollider` is the default — O(1) tile lookup over `TileType[][]`
+  (`fromLegacyMatrix` adapts the int grid). On a wall/border hit it flips the entity's
+  `directionX/Y` in place + increments `bounces` (the reflection contract `BounceMovementStrategy`
+  expects); replaces legacy stateful `colisionType` hysteresis with stateless travel-direction
+  neighbour tests. `TileType` (EMPTY/WALL/CAPTURE_POINT/PLAYER_BASE) replaces magic ints 0/1/2/3.
 
 ## Open Decisions / Backlog
 - **Wire config into logic**: clusters 4-6 must read from `GameConfig` (grid 24/25,
@@ -67,14 +75,12 @@ _(remove an entry once its class is migrated/deleted)_
   fold panel layout offsets + arc angles into a render config when entities migrate.
 - **Font paths** (GameSettings ~110): Windows-absolute paths → classpath (image path already
   resolved via `ImageCache`).
-- **O(N²) collision** (PlayingState.updateGameLogic, PointList scan) → SpatialCollider (cluster 5).
+- **O(N²) collision**: wall-bounce now O(1) via `UniformGridCollider` (cluster 5 done). Remaining:
+  PointList capture-scan + wiring the collider into `PlayingState` replacing `ColisionCalculator` (cluster 6).
 - **Per-frame allocations in all Drawables** → pooling + cached Stroke/Transform (clusters 4-6).
 - **KeyboardInput** — DEAD, no longer wired; safe to delete.
 - **Render interpolation** — `FixedTimestep.alpha()` is plumbed to `Renderer.render(state, alpha)`
   but unused until entities carry prev/curr state (clusters 4-6).
-- **"Colision" misspelling** throughout legacy API — rename to "Collision" when migrating.
-- **Strategy-vs-ECS** for cluster 4: RESOLVED → Strategy-based composition (see contract above).
-- **Wire cluster-4 systems into the loop** (cluster 6): `PlayingState`/`Player` still use legacy
-  `Disc`/`ColisionCalculator`; migrate onto `Entity` + `ObjectPool` + `MovementSystem`/`CombatSystem`.
-- **`BounceMovementStrategy` reflection** relies on the collider flipping `directionX/Y`; cluster 5's
-  `SpatialCollider` must set those on the `Entity` (replacing legacy `ColisionPoint`).
+- **Wire cluster-4/5 into the loop** (cluster 6): `PlayingState`/`Player` still use legacy
+  `Disc`/misspelled `ColisionCalculator`; migrate onto `Entity` + `ObjectPool` +
+  `MovementSystem`/`CombatSystem` + `UniformGridCollider`, then delete the legacy "Colision*" classes.

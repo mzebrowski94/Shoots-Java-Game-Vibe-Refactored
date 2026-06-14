@@ -54,10 +54,10 @@
       zero `new` in hot paths) and wire it into constructor-injected systems
       (`MovementSystem`, `CombatSystem`).
 
-## [ ] 5. Spatial Partitioning & Physics Tests
-- [ ] Implement a `SpatialCollider` interface with a Uniform Grid (default) or
+## [x] 5. Spatial Partitioning & Physics Tests
+- [x] Implement a `SpatialCollider` interface with a Uniform Grid (default) or
       QuadTree implementation, replacing O(N²) collision checks.
-- [ ] JUnit 5 + AssertJ tests for disk-bounce reflection math and grid/collision
+- [x] JUnit 5 + AssertJ tests for disk-bounce reflection math and grid/collision
       queries, verifying deterministic results without a graphics context.
 
 ## [ ] 6. Migrate Player, Disks & Enemies
