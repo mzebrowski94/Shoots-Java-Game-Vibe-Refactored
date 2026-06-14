@@ -16,16 +16,16 @@
 - `...pool` — `ObjectPool<T>` (c4). `...system` — `MovementSystem`, `CombatSystem` (c4); `DiscSystem` (c6).
 - `...spatial` — `SpatialCollider`, `UniformGridCollider`, `TileType`, `CollisionResult` (c5); `MapGenerator` (c7).
 - `...score` — `CapturePoint`, `CaptureScoring`, `PlayerScore`, `MatchScorer` (c7).
-- `...world` — `PlayWorld` facade + `PlayInput` adapter (c8).
+- `...world` — `PlayWorld` facade + `PlayInput` adapter (c8); `MatchFlow` round/match scorer (c9).
 
 ## Legacy Code Map
 _(remove an entry once its class is migrated/deleted)_
-- **GameSettings** — GOD CLASS (config+state+players+rounds+fonts); still holds round flow used by PlayingState.
-- **GameFrame/GameCanvas/GameScreen/GameCounter/GamePointer/GameMenu** — AWT panels; still rendered (delete=c9).
-- **Player** — legacy stats/`Disc`/`PlayerLaser`/`PlayerCursor`; no longer drives sim (PlayWorld does); delete=c9.
-- **Disc/ColisionCalculator/ColisionPoint/MapMatrix/PointList/PointField** — SUPERSEDED; no live callers; delete=c9.
-- **PlayerLaser/PlayerCursor** — rotation paths dead (AimController/LaserPredictor); draw stubs remain; delete=c9.
-- **ColorScheme/PSConst/MenuEnum/RoundEnum** — palette/const. **KeyboardInput** — DEAD; delete=c9.
+- **GameSettings/Round** — GOD CLASS + round timing still used; win/score flow SUPERSEDED by `MatchFlow` (c9); delete=c11.
+- **GameFrame/GameCanvas/GameScreen/GameCounter/GamePointer/GameMenu** — AWT panels; still rendered; migrate=c10, delete=c11.
+- **Player** — legacy stats/`Disc`/`PlayerLaser`/`PlayerCursor`; no longer drives sim (PlayWorld does); delete=c11.
+- **Disc/ColisionCalculator/ColisionPoint/MapMatrix/PointList/PointField** — SUPERSEDED; no live callers; delete=c11.
+- **PlayerLaser/PlayerCursor** — rotation paths dead (AimController/LaserPredictor); draw stubs remain; delete=c11.
+- **ColorScheme/PSConst/MenuEnum/RoundEnum** — palette/const. **KeyboardInput** — DEAD; delete=c11.
 
 ## Established Contracts
 - **Config = immutable records, AWT-decoupled.** `GameConfig` aggregates `GridConfig`, `DiscConfig`,
@@ -49,19 +49,24 @@ _(remove an entry once its class is migrated/deleted)_
   `ownerId`) before the sink runs. `PlayInput` maps polled `GameAction`s → per-player intent (held=aim,
   just-pressed=shoot, left wins ties). `PlayingState.updateContinues` = `PlayInput.apply` + `world.step()`;
   round-begin calls `world.resetRound()`.
+- **Round/match scoring = `world.MatchFlow` (c9), wired.** Owns one `PlayerScore`/player + `MatchScorer`;
+  `PlayWorld.step()` syncs current points from `CaptureScoring`. `PlayingState` ENDS phase calls
+  `world.finishRound()` then `world.isMatchOver()`/`resolveMatchWinners()`; restart calls `world.resetMatch()`.
+  Replaces legacy `Round.checkRoundWinner`+`GameSettings.checkGameEnd` for all win decisions.
 
 ## Open Decisions / Backlog
-- **ENV (this session)**: the workspace mount silently truncates/corrupts in-place file writes and the
-  `target/` dir is lock-broken; verified via a clean copy in `/tmp/build` (`./mvnw test` = BUILD SUCCESS,
-  124 tests). Real-tree `./mvnw test` blocked only by the phantom `target/` (delete `target/` Windows-side).
-- **Render layer (c9/c10)**: `AwtRenderer`/`GameScreen` still draw legacy `Drawables` (alloc per draw) and
-  read legacy `Player`/`Round`; rewire them to read `PlayWorld` state, then delete legacy. `FixedTimestep.alpha()`
-  plumbed but unused until panels interpolate `Entity` prev/curr. Font paths in GameSettings still Windows-absolute.
+- **AUDIT (this session)**: refactor NOT complete — plan re-scoped. Logic is migrated+tested, but never
+  wired: (1) live render `AwtRenderer→GameScreen/GamePointer` still draws the LEGACY model every frame
+  (`Player.getPlayerDiscs/getPlayerLaser`, `PointList.getPointFields`, legacy `Player` points) while
+  `PlayingState` steps `PlayWorld` → rendered model is STALE (correctness gap, not dead code);
+  (2) `MatchScorer`/`PlayerScore` (c7, tested) never wired — round/win flow still uses legacy
+  `Round.checkRoundWinner`+`GameSettings.checkGameEnd`. Old c9 (pure delete) could not compile.
+  Re-scoped: **9 round/match-flow wiring [DONE, 133 tests] → 10 render migration → 11 deletion → 12 audio.**
+- **BUILD ENV**: `./mvnw` auto-detects the vendored offline toolchain in `tools/` (JDK 26 +
+  Maven 3.9 + pre-seeded `.m2`) and builds fully offline IN THE SANDBOX. Always run `./mvnw test`
+  from the project root to verify — do NOT assume it can't run. (System `java` is 11; ignore it.)
+- Carryover: `FixedTimestep.alpha()` plumbed but unused until panels interpolate `Entity` prev/curr.
+  Font paths in `GameSettings.initializeFont()` still Windows-absolute (externalize in c10/c12).
 
-## Legacy Logic Coverage Map (drives cluster 9 deletion)
-- Disc physics/bounce/aim/laser/fire -> DONE `world.PlayWorld`(+`Entity`/`DiscSystem`/`UniformGridCollider`/
-  `AimController`/`LaserPredictor`/`DiscAttackStrategy`), wired into `PlayingState` (c8); legacy delete = c9.
-- `MapMatrix` -> DONE `spatial.MapGenerator` (used by PlayWorld); legacy delete = c9.
-- `PointList`/`PointField` -> DONE `score.CaptureScoring`/`CapturePoint` (used by PlayWorld); delete = c9.
-- `Round`/`GameSettings` win logic -> DONE `score.MatchScorer`/`PlayerScore` (tested; wire into round flow + delete = c9).
-- Rendering (`GameScreen`/`Drawables`/panels) -> stays legacy AWT until c9/c10.
+## Legacy Logic Coverage Map (drives cluster 11 deletion)
+- Disc physics/bounce/aim/laser/fire -> DONE `world.PlayWorld`(+`Entity`/`DiscSystem

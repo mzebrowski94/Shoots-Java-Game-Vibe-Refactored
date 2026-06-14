@@ -52,6 +52,7 @@ public final class PlayWorld {
     private final CombatSystem combatSystem;
     private final DiscSystem discSystem;
     private final CaptureScoring scoring = new CaptureScoring();
+    private final MatchFlow matchFlow;
     private final LaserPredictor laserPredictor;
 
     private final ObjectPool<Entity> discPool;
@@ -117,6 +118,7 @@ public final class PlayWorld {
         this.discs = new ArrayList<>(discPool.capacity());
         this.combatSystem = new CombatSystem(discPool, config.disc());
         this.discSystem = new DiscSystem(collider, combatSystem);
+        this.matchFlow = new MatchFlow(playerCount, config.round());
         this.laserPredictor = new LaserPredictor(collider, new BounceMovementStrategy());
 
         this.aim = new AimController[playerCount];
@@ -146,9 +148,32 @@ public final class PlayWorld {
         }
     }
 
-    /** Advances all active discs by one fixed step (movement + collision + retire). */
+    /** Advances all active discs by one fixed step (movement + collision + retire), then refreshes scores. */
     public void step() {
         discSystem.update(discs, sink);
+        matchFlow.syncCurrentPoints(scoring);
+    }
+
+    /** Finalises the current round: banks points and awards the round winner(s). */
+    public void finishRound() {
+        matchFlow.syncCurrentPoints(scoring);
+        matchFlow.finishRound();
+    }
+
+    /** Whether the configured round limit has been reached. */
+    public boolean isMatchOver() {
+        return matchFlow.isMatchOver();
+    }
+
+    /** Resolves and flags the overall match winner(s); call once the match is over. */
+    public java.util.List<pl.mzebrows.shoots.score.PlayerScore> resolveMatchWinners() {
+        return matchFlow.resolveWinners();
+    }
+
+    /** Resets the entire match for a new game (zeroes every score tally and the round counter). */
+    public void resetMatch() {
+        matchFlow.resetMatch();
+        resetRound();
     }
 
     /** Fires one disc for {@code playerId} if under the per-player cap and the pool has room. */
@@ -183,11 +208,15 @@ public final class PlayWorld {
             }
         }
         scoring.resetAll();
+        matchFlow.resetRound();
     }
 
     // -- queries (read by the renderer) -------------------------------------
 
     public int playerCount() { return playerCount; }
+
+    /** Live round/match score driver, the queryable contract for the render layer. */
+    public MatchFlow matchFlow() { return matchFlow; }
 
     public TileType[][] tiles() { return tiles; }
 
@@ -213,7 +242,7 @@ public final class PlayWorld {
 
     // -- internals ----------------------------------------------------------
 
-    private void registerCapturePoints() {
+       private void registerCapturePoints() {
         for (int i = 0; i < tiles.length; i++) {
             for (int j = 0; j < tiles[i].length; j++) {
                 if (tiles[i][j] == TileType.CAPTURE_POINT) {

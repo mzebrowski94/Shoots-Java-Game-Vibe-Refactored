@@ -106,14 +106,39 @@
       legacy `Player`/`Disc`/`PlayerLaser`/`ColisionPoint` drive in `updateGameLogic` and the
       raw rotation/shoot input path; keep legacy render panels reading the new state.
 
-## [ ] 9. Legacy Deletion (remove superseded classes once nothing references them)
-> Pure removal pass: delete the legacy game-logic classes the cluster 4-8 model replaced, after
+## [x] 9. Round/Match Flow Wiring (drive round + win logic from the new scorer)
+> AUDIT FINDING (see STATE.md "Open Decisions"): cluster 9 was scoped as pure deletion, but the
+> render layer and the round/score-display flow still read the LEGACY model live, so the refactor
+> is not actually complete. `score.MatchScorer`/`PlayerScore` were built+tested in c7 but never
+> wired in — `PlayingState` still calls the legacy `Round.checkRoundWinner` + `GameSettings.checkGameEnd`
+> GOD-class path (with the off-by-one c7 fixed). This cluster wires the new scorer into the live round
+> flow so capture results, round winners, and match end come from `PlayWorld`/`MatchScorer`, not legacy.
+- [x] Wire `PlayingState` round/end/win flow onto `MatchScorer`/`PlayerScore` fed by
+      `PlayWorld.scoring()`: replace `settings.getActualRound().checkRoundWinner()` and
+      `settings.checkGameEnd()`/`getPlayer` with the tested c7 scorer (via `world.MatchFlow`);
+      expose per-player round + match totals as a queryable contract for the render layer.
+      JUnit tests for the wired flow. **[DONE — `world.MatchFlow`, 133 tests green.]**
+
+## [ ] 10. Render Migration (draw the live game from PlayWorld, not the legacy model)
+> AUDIT FINDING: `AwtRenderer → GameScreen/GamePointer` still render the LEGACY model every frame
+> (`Player.getPlayerDiscs()`/`getPlayerLaser()`, `PointList.getPointFields()`, legacy `Player` points),
+> while `PlayingState` steps `PlayWorld`. The rendered model is therefore stale — a correctness gap,
+> not just dead code. This cluster repoints rendering at the new model so deletion (c11) becomes a
+> pure no-op removal.
+- [ ] Migrate `GameScreen.drawRoundContinues` to render from `PlayWorld` (pooled discs, capture
+      points/`CaptureScoring`, predicted laser via `LaserPredictor`, blocks via `MapGenerator`/tiles)
+      with no per-frame allocations; drop the `LightEffect`/`ColisionPoint` coupling.
+- [ ] Migrate `GamePointer` (side score panel) + round timer to read the c9 scorer (`world.MatchFlow`) /
+      `PlayWorld` state instead of `GameSettings.getPointList()` and legacy `Player` points; keep the panel layout.
+
+## [ ] 11. Legacy Deletion (remove superseded classes once nothing references them)
+> Pure removal pass: delete the legacy game-logic classes the cluster 4-10 model replaced, after
 > confirming no production reference remains. No behavioural change.
 - [ ] Delete legacy `Disc`/`ColisionCalculator`/`ColisionPoint`/`MapMatrix`/`PointList`/
-      `PointField` + the now-dead `PlayerLaser`/`PlayerCursor` rotation paths, rewiring any
-      remaining `GameScreen`/`LightEffect` references onto the new model. Verify clean compile + tests.
+      `PointField`/`PlayerLaser`/`PlayerCursor` + dead `LightEffect`/`KeyboardInput`, and prune the
+      now-unused `GameSettings`/`Player`/`Round` legacy-model fields/getters. Verify clean compile + tests.
 
-## [ ] 10. Audio & Final Integration
+## [ ] 12. Audio & Final Integration
 - [ ] Implement `SoundManager` with a small `javax.sound.sampled` clip pool so
       overlapping SFX (shots, hits, explosions) don't cut each other off.
 - [ ] Final integration pass: wire remaining loose ends, delete dead legacy code,

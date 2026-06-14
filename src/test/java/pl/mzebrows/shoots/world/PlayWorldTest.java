@@ -153,4 +153,55 @@ class PlayWorldTest {
         assertThat(world.scoring().at(cpX, cpY).isCaptured()).isTrue();
         assertThat(world.scoring().at(cpX, cpY).getOwnerId()).isEqualTo(0);
     }
+
+    @Test
+    void stepSyncsRoundScoresFromCaptureState() {
+        var world = world(1);
+        // Drop a disc on a capture point so player 0 controls it, then step.
+        TileType[][] tiles = world.tiles();
+        int cpX = -1, cpY = -1;
+        for (int i = 0; i < tiles.length && cpX < 0; i++) {
+            for (int j = 0; j < tiles[i].length; j++) {
+                if (tiles[i][j] == TileType.CAPTURE_POINT) { cpX = i; cpY = j; break; }
+            }
+        }
+        world.fire(0);
+        var disc = world.discs().get(0);
+        disc.setX(cpX * 36 + 18.0);
+        disc.setY(cpY * 36 + 18.0);
+        disc.setAngle(0);
+        disc.setMoveSpeed(0);
+
+        world.step();
+
+        assertThat(world.matchFlow().scoreOf(0).getCurrentPoints())
+                .isEqualTo(world.scoring().pointsFor(0));
+    }
+
+    @Test
+    void finishRoundAndMatchOverDriveFromTheNewScorer() {
+        var world = world(2);
+        // roundLimit is 2 in the test config.
+        assertThat(world.isMatchOver()).isFalse();
+        world.finishRound();
+        assertThat(world.isMatchOver()).isFalse();
+        world.finishRound();
+        assertThat(world.isMatchOver()).isTrue();
+        // Winners resolvable without throwing; one of the two players is flagged or tie.
+        assertThat(world.resolveMatchWinners()).isNotEmpty();
+    }
+
+    @Test
+    void resetMatchClearsScoresAndRoundCounter() {
+        var world = world(2);
+        world.matchFlow().scoreOf(0).setCurrentPoints(4);
+        world.finishRound();
+        assertThat(world.matchFlow().roundsPlayed()).isEqualTo(1);
+
+        world.resetMatch();
+
+        assertThat(world.matchFlow().roundsPlayed()).isZero();
+        assertThat(world.matchFlow().scoreOf(0).getTotalPoints()).isZero();
+        assertThat(world.totalActiveDiscs()).isZero();
+    }
 }

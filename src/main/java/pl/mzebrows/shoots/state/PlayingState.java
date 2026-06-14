@@ -167,15 +167,16 @@ public final class PlayingState implements GameState {
         if (phaseJustEntered) {
             settings.setPlayerKeyboardAvailable(false);
             phaseJustEntered = false;
-            settings.getActualRound().savePlayerPoints();
-            settings.getActualRound().checkRoundWinner();
+            world.finishRound();
         }
         screen.tick();
         pointer.tick();
         if (animationsEnded()) {
             restartAnimations();
             requestNextPhase = false;
-            if (settings.checkGameEnd()) {
+            if (world.isMatchOver()) {
+                world.resolveMatchWinners();
+                settings.setGameEnd(true);
                 return gameOverState;
             }
             phase = Phase.BEGIN;
@@ -217,6 +218,7 @@ public final class PlayingState implements GameState {
 
     private void doRestartGame() {
         settings.restartGame();
+        world.resetMatch();
         pointer.restartGamePointer();
         counter.restartAnimationTime();
         settings.startNewRound(screen);

@@ -7,6 +7,26 @@
 > **mount** (path under `/sessions/<id>/mnt/...`). That mount is reliable for reading
 > and for creating *new* files, but unreliable for two operations.
 
+## Build toolchain: USE `./mvnw`, do NOT trust the system JDK
+
+**Before concluding "the build can't run here", check `tools/`.** This repo ships a
+vendored, offline build toolchain and `./mvnw` auto-detects it:
+
+```
+tools/jdk-26.0.1/            # full JDK (bin/javac) — the project needs release 25+
+tools/apache-maven-3.9.16/   # Apache Maven
+tools/.m2/repository/        # pre-seeded local repo (all deps + plugins, offline)
+```
+
+- The **system** `java`/`javac` on PATH is JDK 11 and there is **no system `mvn`** —
+  ignore both. `./mvnw` picks up the vendored JDK 26 + Maven and builds **fully
+  offline** (Maven Central is firewalled by the sandbox allowlist; the seeded `.m2`
+  is why offline works). Network fetches WILL fail — never `curl`/`wget` deps.
+- So the correct verification is always: `cd <project root> && ./mvnw test`
+  (run from the dir containing `mvnw`). It compiles `release 25` fine via the vendor JDK.
+- Past mistake to avoid: running `java -version`, seeing 11, and reporting that the
+  project (release 25) cannot be built. WRONG — that ignores `tools/`. Always test via `./mvnw`.
+
 ## The two mount failure modes
 
 1. **In-place writes can silently truncate or inject NUL bytes.** Rewriting a file
