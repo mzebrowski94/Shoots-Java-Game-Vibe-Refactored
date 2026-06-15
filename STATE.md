@@ -71,7 +71,7 @@
 - **NOW: c12 Playtest Bug Fixing** — user playtests + reports bugs; legacy KEPT as reference (see Legacy
   Code Map), deleted in c13. Audio -> `NewFeatures.md` (cluster A). 153 tests green. Fixes logged in
   `RefactorPlan.md` c12: disc-retire crash, 45-deg corner penetration, capture +1/hit & disc-consume, tug-of-war erode-before-steal,
-  player-base render + placement (1 tile from border) + spawn-alignment + world rebuilt from menu player count (P3/P4); tunables `disc.maxBounces`/`disc.maxPerPlayer`/`laser.maxBounces`; block-hit flash (`onWallHit`->`BlockHitEffect`, legacy `LightEffect` port).
+  player-base render + placement (1 tile from border) + spawn-alignment + world rebuilt from menu player count (P3/P4); tunables `disc.maxBounces`/`disc.maxPerPlayer`/`laser.maxBounces`; block-hit flash (`onWallHit`->`BlockHitEffect`, legacy `LightEffect` port); menu background per-state (translucent over frozen game on pause/win, opaque clear only on fresh start), menu text legibility (backdrop panel + per-glyph drop shadow + selection bar; panel centred on the menu block + scoreboard columns distributed to fit 4 players, colours unchanged; `ColorScheme`/`GameSettings` now Lombok (immutable @Getter for palette; @Getter/@Setter + @Slf4j for settings)), window fit+centre to usable screen, and per-frame BufferStrategy re-acquire so moving the window no longer freezes rendering.
 - **BUILD ENV**: `./mvnw` auto-detects the vendored offline toolchain in `tools/` (JDK 26 +
   Maven 3.9 + pre-seeded `.m2`) and builds fully offline IN THE SANDBOX. Always run `./mvnw test`
   from the project root to verify — do NOT assume it can't run. (System `java` is 11; ignore it.)

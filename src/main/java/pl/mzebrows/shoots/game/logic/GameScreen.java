@@ -70,30 +70,58 @@ public class GameScreen extends GameCanvas {
 
     @Override
     public void drawUpdate(RoundEnum roundState) {
-        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-
-        if (roundState == RoundEnum.ROUND_PAUSED) {
-            drawRoundPaused();
-            menuLayout.drawMenu(g2d, world);
-        } else {
-            drawRoundContinues();
-            if (roundState == RoundEnum.ROUND_BEGIN) {
-                drawRoundBegining();
-            } else if (roundState == RoundEnum.ROUND_ENDS) {
-                drawRoundEnding();
-            }
+        // Active rendering: re-acquire the draw graphics every frame and repeat while the BufferStrategy
+        // reports lost/restored contents. Caching one Graphics at init breaks when the window is moved or
+        // its surface is recreated -- the cached context goes stale and the game appears frozen.
+        if (strategy == null) {
+            return;
         }
-        strategy.show();
+        do {
+            do {
+                g2d = (Graphics2D) strategy.getDrawGraphics();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                        RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+
+                if (roundState == RoundEnum.ROUND_PAUSED) {
+                    drawRoundPaused();
+                    menuLayout.drawMenu(g2d, world);
+                } else {
+                    drawRoundContinues();
+                    if (roundState == RoundEnum.ROUND_BEGIN) {
+                        drawRoundBegining();
+                    } else if (roundState == RoundEnum.ROUND_ENDS) {
+                        drawRoundEnding();
+                    }
+                }
+                g2d.dispose();
+            } while (strategy.contentsRestored());
+            strategy.show();
+        } while (strategy.contentsLost());
     }
 
     @Override
     public void drawRoundPaused() {
+        // The menu-standard tint is near-transparent (alpha 10): it is meant to sit OVER a frozen game
+        // frame so the field shows through (pause / win-score screens). With per-frame buffer re-acquire
+        // the back buffer is not guaranteed to hold the last frame, so when a game exists we redraw the
+        // frozen field and overlay the tint (the nicer translucent look). On a fresh start (no round yet)
+        // there is nothing behind the menu, so we clear to an opaque background instead.
+        if (hasGameBehindMenu()) {
+            drawRoundContinues();
+        } else {
+            g2d.setColor(gS.getColorScheme().getBackgroudColor());
+            g2d.fillRect(0, 0, width, hight);
+        }
         g2d.setColor(gS.getColorScheme().getMenuStandardColor());
         g2d.fillRect(0, 0, width, hight);
         g2d.setColor(gS.getColorScheme().getDeadLineColor());
         g2d.setFont(textFont);
+    }
+
+    /** True when a game frame should show through the translucent menu (pause mid-game or win screen). */
+    private boolean hasGameBehindMenu() {
+        return world != null && (gS.getActualRoundNumber() > 0 || gS.isGameEnd());
     }
 
     @Override

@@ -78,15 +78,26 @@ public class GameCounter extends GameCanvas {
 
     @Override
     public void drawUpdate(RoundEnum roundState) {
-        this.actualRoundState = roundState;
-        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-        if (roundState == RoundEnum.ROUND_PAUSED) {
-            drawRoundPaused();
-        } else {
-            drawRoundContinues();
+        // Active rendering: re-acquire graphics each frame and repeat on lost/restored contents so a
+        // window move (which can recreate the surface) does not leave us drawing into a stale context.
+        if (strategy == null) {
+            return;
         }
-        strategy.show();
+        this.actualRoundState = roundState;
+        do {
+            do {
+                g2d = (Graphics2D) strategy.getDrawGraphics();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                if (roundState == RoundEnum.ROUND_PAUSED) {
+                    drawRoundPaused();
+                } else {
+                    drawRoundContinues();
+                }
+                g2d.dispose();
+            } while (strategy.contentsRestored());
+            strategy.show();
+        } while (strategy.contentsLost());
     }
 
     /**
@@ -185,12 +196,24 @@ public class GameCounter extends GameCanvas {
 
     @Override
     public void drawRoundPaused() {
+        // During pause / win (a round has been played) redraw the normal counter so it shows faintly
+        // through the near-transparent menu tint, matching the play-screen translucent look. On a fresh
+        // start there is no game behind the menu, so clear to an opaque background instead.
+        if (gS.getActualRoundNumber() > 0 || gS.isGameEnd()) {
+            drawRoundContinues();
+        } else {
+            g2d.setColor(gS.getColorScheme().getBackgroudColor());
+            g2d.fillRect(0, 0, gS.getDEFAULT_COUNTER_WIDTH(), gS.getDEFAULT_COUNTER_HIGHT());
+        }
         g2d.setColor(gS.getColorScheme().getMenuStandardColor());
         g2d.fillRect(0, 0, gS.getDEFAULT_COUNTER_WIDTH(), gS.getDEFAULT_COUNTER_HIGHT());
     }
 
     @Override
     public void drawRoundContinues() {
+        // Re-apply the title font every frame: graphics are now re-acquired per frame, so a font set only
+        // at init would be lost and the title would fall back to the default AWT font.
+        g2d.setFont(new Font(gS.getGameFont().getFontName(), 100, 25));
         g2d.setColor(gS.getColorScheme().getBackgroudColor());
         g2d.fillRect(0, 0, gS.getDEFAULT_COUNTER_WIDTH(), gS.getDEFAULT_COUNTER_HIGHT());
 

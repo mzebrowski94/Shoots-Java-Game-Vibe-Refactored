@@ -7,8 +7,8 @@ import pl.mzebrows.shoots.input.InputBridge;
 
 import java.awt.Color;
 import java.awt.Font;
+import java.awt.FontMetrics;
 import java.awt.Graphics2D;
-import java.awt.Rectangle;
 
 /**
  * Klasa odpowiadając za interfejs menu gry, zmienę ustawień menu, obsługę
@@ -23,9 +23,7 @@ public class GameMenu {
     int textPostion;
     int nextLine;
     int menuHight;
-    int playerTextPosition = 175;
     int menuScoreHigh;
-    Rectangle menuRect;
     MenuEnum menuOption;
     GameSettings gS;
     Font menuFont;
@@ -74,26 +72,130 @@ public class GameMenu {
     public void drawMenu(Graphics2D g2d, PlayWorld world) {
         g2d.setFont(menuFont);
 
-        g2d.setColor(gS.getColorScheme().getDeadLineColor());
-        g2d.drawString(stringNewGame, textPostion, menuHight + 3 * nextLine);
-        g2d.drawString(stringPlayerNumberText, textPostion, menuHight + 4 * nextLine);
-        g2d.drawString(stringPlayerNumber, textPostion, menuHight + 5 * nextLine);
-        g2d.drawString(stringRoundLimitText, textPostion, menuHight + 6 * nextLine);
-        g2d.drawString(stringRoundNumber, textPostion, menuHight + 7 * nextLine);
-        g2d.drawString(stringRoundTimeText, textPostion, menuHight + 8 * nextLine);
-        g2d.drawString(stringRoundTime, textPostion, menuHight + 9 * nextLine);
-        g2d.drawString(stringQuit, textPostion, menuHight + 12 * nextLine);
+        // UX: anchor the menu on a dark rounded backdrop so the purple/green text keeps consistent
+        // contrast regardless of the (now more opaque) game frame behind it.
+        drawMenuBackdrop(g2d);
+
+        // Subtle highlight bar behind the currently selected row, for clear focus.
+        drawSelectionHighlight(g2d);
+
+        Color purple = gS.getColorScheme().getDeadLineColor();
+        shadowString(g2d, stringNewGame, textPostion, menuHight + 3 * nextLine, purple);
+        shadowString(g2d, stringPlayerNumberText, textPostion, menuHight + 4 * nextLine, purple);
+        shadowString(g2d, stringPlayerNumber, textPostion, menuHight + 5 * nextLine, purple);
+        shadowString(g2d, stringRoundLimitText, textPostion, menuHight + 6 * nextLine, purple);
+        shadowString(g2d, stringRoundNumber, textPostion, menuHight + 7 * nextLine, purple);
+        shadowString(g2d, stringRoundTimeText, textPostion, menuHight + 8 * nextLine, purple);
+        shadowString(g2d, stringRoundTime, textPostion, menuHight + 9 * nextLine, purple);
+        shadowString(g2d, stringQuit, textPostion, menuHight + 12 * nextLine, purple);
 
         if (gS.getActualRoundNumber() == 0) {
-            g2d.setColor(gS.getColorScheme().getBackgroundFontColor());
-            g2d.drawString(stringContinue, textPostion, menuHight);
+            shadowString(g2d, stringContinue, textPostion, menuHight, gS.getColorScheme().getBackgroundFontColor());
         } else if (gS.isGameEnd()) {
             drawGameEnd(g2d, world);
         } else {
-            g2d.drawString(stringContinue, textPostion, menuHight);
+            shadowString(g2d, stringContinue, textPostion, menuHight, purple);
         }
 
         drawChoosenMenuOption(g2d);
+    }
+
+    /** Horizontal padding between the menu panel edge and its content. */
+    private static final int PANEL_PAD_X = 28;
+    /** Minimum gap kept between the panel and the window edges. */
+    private static final int PANEL_SCREEN_MARGIN = 16;
+
+    /** Max players the scoreboard ever shows; the game-end panel is always sized for this many columns. */
+    private static final int MAX_PLAYERS = 4;
+    /** Width reserved for the "Rounds:/Points:" row labels at the left of the scoreboard. */
+    private static final int SCORE_LABEL_WIDTH = 150;
+
+    /** Widest menu row (measured) plus padding on both sides -- the base panel width. */
+    private int menuRowsWidth(Graphics2D g2d) {
+        FontMetrics fm = g2d.getFontMetrics(menuFont);
+        int widest = 0;
+        for (String row : new String[]{stringContinue, stringNewGame, stringPlayerNumberText,
+                stringRoundLimitText, stringRoundTimeText, stringQuit, "       WINNER(s) !     "}) {
+            widest = Math.max(widest, fm.stringWidth(row));
+        }
+        return widest + 2 * PANEL_PAD_X;
+    }
+
+    /**
+     * Panel width. On the game-end screen it is widened to hold the label column plus all
+     * {@value #MAX_PLAYERS} score columns; otherwise it is just the widest menu row. Always clamped to
+     * fit on-screen.
+     */
+    private int panelWidth(Graphics2D g2d) {
+        int w = menuRowsWidth(g2d);
+        if (gS.isGameEnd()) {
+            FontMetrics fm = g2d.getFontMetrics(menuFont);
+            int scoreboard = SCORE_LABEL_WIDTH + MAX_PLAYERS * (fm.stringWidth("00") + 44)
+                    + 2 * PANEL_PAD_X;
+            w = Math.max(w, scoreboard);
+        }
+        return Math.min(w, width - 2 * PANEL_SCREEN_MARGIN);
+    }
+
+    /** Left edge of the menu panel: centred on the (left-aligned) menu text block, clamped on-screen. */
+    private int panelLeft(Graphics2D g2d) {
+        FontMetrics fm = g2d.getFontMetrics(menuFont);
+        int menuCentre = textPostion + fm.stringWidth(stringNewGame) / 2;
+        int w = panelWidth(g2d);
+        int x = menuCentre - w / 2;
+        int maxX = width - PANEL_SCREEN_MARGIN - w;
+        return Math.max(PANEL_SCREEN_MARGIN, Math.min(x, maxX));
+    }
+
+    /** Dark, slightly transparent rounded panel behind the menu items to lift text contrast. */
+    private void drawMenuBackdrop(Graphics2D g2d) {
+        int pad = 24;
+        int top = menuHight - 3 * nextLine;            // above the WINNER/CONTINUE line
+        int bottom = menuHight + 12 * nextLine + pad;  // below QUIT
+        int x = panelLeft(g2d);
+        int w = panelWidth(g2d);
+        int h = bottom - top;
+        g2d.setColor(new Color(15, 15, 20, 150));
+        g2d.fillRoundRect(x, top, w, h, 28, 28);
+        g2d.setColor(new Color(0, 0, 0, 90));
+        g2d.drawRoundRect(x, top, w, h, 28, 28);
+    }
+
+    /** Draws a soft drop shadow then the coloured text; never changes the requested text colour. */
+    private void shadowString(Graphics2D g2d, String text, int x, int y, Color color) {
+        g2d.setColor(new Color(0, 0, 0, 160));
+        g2d.drawString(text, x + 2, y + 2);
+        g2d.setColor(color);
+        g2d.drawString(text, x, y);
+    }
+
+    /** Soft filled bar behind the selected row so the green/yellow choice reads as focused. */
+    private void drawSelectionHighlight(Graphics2D g2d) {
+        int row = selectedRow();
+        if (row < 0) {
+            return;
+        }
+        FontMetrics fm = g2d.getFontMetrics(menuFont);
+        int y = menuHight + row * nextLine;
+        int barX = panelLeft(g2d) + 10;
+        int barW = panelWidth(g2d) - 20;
+        int barY = y - fm.getAscent();
+        int barH = fm.getHeight() + 6;
+        g2d.setColor(new Color(255, 255, 255, 28));
+        g2d.fillRoundRect(barX, barY, barW, barH, 14, 14);
+    }
+
+    /** Row index (in nextLine units from menuHight) of the selected option, or -1 if none. */
+    private int selectedRow() {
+        return switch (menuOption) {
+            case CONTINUE -> 0;
+            case START_NEW_GAME -> 3;
+            case PLAYER_NUMBER_OPTION -> 5;
+            case ROUND_NUMBER_OPTION -> 7;
+            case ROUND_TIME_OPTION -> 9;
+            case QUIT -> 12;
+            default -> -1;
+        };
     }
 
     /**
@@ -103,48 +205,59 @@ public class GameMenu {
      * elementy na ekranie gry menu
      */
     public void drawGameEnd(Graphics2D g2d, PlayWorld world) {
-        g2d.drawString("Rounds: ", playerTextPosition - 150, menuScoreHigh + 50);
-        g2d.drawString("Points: ", playerTextPosition - 150, menuScoreHigh + 100);
+        // Lay the scoreboard out INSIDE the centred panel: the row labels sit at the panel\'s left padding
+        // and the player columns are distributed evenly across the remaining width, so every column
+        // (including P4) stays within the backdrop regardless of player count.
+        int panelX = panelLeft(g2d);
+        int panelW = panelWidth(g2d);
+        int labelX = panelX + PANEL_PAD_X;
+        int colsLeft = labelX + SCORE_LABEL_WIDTH;
+        int colsRight = panelX + panelW - PANEL_PAD_X;
+
+        Color labelColor = gS.getColorScheme().getBackgroundFontColor();
+        shadowString(g2d, "Rounds: ", labelX, menuScoreHigh + 50, labelColor);
+        shadowString(g2d, "Points: ", labelX, menuScoreHigh + 100, labelColor);
 
         if (world == null) {
             return;
         }
-        for (int i = 0; i < world.playerCount(); i++) {
-            var score = world.matchFlow().scoreOf(i);
 
-            if (textBrighter) {
-                winTextColor = new Color(iterator / 2, 2 * iterator, iterator / 2);
-
-                iterator++;
-                if (iterator == 100) {
-                    textBrighter = false;
-                    //winTextColor = new Color(iterator, iterator, iterator);
-                }
-            } else {
-                winTextColor = new Color(iterator / 2, 2 * iterator, iterator / 2);
-
-                iterator--;
-                if (iterator == 50) {
-                    textBrighter = true;
-                    // winTextColor = gS.getColorScheme().getBackgroundFontColor();
-                    //winTextColor = new Color(iterator, iterator, iterator);
-                }
+        // Advance the WINNER pulse once per frame (not once per player).
+        if (textBrighter) {
+            winTextColor = new Color(iterator / 2, 2 * iterator, iterator / 2);
+            iterator++;
+            if (iterator == 100) {
+                textBrighter = false;
             }
-
-            g2d.setColor(winTextColor);
-            g2d.drawString("       WINNER(s) !     ", textPostion, menuHight - 2 * nextLine);
-
-            if (score.isWinner()) {
-                g2d.setColor(winTextColor);
-            } else {
-                g2d.setColor(gS.getColorScheme().getDeadLineColor());
+        } else {
+            winTextColor = new Color(iterator / 2, 2 * iterator, iterator / 2);
+            iterator--;
+            if (iterator == 50) {
+                textBrighter = true;
             }
-
-            g2d.drawString("P" + (i + 1), playerTextPosition + 200 * i, menuScoreHigh);
-            g2d.drawString("" + score.getRoundsWon(), playerTextPosition + 200 * i, menuScoreHigh + 50);
-            g2d.drawString("" + score.getTotalPoints(), playerTextPosition + 200 * i, menuScoreHigh + 100);
-
         }
+        // Animated green "WINNER" colour preserved; shadow added for legibility; centred over the panel.
+        FontMetrics fm = g2d.getFontMetrics(menuFont);
+        String winner = "WINNER(s) !";
+        int winnerX = panelX + (panelW - fm.stringWidth(winner)) / 2;
+        shadowString(g2d, winner, winnerX, menuHight - 2 * nextLine, winTextColor);
+
+        // Distribute up to MAX_PLAYERS columns evenly across [colsLeft, colsRight]; draw only active ones.
+        int players = world.playerCount();
+        int slotWidth = (colsRight - colsLeft) / MAX_PLAYERS;
+        for (int i = 0; i < players; i++) {
+            var score = world.matchFlow().scoreOf(i);
+            int colCentre = colsLeft + slotWidth * i + slotWidth / 2;
+            Color scoreColor = score.isWinner() ? winTextColor : gS.getColorScheme().getDeadLineColor();
+            drawScoreCell(g2d, "P" + (i + 1), colCentre, menuScoreHigh, scoreColor, fm);
+            drawScoreCell(g2d, "" + score.getRoundsWon(), colCentre, menuScoreHigh + 50, scoreColor, fm);
+            drawScoreCell(g2d, "" + score.getTotalPoints(), colCentre, menuScoreHigh + 100, scoreColor, fm);
+        }
+    }
+
+    /** Draws a scoreboard cell centred horizontally on {@code centreX}. */
+    private void drawScoreCell(Graphics2D g2d, String text, int centreX, int y, Color color, FontMetrics fm) {
+        shadowString(g2d, text, centreX - fm.stringWidth(text) / 2, y, color);
     }
 
     /**
@@ -277,23 +390,19 @@ public class GameMenu {
      * elementy na ekranie gry
      */
     public void drawChoosenMenuOption(Graphics2D g2d) {
-
-        g2d.setColor(Color.green);
+        // Keep the same green/yellow selection colours; only add the shared drop shadow for legibility.
         if (menuOption == MenuEnum.CONTINUE) {
-            g2d.drawString(stringContinue, textPostion, menuHight);
+            shadowString(g2d, stringContinue, textPostion, menuHight, Color.green);
         } else if (menuOption == MenuEnum.START_NEW_GAME) {
-            g2d.drawString(stringNewGame, textPostion, menuHight + 3 * nextLine);
+            shadowString(g2d, stringNewGame, textPostion, menuHight + 3 * nextLine, Color.green);
         } else if (menuOption == MenuEnum.PLAYER_NUMBER_OPTION) {
-            g2d.setColor(Color.yellow);
-            g2d.drawString(stringPlayerNumber, textPostion, menuHight + 5 * nextLine);
+            shadowString(g2d, stringPlayerNumber, textPostion, menuHight + 5 * nextLine, Color.yellow);
         } else if (menuOption == MenuEnum.ROUND_NUMBER_OPTION) {
-            g2d.setColor(Color.yellow);
-            g2d.drawString(stringRoundNumber, textPostion, menuHight + 7 * nextLine);
+            shadowString(g2d, stringRoundNumber, textPostion, menuHight + 7 * nextLine, Color.yellow);
         } else if (menuOption == MenuEnum.ROUND_TIME_OPTION) {
-            g2d.setColor(Color.yellow);
-            g2d.drawString(stringRoundTime, textPostion, menuHight + 9 * nextLine);
+            shadowString(g2d, stringRoundTime, textPostion, menuHight + 9 * nextLine, Color.yellow);
         } else if (menuOption == MenuEnum.QUIT) {
-            g2d.drawString(stringQuit, textPostion, menuHight + 12 * nextLine);
+            shadowString(g2d, stringQuit, textPostion, menuHight + 12 * nextLine, Color.green);
         }
     }
 }

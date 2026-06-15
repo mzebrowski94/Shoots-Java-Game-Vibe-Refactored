@@ -140,25 +140,34 @@ public class GamePointer extends GameCanvas {
 
     @Override
     public void drawUpdate(RoundEnum roundState) {
-        Graphics2D g2d = (Graphics2D) graphics;
-        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-        if (roundState == RoundEnum.ROUND_PAUSED) {
-            drawRoundPaused();
-        } else {
-            g2d.setColor(gS.getColorScheme().getBackgroudColor());
-            g2d.fillRect(0, 0, gS.getDEFAULT_POINTER_WIGHT(), gS.getDEFAULT_POINTER_HIGHT());
-            drawBorder(g2d);
-            drawRoundCounter(g2d);
-            if (world != null) {
-                drawPlayerStats(g2d, roundState);
-                drawRoundCounterBlocks(g2d, roundState);
-            }
-            drawAuthor(g2d);
+        // Active rendering: re-acquire graphics each frame and repeat on lost/restored contents. The
+        // helper draw methods read the FIELD g2d, so we refresh the field here (no local shadow) -- this
+        // is what keeps a window move from leaving the panel drawing into a stale, frozen context.
+        if (strategy == null) {
+            return;
         }
+        do {
+            do {
+                g2d = (Graphics2D) strategy.getDrawGraphics();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        strategy.show();
-
+                if (roundState == RoundEnum.ROUND_PAUSED) {
+                    drawRoundPaused();
+                } else {
+                    g2d.setColor(gS.getColorScheme().getBackgroudColor());
+                    g2d.fillRect(0, 0, gS.getDEFAULT_POINTER_WIGHT(), gS.getDEFAULT_POINTER_HIGHT());
+                    drawBorder(g2d);
+                    drawRoundCounter(g2d);
+                    if (world != null) {
+                        drawPlayerStats(g2d, roundState);
+                        drawRoundCounterBlocks(g2d, roundState);
+                    }
+                    drawAuthor(g2d);
+                }
+                g2d.dispose();
+            } while (strategy.contentsRestored());
+            strategy.show();
+        } while (strategy.contentsLost());
     }
 
     /**
@@ -289,6 +298,21 @@ public class GamePointer extends GameCanvas {
 
     @Override
     public void drawRoundPaused() {
+        // During pause / win (a round has been played, world present) redraw the normal stats panel so it
+        // shows faintly through the near-transparent menu tint, matching the play-screen translucent look.
+        // On a fresh start there is no game behind the menu, so clear to an opaque background instead.
+        if (world != null && (gS.getActualRoundNumber() > 0 || gS.isGameEnd())) {
+            g2d.setColor(gS.getColorScheme().getBackgroudColor());
+            g2d.fillRect(0, 0, gS.getDEFAULT_POINTER_WIGHT(), gS.getDEFAULT_POINTER_HIGHT());
+            drawBorder(g2d);
+            drawRoundCounter(g2d);
+            drawPlayerStats(g2d, RoundEnum.ROUND_PAUSED);
+            drawRoundCounterBlocks(g2d, RoundEnum.ROUND_PAUSED);
+            drawAuthor(g2d);
+        } else {
+            g2d.setColor(gS.getColorScheme().getBackgroudColor());
+            g2d.fillRect(0, 0, gS.getDEFAULT_POINTER_WIGHT(), gS.getDEFAULT_POINTER_HIGHT());
+        }
         g2d.setColor(gS.getColorScheme().getMenuStandardColor());
         g2d.fillRect(0, 0, gS.getDEFAULT_POINTER_WIGHT(), gS.getDEFAULT_POINTER_HIGHT());
     }
