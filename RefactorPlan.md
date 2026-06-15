@@ -131,15 +131,38 @@
 - [x] Migrate `GamePointer` (side score panel) + round timer to read the c9 scorer (`world.MatchFlow`) /
       `PlayWorld` state instead of `GameSettings.getPointList()` and legacy `Player` points; keep the panel layout.
 
-## [ ] 11. Legacy Deletion (remove superseded classes once nothing references them)
-> Pure removal pass: delete the legacy game-logic classes the cluster 4-10 model replaced, after
-> confirming no production reference remains. No behavioural change.
-- [ ] Delete legacy `Disc`/`ColisionCalculator`/`ColisionPoint`/`MapMatrix`/`PointList`/
-      `PointField`/`PlayerLaser`/`PlayerCursor` + dead `LightEffect`/`KeyboardInput`, and prune the
-      now-unused `GameSettings`/`Player`/`Round` legacy-model fields/getters. Verify clean compile + tests.
+## [x] 11. Legacy Model Decommission (sever the live game from legacy Player/Round/GameSettings state)
+> AUDIT FINDING: the c4-10 model fully drives the live sim + render, but the legacy `Player`/`Round`/
+> `GameSettings` objects are still constructed and partially read: `GamePointer`/`GameScreen` keep a
+> `world==null` legacy fallback, `GameSettings.checkPlayerInput`/`startNewRound` still call
+> `Player.checkPlayerInput`/`resetPlayerCursor`, and `Round.savePlayerPoints`/`getPointList` linger.
+> Deleting the Drawable/physics legacy (c12) requires gutting `Player` (it builds Disc/PlayerLaser/
+> PlayerCursor/PlayerBase/ColisionPoint), so that decoupling is split out here as its own verifiable step.
+- [x] Remove the legacy `world==null` fallbacks in `GamePointer`/`GameScreen` so the panels read
+      `PlayWorld`/`MatchFlow` unconditionally (panels source player count/colour/name/points from the
+      new model; pass the world into the panels even while paused, or guard draw when absent).
+- [x] Strip the legacy drive from `GameSettings`/`Round`: drop `checkPlayerInput`→`Player`, the
+      `MapMatrix`/`ColisionCalculator`/`PointList` ownership + `startNewRound` legacy reinit, and
+      `Round.savePlayerPoints`/`checkRoundWinner`/`getPointList`; keep only round-number/timing state
+      the panels still need. JUnit-cover any nontrivial logic that moves.
 
-## [ ] 12. Audio & Final Integration
-- [ ] Implement `SoundManager` with a small `javax.sound.sampled` clip pool so
-      overlapping SFX (shots, hits, explosions) don't cut each other off.
-- [ ] Final integration pass: wire remaining loose ends, delete dead legacy code,
-      run `./mvnw clean test` end-to-end.
+## [ ] 12. Playtest Bug Fixing (fix gameplay bugs found while playing the migrated game)
+> The migrated model now drives the live game, but manual playtesting surfaced gameplay bugs.
+> Old legacy classes are intentionally KEPT (reverted from stubs) during this cluster so we can
+> compare behaviour against the original implementation while diagnosing. Each reported bug becomes
+> a sub-item below with a short repro + root cause + fix; add a regression test where practical.
+> Do NOT delete legacy classes until this cluster is complete (deletion is the next cluster).
+- [ ] (bugs will be appended here as the user reports them during playtesting)
+
+## [ ] 13. Legacy Deletion (remove superseded classes once nothing references them)
+> Deferred until after playtest bug fixing (c12) so legacy code stays available as a behavioural
+> reference while diagnosing gameplay bugs. Pure removal pass; no behavioural change.
+- [ ] **Migration gate (do FIRST):** re-verify every legacy `game.logic` responsibility is fully
+      migrated to the new model and that NO production/test code references a deletion target except
+      the targets themselves. If anything is still wired in, STOP — add a cluster (or sub-items) to
+      finish that migration and do it before any deletion. Record the check result in `STATE.md`.
+- [ ] Delete the now-unreferenced legacy classes (`Disc`/`ColisionCalculator`/`ColisionPoint`/
+      `MapMatrix`/`PointList`/`PointField`/`PlayerLaser`/`PlayerCursor`/`LightEffect`/`KeyboardInput`,
+      `Drawable`/`DrawableEffect`/`Block`/`PlayerBase` if dead, `Player`) + any residual dead
+      fields/getters on `Round`/`GameSettings`. Verify clean compile + tests; no behavioural change.
+- [ ] Final integration pass: wire remaining loose ends, run `./mvnw clean test` end-to-end.

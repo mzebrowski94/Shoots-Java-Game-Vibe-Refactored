@@ -4,11 +4,10 @@ package pl.mzebrows.shoots.game.logic;
 import java.util.ArrayList;
 
 /**
- * Klasa zawierająca informację na temat odbytej bądź odbywanej aktualnie rundy.
- * Zawiera informacje takie jak, numer rundy, ilośc zdobytych podczas niej
- * punktów
- *
- * @author Mateusz Żebrowski, Nr albumu: 95281
+ * Lightweight per-round timing state read by {@code PlayingState} and the panels: the round number,
+ * elapsed round time, and end-of-round delay bookkeeping. Scoring and win resolution now live in the
+ * {@code score}/{@code world} model ({@code MatchFlow}/{@code MatchScorer}); this class no longer
+ * owns points or capture state.
  */
 public class Round {
 
@@ -17,33 +16,26 @@ public class Round {
     int roundTime;
     boolean roundEnd;
 
-    /**
-     * Zmienna przechowująca informację o tym ile dodatkowego czasu trwa runda
-     */
+    /** Extra time the round runs past its limit while in-flight discs settle. */
     public int roundEndTimeDelay;
     boolean animationEnded;
     GameSettings gS;
-    PointList pointList;
 
     /**
-     * Konstruktor obiektu Round
-     *
-     * @param gameSettings argument przyjmujący ustawienia gry
-     * @param roundNumber argument przyjmujący numer tworzonej rundy
+     * @param gameSettings shared settings (round duration)
+     * @param roundNumber  this round's 1-based index
      */
     public Round(GameSettings gameSettings, int roundNumber) {
         gS = gameSettings;
+        this.roundNumber = roundNumber;
         this.roundEnd = false;
         this.roundEndTimeDelay = 0;
         this.animationEnded = false;
         this.roundTime = 0;
         playerPointsList = new ArrayList<>();
-        pointList = new PointList(gS);
     }
 
-    /**
-     * Metoda odmierzająca czas trwania rundy
-     */
+    /** Advances the round clock; flags the round as ended once it reaches the configured duration. */
     public void roundTick() {
         roundTime++;
         if (roundTime >= gS.getRoundTime()) {
@@ -51,58 +43,22 @@ public class Round {
         }
     }
 
-    /**
-     * Metoda odpowiedzialna, za zapisanie punktów zdobytych przez graczy
-     * podczas tej rundy
-     */
-    public void savePlayerPoints() {
-        for (int i = 0; i < gS.getPlayerList().size(); i++) {
-            playerPointsList.add(gS.getPlayerList().get(i).getPoints());
-            gS.getPlayerList().get(i).increaseAllPointsErned(playerPointsList.get(i));
-        }
-    }
-
-    /**
-     * Metoda sumująca punkty i sprawdzająca który z podanych graczy daną rundę
-     * wygrał
-     */
-    public void checkRoundWinner() {
-        int bestRoundScore = 0;
-
-        for (int i = 0; i < gS.getPlayerList().size(); i++) {
-            if (playerPointsList.get(i) > bestRoundScore) {
-                bestRoundScore = playerPointsList.get(i);
-            }
-        }
-
-        for (int i = 0; i < gS.getPlayerList().size(); i++) {
-            if (playerPointsList.get(i) == bestRoundScore) {
-                gS.getPlayerList().get(i).increaseRoundsWon();
-            }
-        }
-
-    }
-
     public int getRoundNumber() {
         return roundNumber;
     }
-
 
     public void setRoundNumber(int roundNumber) {
         this.roundNumber = roundNumber;
     }
 
-
     public ArrayList<Integer> getPlayerPointsList() {
         return playerPointsList;
     }
-
 
     public void setPlayerPointsList(ArrayList<Integer> playerPointsList) {
         this.playerPointsList = playerPointsList;
     }
 
- 
     public int getRoundTime() {
         return roundTime;
     }
@@ -111,43 +67,27 @@ public class Round {
         this.roundTime = roundTime;
     }
 
-
     public boolean isRoundEnd() {
         return roundEnd;
     }
-
 
     public void setRoundEnd(boolean roundEnd) {
         this.roundEnd = roundEnd;
     }
 
-
     public int getRoundEndTimeDelay() {
         return roundEndTimeDelay;
     }
-
 
     public void setRoundEndTimeDelay(int roundEndTimeDelay) {
         this.roundEndTimeDelay = roundEndTimeDelay;
     }
 
-
     public boolean isAnimationEnded() {
         return animationEnded;
     }
 
-
     public void setAnimationEnded(boolean animationEnded) {
         this.animationEnded = animationEnded;
     }
-
-    public PointList getPointList() {
-        return pointList;
-    }
-
- 
-    public void setPointList(PointList pointList) {
-        this.pointList = pointList;
-    }
-
 }

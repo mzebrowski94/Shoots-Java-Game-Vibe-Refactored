@@ -2,6 +2,7 @@
 package pl.mzebrows.shoots.game.logic;
 
 import pl.mzebrows.shoots.input.GameAction;
+import pl.mzebrows.shoots.world.PlayWorld;
 import pl.mzebrows.shoots.input.InputBridge;
 
 import java.awt.Color;
@@ -70,7 +71,7 @@ public class GameMenu {
      * @param g2d parametr pobierający obiekt Graphic2D który rysuje elementy
      * menu
      */
-    public void drawMenu(Graphics2D g2d) {
+    public void drawMenu(Graphics2D g2d, PlayWorld world) {
         g2d.setFont(menuFont);
 
         g2d.setColor(gS.getColorScheme().getDeadLineColor());
@@ -87,7 +88,7 @@ public class GameMenu {
             g2d.setColor(gS.getColorScheme().getBackgroundFontColor());
             g2d.drawString(stringContinue, textPostion, menuHight);
         } else if (gS.isGameEnd()) {
-            drawGameEnd(g2d);
+            drawGameEnd(g2d, world);
         } else {
             g2d.drawString(stringContinue, textPostion, menuHight);
         }
@@ -101,11 +102,15 @@ public class GameMenu {
      * @param g2d parametr pobierający obiekt Graphic2D który rysuje odpowiednie
      * elementy na ekranie gry menu
      */
-    public void drawGameEnd(Graphics2D g2d) {
+    public void drawGameEnd(Graphics2D g2d, PlayWorld world) {
         g2d.drawString("Rounds: ", playerTextPosition - 150, menuScoreHigh + 50);
         g2d.drawString("Points: ", playerTextPosition - 150, menuScoreHigh + 100);
 
-        for (int i = 0; i < gS.getPlayerList().size(); i++) {
+        if (world == null) {
+            return;
+        }
+        for (int i = 0; i < world.playerCount(); i++) {
+            var score = world.matchFlow().scoreOf(i);
 
             if (textBrighter) {
                 winTextColor = new Color(iterator / 2, 2 * iterator, iterator / 2);
@@ -129,15 +134,15 @@ public class GameMenu {
             g2d.setColor(winTextColor);
             g2d.drawString("       WINNER(s) !     ", textPostion, menuHight - 2 * nextLine);
 
-            if (gS.getPlayerList().get(i).isWinner()) {
+            if (score.isWinner()) {
                 g2d.setColor(winTextColor);
             } else {
                 g2d.setColor(gS.getColorScheme().getDeadLineColor());
             }
 
-            g2d.drawString(gS.getPlayerList().get(i).getName(), playerTextPosition + 200 * i, menuScoreHigh);
-            g2d.drawString("" + gS.getPlayerList().get(i).getRoundsWon(), playerTextPosition + 200 * i, menuScoreHigh + 50);
-            g2d.drawString("" + gS.getPlayerList().get(i).allPointsErned, playerTextPosition + 200 * i, menuScoreHigh + 100);
+            g2d.drawString("P" + (i + 1), playerTextPosition + 200 * i, menuScoreHigh);
+            g2d.drawString("" + score.getRoundsWon(), playerTextPosition + 200 * i, menuScoreHigh + 50);
+            g2d.drawString("" + score.getTotalPoints(), playerTextPosition + 200 * i, menuScoreHigh + 100);
 
         }
     }

@@ -21,7 +21,6 @@ public class GamePointer extends GameCanvas {
 
     Font roundTextFont;
     Font authorTextFont;
-    int maxPointAmount;
 
     //LayoutSizes
     int frameWidth = 5;
@@ -52,12 +51,11 @@ public class GamePointer extends GameCanvas {
         fontSize = 25;
         textOffset = 1;
         this.gS = gameSettings;
-        maxPointAmount = gS.getPointList().getMaxPointsAmount();
 
         setPreferredSize(new Dimension(gS.getDEFAULT_POINTER_WIGHT(), gS.getDEFAULT_POINTER_HIGHT()));
         playerPointBarsList = new ArrayList<>();
         playerPointBarElapsed = new ArrayList<>();
-        for (int i = 0; i < gS.getPlayerList().size(); i++) {
+        for (int i = 0; i < gS.getPlayerNumber(); i++) {
             playerPointBarsList.add(0);
             playerPointBarElapsed.add(0);
         }
@@ -75,56 +73,53 @@ public class GamePointer extends GameCanvas {
         this.world = world;
     }
 
-    /** Number of players to render stats for (new model when playing, else legacy list). */
+    /** Number of players to render stats for, from the live model. */
     private int playerCount() {
-        return world != null ? world.playerCount() : gS.getPlayerList().size();
+        return world != null ? world.playerCount() : gS.getPlayerNumber();
     }
 
     /** Current-round points controlled by a 0-based player. */
     private int currentPoints(int p) {
-        return world != null ? world.matchFlow().scoreOf(p).getCurrentPoints()
-                             : gS.getPlayerList().get(p).getPoints();
+        return world != null ? world.matchFlow().scoreOf(p).getCurrentPoints() : 0;
     }
 
     /** Rounds won by a 0-based player. */
     private int roundsWon(int p) {
-        return world != null ? world.matchFlow().scoreOf(p).getRoundsWon()
-                             : gS.getPlayerList().get(p).getRoundsWon();
+        return world != null ? world.matchFlow().scoreOf(p).getRoundsWon() : 0;
     }
 
-    /** Previous round's banked points for a 0-based player (0 when unavailable). */
+    /** Previous round's banked points for a 0-based player (total minus current). */
     private int previousPoints(int p) {
-        if (world != null) {
-            var s = world.matchFlow().scoreOf(p);
-            return s.getTotalPoints() - s.getCurrentPoints();
+        if (world == null) {
+            return 0;
         }
-        return gS.getPreviousRound() != null ? gS.getPreviousRound().getPlayerPointsList().get(p) : 0;
+        var s = world.matchFlow().scoreOf(p);
+        return s.getTotalPoints() - s.getCurrentPoints();
     }
 
     /** Player display colour for a 0-based player. */
     private Color playerColor(int p) {
-        return world != null ? world.playerColor(p) : gS.getPlayerList().get(p).getColor();
+        return world != null ? world.playerColor(p) : Color.GRAY;
     }
 
     /** Player display name for a 0-based player. */
     private String playerName(int p) {
-        return world != null ? "P" + (p + 1) : gS.getPlayerList().get(p).getName();
+        return "P" + (p + 1);
     }
 
-    /** Bar denominator: total capturable points on the map (new model) or legacy max. */
+    /** Bar denominator: total capturable points on the map. */
     private int maxPoints() {
-        if (world != null) {
-            int pts = world.scoring().points().size() * CapturePoint.MAX_LEVEL;
-            return Math.max(1, pts);
+        if (world == null) {
+            return 1;
         }
-        return maxPointAmount;
+        return Math.max(1, world.scoring().points().size() * CapturePoint.MAX_LEVEL);
     }
 
     /**
      * Metoda służąca do restartu pasków obrazujących ilość zdobytych punktów
      */
     public void restartGamePointer() {
-        for (int i = 0; i < gS.getPlayerList().size(); i++) {
+        for (int i = 0; i < gS.getPlayerNumber(); i++) {
             playerPointBarsList.add(0);
             playerPointBarElapsed.add(0);
         }
@@ -155,8 +150,10 @@ public class GamePointer extends GameCanvas {
             g2d.fillRect(0, 0, gS.getDEFAULT_POINTER_WIGHT(), gS.getDEFAULT_POINTER_HIGHT());
             drawBorder(g2d);
             drawRoundCounter(g2d);
-            drawPlayerStats(g2d, roundState);
-            drawRoundCounterBlocks(g2d, roundState);
+            if (world != null) {
+                drawPlayerStats(g2d, roundState);
+                drawRoundCounterBlocks(g2d, roundState);
+            }
             drawAuthor(g2d);
         }
 

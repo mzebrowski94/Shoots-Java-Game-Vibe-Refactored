@@ -30,7 +30,10 @@ public class PointList {
     public PointList(GameSettings gameSettings) {
         gS = gameSettings;
         pointFields = new ArrayList<>();
-        playerList = gameSettings.getPlayerList();
+        // c11: GameSettings.getPlayerList() removed when the legacy Player model was decommissioned.
+        // Legacy class kept only as a behavioural reference (see STATE.md); not constructed by the
+        // live game. Disabled so the IDE raw compile (which ignores Maven <excludes>) passes.
+        // playerList = gameSettings.getPlayerList();
         maxPointsAmount = 8 * 4;
     }
 

@@ -31,6 +31,7 @@ public final class GameLoop implements Runnable {
 
     private GameFrame gameFrame;
     private GameStateMachine stateMachine;
+    private PlayingState playingState;
     private Renderer renderer;
     private Thread loopThread;
 
@@ -84,9 +85,9 @@ public final class GameLoop implements Runnable {
         };
     }
 
-    /** The live simulation when playing, else {@code null} (paused/menu/game-over). */
+    /** The live simulation; stable across pause/menu so panels always render the new model. */
     private PlayWorld currentWorld() {
-        return stateMachine.current() instanceof PlayingState ps ? ps.getWorld() : null;
+        return playingState != null ? playingState.getWorld() : null;
     }
 
     private void parkBriefly() {
@@ -109,7 +110,7 @@ public final class GameLoop implements Runnable {
     }
 
     private void initializeLogic() {
-        var playingState = new PlayingState(gameSettings, gameFrame);
+        playingState = new PlayingState(gameSettings, gameFrame);
         var pausedState = new PausedState(gameSettings, gameFrame.gameScreen, playingState);
         var gameOverState = new GameOverState(gameSettings, gameFrame.gameScreen, playingState);
 

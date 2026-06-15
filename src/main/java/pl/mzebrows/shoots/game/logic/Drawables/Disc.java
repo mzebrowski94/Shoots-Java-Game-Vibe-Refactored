@@ -76,7 +76,10 @@ public class Disc implements Drawable {
      */
     public ColisionPoint checkCollision() {
         discPoint.setColision(false);
-        discPoint = gS.getColisionCalculator().checkColision(discPoint);
+        // c11: GameSettings.getColisionCalculator() removed when legacy collision state was
+        // decommissioned. Legacy class kept only as a behavioural reference (see STATE.md); not run
+        // by the live game. Disabled so the IDE raw compile (which ignores Maven <excludes>) passes.
+        // discPoint = gS.getColisionCalculator().checkColision(discPoint);
         if (discPoint.isColision()) {
             if (discPoint.getColisionType() != 0) {
                 colisionTimes++;

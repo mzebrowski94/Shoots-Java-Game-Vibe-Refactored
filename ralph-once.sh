@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-claude --permission-mode acceptEdits -p "@RefactorPrompt.md @GameRules.md @RefactorPlan.md @STATE.md
+claude --permission-mode acceptEdits -p "@RefactorPrompt.md @GameRules.md @RefactorPlan.md @STATE.md tools/@AgentWorkflow.md tools/@BuildToolChainReadme.md
 1. Read STATE.md first. It holds the current package map, the legacy code map, and contracts (interfaces/base classes/enums) already established by earlier clusters. Reuse those contracts as-is - do not redesign them unless STATE.md lists them under 'Open Decisions'.
 2. Find the highest-priority CLUSTER in RefactorPlan.md that still has unchecked [ ] sub-items. Work ONLY within that cluster, even if you finish early.
 3. Implement every unchecked sub-item of that cluster, following RefactorPrompt.md (Java 25 features, object pooling, Strategy/ECS composition, decoupled rendering, etc.). Complete whole sub-items only - never leave one half-done.

@@ -32,7 +32,10 @@ public class ColisionCalculator {
      * @param gameSettings argument pobierający ustawienia gry
      */
     public ColisionCalculator(GameSettings gameSettings) {
-        this.matrix = gameSettings.getMapMatrix().mapMatrix;
+        // c11: GameSettings.getMapMatrix() removed when legacy map state was decommissioned.
+        // Legacy class kept only as a behavioural reference (see STATE.md); not constructed by the
+        // live game. Disabled so the IDE raw compile (which ignores Maven <excludes>) passes.
+        // this.matrix = gameSettings.getMapMatrix().mapMatrix;
         size = gameSettings.getUNIT();
     }
 

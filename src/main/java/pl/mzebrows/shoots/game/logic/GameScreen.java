@@ -71,7 +71,7 @@ public class GameScreen extends GameCanvas {
 
         if (roundState == RoundEnum.ROUND_PAUSED) {
             drawRoundPaused();
-            menuLayout.drawMenu(g2d);
+            menuLayout.drawMenu(g2d, world);
         } else {
             drawRoundContinues();
             if (roundState == RoundEnum.ROUND_BEGIN) {

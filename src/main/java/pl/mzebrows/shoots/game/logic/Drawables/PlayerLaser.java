@@ -140,9 +140,14 @@ public class PlayerLaser implements Drawable {
 
             //kalkulujemy do poki nie bedzie kolizji
             while (!colisionPoint.isColision()) {
-                colisionPoint = gS.getColisionCalculator().checkColision(colisionPoint);
+                // c11: GameSettings.getColisionCalculator() removed when legacy collision state was
+                // decommissioned. Legacy class kept only as a behavioural reference (see STATE.md);
+                // not run by the live game. Disabled so the IDE raw compile (ignores Maven
+                // <excludes>) passes. break added so the reference loop is not infinite.
+                // colisionPoint = gS.getColisionCalculator().checkColision(colisionPoint);
                 colisionPoint.updatePosition(angle);
                 //loops++;
+                break;
             }
 
             //System.out.println("LASER CALCULATED: " + loops + " loops");

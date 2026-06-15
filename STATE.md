@@ -19,15 +19,17 @@
 - `...score` — `CapturePoint`, `CaptureScoring`, `PlayerScore`, `MatchScorer` (c7).
 - `...world` — `PlayWorld` facade + `PlayInput` adapter (c8); `MatchFlow` round/match scorer (c9).
 
-## Legacy Code Map
-_(remove an entry once its class is migrated/deleted)_
-- **GameSettings/Round** — GOD CLASS + round timing still used; win/score flow SUPERSEDED by `MatchFlow` (c9); delete=c11.
-- **GameFrame/GameCanvas/GameCounter/GameMenu** — AWT panels (kept). **GameScreen/GamePointer** now draw
-  `PlayWorld`/`MatchFlow` (c10); legacy `Disc`/`PlayerLaser`/`PointField` draw paths removed.
-- **Player** — legacy stats/`Disc`/`PlayerLaser`/`PlayerCursor`; no longer drives sim (PlayWorld does); delete=c11.
-- **Disc/ColisionCalculator/ColisionPoint/MapMatrix/PointList/PointField** — SUPERSEDED; no live callers; delete=c11.
-- **PlayerLaser/PlayerCursor** — rotation paths dead (AimController/LaserPredictor); draw stubs remain; delete=c11.
-- **ColorScheme/PSConst/MenuEnum/RoundEnum** — palette/const. **KeyboardInput** — DEAD; delete=c11.
+## Legacy Code Map (live game off legacy; legacy KEPT as reference during c12 bug fixing)
+- **Live AWT shell (kept)**: `GameFrame`/`GameCanvas`/`GameCounter`/`GameScreen`/`GamePointer`/`GameMenu`
+  (all draw `PlayWorld`/`MatchFlow`), `GameLoop`, `GameSettings` (window/fonts/round-timing only),
+  `Round` (timing only), `ColorScheme`/`PSConst`/`MenuEnum`/`RoundEnum`.
+- **Superseded but RETAINED as reference** (c12 bug-fixing; DELETE in c13): `Player`, `Disc`,
+  `PlayerLaser`, `PlayerCursor`, `PlayerBase`, `Block`, `PointField`, `PointList`, `MapMatrix`,
+  `ColisionCalculator`, `ColisionPoint`, `LightEffect`, `Drawable`, `DrawableEffect`, `KeyboardInput`.
+  Not referenced by the live sim/render. **EXCLUDED FROM BUILD** via `maven-compiler-plugin <excludes>`
+  in `pom.xml` (`game/logic/{Player,PointList,MapMatrix,ColisionCalculator,ColisionPoint,KeyboardInput}.java`
+  + `game/logic/Drawables/*.java`) — they reference GameSettings members removed in c11, so they compile
+  only against the old model. To read them is fine; to re-enable, restore those getters. Delete in c13.
 
 ## Established Contracts
 - **Config = immutable records, AWT-decoupled.** `GameConfig` aggregates `GridConfig`, `DiscConfig`,
@@ -56,23 +58,24 @@ _(remove an entry once its class is migrated/deleted)_
   `world.finishRound()` then `world.isMatchOver()`/`resolveMatchWinners()`; restart calls `world.resetMatch()`.
   Replaces legacy `Round.checkRoundWinner`+`GameSettings.checkGameEnd` for all win decisions.
 - **Rendering = AWT panels draw from `PlayWorld` (c10).** `Renderer.render(RoundEnum, alpha, PlayWorld)`;
-  `GameLoop` passes the live world (null off-play). `AwtRenderer` pushes it via `GameScreen.setWorld(world,
-  alpha)` + `GamePointer.setWorld(world)`. `GameScreen` draws walls (`tiles()`), capture points
-  (`scoring().points()`), discs (`discs()`, interpolated ring), lasers (`predictLaser` into reused arrays).
-  `GamePointer` reads `matchFlow().scoreOf(p)` for points/roundsWon, `playerColor(p)` for colour
-  (legacy fallback only when world==null, i.e. paused/menu). Render helpers on `PlayWorld`: `config()`,
-  `unit()`, `playerColor(0-based)`. NOTE coordinate convention: tile[i][j] draws at pixel (i*unit, j*unit).
+  `GameLoop` holds `PlayingState` so the world is stable across pause. `AwtRenderer` pushes it via
+  `GameScreen.setWorld(world,alpha)`/`GamePointer.setWorld(world)`. `GameScreen` draws walls (`tiles()`),
+  capture points (`scoring().points()`), discs (`discs()`, interpolated ring), lasers (`predictLaser`,
+  reused arrays). `GamePointer`/`GameMenu` read `matchFlow().scoreOf(p)` + `playerColor(p)` (no legacy
+  fallback). Helpers: `config()`/`unit()`/`playerColor`. Convention: tile[i][j] -> pixel (i*unit, j*unit).
 
 ## Open Decisions / Backlog
-- **AUDIT (resolved)**: original "c9 = pure delete" couldn't compile — render + win-flow still on legacy.
-  Re-scoped & done: **9 round/win wiring [DONE] + 10 render migration [DONE] → 11 deletion → 12 audio**
-  (134 tests). Legacy `game.logic` classes are now unreferenced by the live sim/render; c11 removes them.
+- **DONE c9-c11** (134 tests, BUILD SUCCESS): round/win wiring, render migration, legacy model
+  decommission. Live game runs entirely on the `world`/`score`/`entity`/`spatial` model.
+- **NOW: c12 Playtest Bug Fixing** — user playtests and reports gameplay bugs; legacy classes are
+  RETAINED as a behavioural reference (see Legacy Code Map). Deletion deferred to c13. Audio moved to
+  `NewFeatures.md` (cluster A).
 - **BUILD ENV**: `./mvnw` auto-detects the vendored offline toolchain in `tools/` (JDK 26 +
   Maven 3.9 + pre-seeded `.m2`) and builds fully offline IN THE SANDBOX. Always run `./mvnw test`
   from the project root to verify — do NOT assume it can't run. (System `java` is 11; ignore it.)
-- Carryover: `GameScreen` now interpolates discs with `alpha`. Font paths in `GameSettings.initializeFont()`
-  still Windows-absolute (externalize in c12). `GamePointer` ctor still reads legacy `getPointList()` max
-  (harmless; removed with the legacy model in c11).
+- Carryover: `GameScreen` interpolates discs with `alpha`. Font paths in `GameSettings.initializeFont()`
+  are now relative (`src/main/resources/fonts/...`). Remaining after bug fixing: c13 legacy deletion;
+  `NewFeatures.md` A = audio.
 
-## Legacy Logic Coverage Map (drives cluster 11 deletion)
-- Disc physics/bounce/aim/laser/fire -> DONE `world.PlayWorld`(+`Entity`/`DiscSystem
+## Legacy Logic Coverage Map
+- All legacy `game.logic` responsibilities migrated to `world`/`score`/`entity`/`spatial` (c4-c11); legacy retained for c12 ref, deleted c13.

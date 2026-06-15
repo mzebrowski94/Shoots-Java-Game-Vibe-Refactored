@@ -4,7 +4,7 @@
 # Resolution order:
 #   1. A vendored toolchain under ./tools (JDK 25 + Maven + a pre-populated
 #      .m2 repo). Used automatically when present so the sandbox can build
-#      fully offline. See tools/README.md for how to populate it.
+#      fully offline. See tools/BuildToolChainReadme.md for how to populate it.
 #   2. Otherwise, fall back to the JDK (JAVA_HOME / PATH) and `mvn` on PATH.
 #
 # The ralph verify harness and permission allowlist invoke ./mvnw; this keeps
@@ -44,7 +44,7 @@ fi
 
 # --- 4. Redirect target/ off a 9p/virtiofs mount when in the Linux sandbox -----
 # Writing class files onto the Windows<->Linux mount causes silent stale-bytecode
-# and file-lock failures (see tools/AGENT_WORKFLOW.md). When the project lives under
+# and file-lock failures (see tools/AgentWorkflow.md). When the project lives under
 # a sandbox mount (/sessions/.../mnt/), build to a Linux-local dir instead. Windows /
 # IDE builds never take this branch and keep using ./target unchanged. Honour an
 # explicit -Dbuild.dir / $BUILD_DIR if the caller already set one.
