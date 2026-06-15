@@ -1,5 +1,8 @@
+// pl/mzebrows/shoots/ui/GamePointer.java
+package pl.mzebrows.shoots.ui;
 
-package pl.mzebrows.shoots.game.logic;
+import pl.mzebrows.shoots.app.GameSettings;
+import pl.mzebrows.shoots.app.Round;
 
 import pl.mzebrows.shoots.score.CapturePoint;
 import pl.mzebrows.shoots.world.MatchFlow;
@@ -13,10 +16,7 @@ import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.util.ArrayList;
 
-/**
- * Klasa rozrzeszająca klasę abstrakcyjną GameCanvas, odpowidająca za boczny panel w grze, tzw. panel statystyk
- * @author Mateusz Żebrowski, Nr albumu: 95281
- */
+/** Extends {@link GameCanvas}: the side panel that shows match statistics. */
 public class GamePointer extends GameCanvas {
 
     Font roundTextFont;
@@ -52,7 +52,7 @@ public class GamePointer extends GameCanvas {
         textOffset = 1;
         this.gS = gameSettings;
 
-        setPreferredSize(new Dimension(gS.getDEFAULT_POINTER_WIGHT(), gS.getDEFAULT_POINTER_HIGHT()));
+        setPreferredSize(new Dimension(gS.getDEFAULT_POINTER_WIDTH(), gS.getDEFAULT_POINTER_HEIGHT()));
         playerPointBarsList = new ArrayList<>();
         playerPointBarElapsed = new ArrayList<>();
         for (int i = 0; i < gS.getPlayerNumber(); i++) {
@@ -60,8 +60,8 @@ public class GamePointer extends GameCanvas {
             playerPointBarElapsed.add(0);
         }
 
-        width = gS.getDEFAULT_POINTER_WIGHT();
-        hight = gS.getDEFAULT_POINTER_HIGHT();
+        width = gS.getDEFAULT_POINTER_WIDTH();
+        height = gS.getDEFAULT_POINTER_HEIGHT();
         pointBarSize = width - (5 * borderSize) - (statsStartPosiotionWidth + borderSize);
         textFont = gS.getGameFont();
         standardColor = gS.getColorScheme().getStandardColor();
@@ -115,9 +115,7 @@ public class GamePointer extends GameCanvas {
         return Math.max(1, world.scoring().points().size() * CapturePoint.MAX_LEVEL);
     }
 
-    /**
-     * Metoda służąca do restartu pasków obrazujących ilość zdobytych punktów
-     */
+    /** Resets the bars that visualise each player's captured points. */
     public void restartGamePointer() {
         for (int i = 0; i < gS.getPlayerNumber(); i++) {
             playerPointBarsList.add(0);
@@ -154,8 +152,8 @@ public class GamePointer extends GameCanvas {
                 if (roundState == RoundEnum.ROUND_PAUSED) {
                     drawRoundPaused();
                 } else {
-                    g2d.setColor(gS.getColorScheme().getBackgroudColor());
-                    g2d.fillRect(0, 0, gS.getDEFAULT_POINTER_WIGHT(), gS.getDEFAULT_POINTER_HIGHT());
+                    g2d.setColor(gS.getColorScheme().getBackgroundColor());
+                    g2d.fillRect(0, 0, gS.getDEFAULT_POINTER_WIDTH(), gS.getDEFAULT_POINTER_HEIGHT());
                     drawBorder(g2d);
                     drawRoundCounter(g2d);
                     if (world != null) {
@@ -171,23 +169,21 @@ public class GamePointer extends GameCanvas {
     }
 
     /**
-     * Metoda rysująca w prawym dolnym rogu ekranu nazwę autora gry
-     * @param g2d parametr pobierający obiekt Graphic2D który rysuje odpowiednie
-     * elementy na ekranie gry
+     * Draws the author name in the bottom-right corner.
+     * @param g2d        the Graphics2D used to draw the elements
      */
     public void drawAuthor(Graphics2D g2d) {
         g2d.setColor(standardColor);
         g2d.setFont(authorTextFont);
-        g2d.drawString("By:", borderSize + textOffset, hight - freeSpace * 2);
-        g2d.drawString("Mateusz", borderSize + textOffset, hight - freeSpace - 10);
-        g2d.drawString("Zebrowski", borderSize + textOffset, hight - freeSpace + 10);
+        g2d.drawString("By:", borderSize + textOffset, height - freeSpace * 2);
+        g2d.drawString("Mateusz", borderSize + textOffset, height - freeSpace - 10);
+        g2d.drawString("Zebrowski", borderSize + textOffset, height - freeSpace + 10);
         g2d.setFont(textFont);
     }
 
     /**
-     * Metoda rysująca na panelu numer aktualnie odbywanej rundy
-     * @param g2d parametr pobierający obiekt Graphic2D który rysuje odpowiednie
-     * elementy na ekranie gry
+     * Draws the current round number on the panel.
+     * @param g2d        the Graphics2D used to draw the elements
      */
     public void drawRoundCounter(Graphics2D g2d) {
         g2d.setColor(gS.getColorScheme().getBackgroundFontColor());
@@ -206,10 +202,9 @@ public class GamePointer extends GameCanvas {
     }
 
     /**
-     * Metoda rysująca paski obrazujące ilość zdobytych punktów w aktualnie granej rundzie
-     * @param g2d parametr pobierający obiekt Graphic2D który rysuje odpowiednie
-     * elementy na ekranie gry
-     * @param roundState argument pobierający aktualny stan rundy
+     * Draws the bars visualising points captured in the current round.
+     * @param g2d        the Graphics2D used to draw the elements
+     * @param roundState the current round phase
      */
     public void drawPlayerStats(Graphics2D g2d, RoundEnum roundState) {
 
@@ -247,10 +242,9 @@ public class GamePointer extends GameCanvas {
     }
 
     /**
-     * Metoda rysująca lewą i prawą ramkę pasków punktów
-     * @param g2d parametr pobierający obiekt Graphic2D który rysuje odpowiednie
-     * elementy na ekranie gry
-     * @param roundState argument pobierający aktualny stan rundy
+     * Draws the left and right borders of the point bars.
+     * @param g2d        the Graphics2D used to draw the elements
+     * @param roundState the current round phase
      */
     public void drawRoundCounterBlocks(Graphics2D g2d, RoundEnum roundState) {
 
@@ -282,17 +276,16 @@ public class GamePointer extends GameCanvas {
     }
 
     /**
-     * Metoda rysująca ramkę panelu GamePointer
-     * @param g2d parametr pobierający obiekt Graphic2D który rysuje odpowiednie
-     * elementy na ekranie gry
+     * Draws the GamePointer panel border.
+     * @param g2d        the Graphics2D used to draw the elements
      */
     public void drawBorder(Graphics2D g2d) {
         g2d.setColor(standardColor);
-        g2d.fillRect(0, 0, borderSize, hight);
-        g2d.fillRect(width - borderSize, 0, borderSize, hight);
+        g2d.fillRect(0, 0, borderSize, height);
+        g2d.fillRect(width - borderSize, 0, borderSize, height);
         //g2d.fillRect(0, 0, width, borderSize);
-        g2d.fillRect(0, hight - borderSize, width, borderSize);
-        g2d.fillRect(0, hight - freeSpace * 3, width, borderSize);
+        g2d.fillRect(0, height - borderSize, width, borderSize);
+        g2d.fillRect(0, height - freeSpace * 3, width, borderSize);
 
     }
 
@@ -302,19 +295,19 @@ public class GamePointer extends GameCanvas {
         // shows faintly through the near-transparent menu tint, matching the play-screen translucent look.
         // On a fresh start there is no game behind the menu, so clear to an opaque background instead.
         if (world != null && (gS.getActualRoundNumber() > 0 || gS.isGameEnd())) {
-            g2d.setColor(gS.getColorScheme().getBackgroudColor());
-            g2d.fillRect(0, 0, gS.getDEFAULT_POINTER_WIGHT(), gS.getDEFAULT_POINTER_HIGHT());
+            g2d.setColor(gS.getColorScheme().getBackgroundColor());
+            g2d.fillRect(0, 0, gS.getDEFAULT_POINTER_WIDTH(), gS.getDEFAULT_POINTER_HEIGHT());
             drawBorder(g2d);
             drawRoundCounter(g2d);
             drawPlayerStats(g2d, RoundEnum.ROUND_PAUSED);
             drawRoundCounterBlocks(g2d, RoundEnum.ROUND_PAUSED);
             drawAuthor(g2d);
         } else {
-            g2d.setColor(gS.getColorScheme().getBackgroudColor());
-            g2d.fillRect(0, 0, gS.getDEFAULT_POINTER_WIGHT(), gS.getDEFAULT_POINTER_HIGHT());
+            g2d.setColor(gS.getColorScheme().getBackgroundColor());
+            g2d.fillRect(0, 0, gS.getDEFAULT_POINTER_WIDTH(), gS.getDEFAULT_POINTER_HEIGHT());
         }
         g2d.setColor(gS.getColorScheme().getMenuStandardColor());
-        g2d.fillRect(0, 0, gS.getDEFAULT_POINTER_WIGHT(), gS.getDEFAULT_POINTER_HIGHT());
+        g2d.fillRect(0, 0, gS.getDEFAULT_POINTER_WIDTH(), gS.getDEFAULT_POINTER_HEIGHT());
     }
 
     @Override
@@ -328,13 +321,11 @@ public class GamePointer extends GameCanvas {
 
     @Override
     public void drawRoundBegining() {
-        //System.out.println("ROUND STATS BEGIN");
         animationElementEnd = true;
     }
 
     @Override
     public void drawRoundEnding() {
-        //System.out.println("ROUND STATS END");
         g2d.setColor(playerColor(actualPlayerIndex).darker());
         g2d.fillRect(actualLeftWidth + frameWidth, actualHight + freeSpace + 3 + pointBarOffset, playerPointBarsList.get(actualPlayerIndex) - playerPointBarElapsed.get(actualPlayerIndex) + pointBarOffset, 10);
         g2d.setColor(playerColor(actualPlayerIndex));

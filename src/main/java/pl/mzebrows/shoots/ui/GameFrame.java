@@ -1,5 +1,7 @@
+// pl/mzebrows/shoots/ui/GameFrame.java
+package pl.mzebrows.shoots.ui;
 
-package pl.mzebrows.shoots.game.logic;
+import pl.mzebrows.shoots.app.GameSettings;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;
@@ -11,11 +13,14 @@ import java.awt.Rectangle;
 import java.awt.Toolkit;
 import javax.swing.JFrame;
 
+import lombok.Getter;
+
 /** Game window: hosts the play screen, top round-timer counter, and side score panel. */
 public class GameFrame extends JFrame {
-    GameScreen gameScreen;
-    GameCounter gameCounter;
-    GamePointer gamePointer;
+
+    @Getter private final GameScreen gameScreen;
+    @Getter private final GameCounter gameCounter;
+    @Getter private final GamePointer gamePointer;
 
     /**
      * @param gameSettings shared game state/config
@@ -79,8 +84,4 @@ public class GameFrame extends JFrame {
                 : usableY;
         setLocation(x, y);
     }
-
-    public GameScreen getGameScreen()   { return gameScreen; }
-    public GameCounter getGameCounter() { return gameCounter; }
-    public GamePointer getGamePointer() { return gamePointer; }
 }

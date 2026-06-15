@@ -1,5 +1,7 @@
+// pl/mzebrows/shoots/ui/GameScreen.java
+package pl.mzebrows.shoots.ui;
 
-package pl.mzebrows.shoots.game.logic;
+import pl.mzebrows.shoots.app.GameSettings;
 
 import pl.mzebrows.shoots.entity.Entity;
 import pl.mzebrows.shoots.score.CapturePoint;
@@ -44,11 +46,11 @@ public class GameScreen extends GameCanvas {
         super(gameSettings);
 
         width = gS.getDEFAULT_WIDTH();
-        hight = gS.getDEFAULT_HIGHT();
+        height = gS.getDEFAULT_HEIGHT();
         menuLayout = new GameMenu(gS);
 
-        setPreferredSize(new Dimension(width, hight));
-        animatedElementLenght = width / 2;
+        setPreferredSize(new Dimension(width, height));
+        animatedElementLength = width / 2;
     }
 
     /** Receives the live model + interpolation factor for this frame from the renderer. */
@@ -110,11 +112,11 @@ public class GameScreen extends GameCanvas {
         if (hasGameBehindMenu()) {
             drawRoundContinues();
         } else {
-            g2d.setColor(gS.getColorScheme().getBackgroudColor());
-            g2d.fillRect(0, 0, width, hight);
+            g2d.setColor(gS.getColorScheme().getBackgroundColor());
+            g2d.fillRect(0, 0, width, height);
         }
         g2d.setColor(gS.getColorScheme().getMenuStandardColor());
-        g2d.fillRect(0, 0, width, hight);
+        g2d.fillRect(0, 0, width, height);
         g2d.setColor(gS.getColorScheme().getDeadLineColor());
         g2d.setFont(textFont);
     }
@@ -126,8 +128,8 @@ public class GameScreen extends GameCanvas {
 
     @Override
     public void drawRoundContinues() {
-        g2d.setColor(gS.getColorScheme().getBackgroudColor());
-        g2d.fillRect(0, 0, width, hight);
+        g2d.setColor(gS.getColorScheme().getBackgroundColor());
+        g2d.fillRect(0, 0, width, height);
         if (world == null) {
             return;
         }
@@ -285,12 +287,12 @@ public class GameScreen extends GameCanvas {
     @Override
     public void drawRoundBegining() {
         g2d.setColor(gS.getColorScheme().getStandardColor());
-        g2d.fillRect(0, 0, animatedElementLenght - animatedElementElapsed, hight);
-        g2d.fillRect(animatedElementLenght + animatedElementElapsed, 0, animatedElementLenght - animatedElementElapsed, hight);
-        g2d.fillRect(0, 0, width, animatedElementLenght - animatedElementElapsed);
-        g2d.fillRect(0, animatedElementLenght + animatedElementElapsed, width, animatedElementLenght - animatedElementElapsed);
+        g2d.fillRect(0, 0, animatedElementLength - animatedElementElapsed, height);
+        g2d.fillRect(animatedElementLength + animatedElementElapsed, 0, animatedElementLength - animatedElementElapsed, height);
+        g2d.fillRect(0, 0, width, animatedElementLength - animatedElementElapsed);
+        g2d.fillRect(0, animatedElementLength + animatedElementElapsed, width, animatedElementLength - animatedElementElapsed);
 
-        if (animatedElementElapsed > animatedElementLenght) {
+        if (animatedElementElapsed > animatedElementLength) {
             animationElementEnd = animationEnd;
         }
     }
@@ -298,12 +300,12 @@ public class GameScreen extends GameCanvas {
     @Override
     public void drawRoundEnding() {
         g2d.setColor(gS.getColorScheme().getStandardColor());
-        g2d.fillRect(0, 0, animatedElementElapsed, hight);
-        g2d.fillRect(width - animatedElementElapsed, 0, animatedElementElapsed, hight);
+        g2d.fillRect(0, 0, animatedElementElapsed, height);
+        g2d.fillRect(width - animatedElementElapsed, 0, animatedElementElapsed, height);
         g2d.fillRect(0, 0, width, animatedElementElapsed);
-        g2d.fillRect(0, width - animatedElementElapsed, hight, animatedElementElapsed);
+        g2d.fillRect(0, width - animatedElementElapsed, height, animatedElementElapsed);
 
-        if (animatedElementElapsed > animatedElementLenght) {
+        if (animatedElementElapsed > animatedElementLength) {
             animationElementEnd = animationEnd;
         }
     }

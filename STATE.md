@@ -5,7 +5,7 @@
 > ones. Target: whole file under ~120 lines.
 
 ## Package Map
-- Root: `pl.mzebrows.shoots`. Legacy in `...game.logic` (+ `.Drawables`) and `...game.main`.
+- Root: `pl.mzebrows.shoots`. Entry point in `...game.main` (`ProjectShoots`).
 - `...config` — immutable config records + loader (c1). Resources: `game.properties`, `fonts/`, `images/`.
 - `...input` — `GameAction` enum + `InputBridge` (c2).
 - `...state` — `GameState`, `GameStateMachine`, `PlayingState`, `PausedState`, `GameOverState` (c2);
@@ -18,18 +18,17 @@
 - `...spatial` — `SpatialCollider`, `UniformGridCollider`, `TileType`, `CollisionResult` (c5); `MapGenerator` (c7).
 - `...score` — `CapturePoint`, `CaptureScoring`, `PlayerScore`, `MatchScorer` (c7).
 - `...world` — `PlayWorld` facade + `PlayInput` adapter (c8); `MatchFlow` round/match scorer (c9); `BlockHitEffect` (c12).
+- `...ui` (c14) — AWT shell: `GameFrame`, `GameCanvas`, `GameCounter`, `GamePointer`, `GameScreen`, `GameMenu`,
+  + UI enums/palette `MenuEnum`/`RoundEnum`/`PSConst`/`ColorScheme`.
+- `...app` (c14) — lifecycle/loop/state: `GameLoop`, `GameSettings`, `Round`.
 
-## Legacy Code Map (live game off legacy; legacy KEPT as reference during c12 bug fixing)
-- **Live AWT shell (kept)**: `GameFrame`/`GameCanvas`/`GameCounter`/`GameScreen`/`GamePointer`/`GameMenu`
-  (all draw `PlayWorld`/`MatchFlow`), `GameLoop`, `GameSettings` (window/fonts/round-timing only),
-  `Round` (timing only), `ColorScheme`/`PSConst`/`MenuEnum`/`RoundEnum`.
-- **Superseded but RETAINED as reference** (c12 bug-fixing; DELETE in c13): `Player`, `Disc`,
-  `PlayerLaser`, `PlayerCursor`, `PlayerBase`, `Block`, `PointField`, `PointList`, `MapMatrix`,
-  `ColisionCalculator`, `ColisionPoint`, `LightEffect`, `Drawable`, `DrawableEffect`, `KeyboardInput`.
-  Not referenced by the live sim/render. **EXCLUDED FROM BUILD** via `maven-compiler-plugin <excludes>`
-  in `pom.xml` (`game/logic/{Player,PointList,MapMatrix,ColisionCalculator,ColisionPoint,KeyboardInput}.java`
-  + `game/logic/Drawables/*.java`) — they reference GameSettings members removed in c11, so they compile
-  only against the old model. To read them is fine; to re-enable, restore those getters. Delete in c13.
+## Kept AWT Shell (c13 standards pass; c14 repackaged)
+- Live shell in `...ui`/`...app` draws `PlayWorld`/`MatchFlow`. `GameSettings` = window/fonts/round-timing
+  only; `Round` = timing only (`@Getter`/`@Setter`). c13: removed `@author`, fixed misspellings, Lombok-ified
+  getters, dropped dead `Round.playerPointsList` + `GameCounter.getRoundTimeInSeconds`. All legacy
+  `game.logic`/`Drawables` classes DELETED (c13).
+- **c14 leftover:** the 13 moved files left inert Windows-locked stubs in `game/logic/` (package line only).
+  **ACTION FOR USER (Windows):** delete the whole `src/main/java/pl/mzebrows/shoots/game/logic/` folder.
 
 ## Established Contracts
 - **Config = immutable records, AWT-decoupled.** `GameConfig` aggregates `GridConfig`, `DiscConfig`,
@@ -66,18 +65,17 @@
   fallback). Helpers: `config()`/`unit()`/`playerColor`. Convention: tile[i][j] -> pixel (i*unit, j*unit).
 
 ## Open Decisions / Backlog
-- **DONE c9-c11** (134 tests, BUILD SUCCESS): round/win wiring, render migration, legacy model
-  decommission. Live game runs entirely on the `world`/`score`/`entity`/`spatial` model.
-- **NOW: c12 Playtest Bug Fixing** — user playtests + reports bugs; legacy KEPT as reference (see Legacy
-  Code Map), deleted in c13. Audio -> `NewFeatures.md` (cluster A). 153 tests green. Fixes logged in
-  `RefactorPlan.md` c12: disc-retire crash, 45-deg corner penetration, capture +1/hit & disc-consume, tug-of-war erode-before-steal,
-  player-base render + placement (1 tile from border) + spawn-alignment + world rebuilt from menu player count (P3/P4); tunables `disc.maxBounces`/`disc.maxPerPlayer`/`laser.maxBounces`; block-hit flash (`onWallHit`->`BlockHitEffect`, legacy `LightEffect` port); menu background per-state (translucent over frozen game on pause/win, opaque clear only on fresh start), menu text legibility (backdrop panel + per-glyph drop shadow + selection bar; panel centred on the menu block + scoreboard columns distributed to fit 4 players, colours unchanged; `ColorScheme`/`GameSettings` now Lombok (immutable @Getter for palette; @Getter/@Setter + @Slf4j for settings)), window fit+centre to usable screen, and per-frame BufferStrategy re-acquire so moving the window no longer freezes rendering.
-- **BUILD ENV**: `./mvnw` auto-detects the vendored offline toolchain in `tools/` (JDK 26 +
-  Maven 3.9 + pre-seeded `.m2`) and builds fully offline IN THE SANDBOX. Always run `./mvnw test`
-  from the project root to verify — do NOT assume it can't run. (System `java` is 11; ignore it.)
-- Carryover: `GameScreen` interpolates discs with `alpha`. Font paths in `GameSettings.initializeFont()`
-  are now relative (`src/main/resources/fonts/...`). Remaining after bug fixing: c13 legacy deletion;
-  `NewFeatures.md` A = audio.
+- **DONE c1-c13**: full migration to `world`/`score`/`entity`/`spatial`/`ui`/`app`; legacy deleted; live
+  game runs entirely on the new model. **c14 DONE** (package restructure): `game.logic` -> `ui`+`app`,
+  153 tests green (pending user delete of the locked `game/logic` stub folder on Windows).
+- **NEXT clusters (see RefactorPlan.md):** c15 naming audit (rename `PSConst`, fix non-conventional
+  vars); c16 design-pattern docs + pattern-driven renames + pattern audit table; c17 translate all
+  `src/main` Javadoc to Polish (educational). Do c15/c16 before c17 so docs land on final names.
+- **BUILD ENV**: `./mvnw` auto-detects the vendored offline toolchain in `tools/` (JDK 26 + Maven 3.9 +
+  pre-seeded `.m2`) and builds fully offline IN THE SANDBOX. Verify with `./mvnw test` from project root.
+  (System `java` is 11; ignore it.) **Mount gotcha:** editor/`rm` on existing files is Windows-locked
+  (`Operation not permitted`) and writes can append NUL bytes — write via bash heredoc/python, verify,
+  and hand file deletions to the user on Windows.
 
 ## Legacy Logic Coverage Map
 - All legacy `game.logic` responsibilities migrated to `world`/`score`/`entity`/`spatial` (c4-c11); legacy retained for c12 ref, deleted c13.

@@ -5,12 +5,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import pl.mzebrows.shoots.config.GameConfig;
 import pl.mzebrows.shoots.config.GameConfigLoader;
-import pl.mzebrows.shoots.game.logic.GameCounter;
-import pl.mzebrows.shoots.game.logic.GameFrame;
-import pl.mzebrows.shoots.game.logic.GamePointer;
-import pl.mzebrows.shoots.game.logic.GameScreen;
-import pl.mzebrows.shoots.game.logic.GameSettings;
-import pl.mzebrows.shoots.game.logic.RoundEnum;
+import pl.mzebrows.shoots.ui.GameCounter;
+import pl.mzebrows.shoots.ui.GameFrame;
+import pl.mzebrows.shoots.ui.GamePointer;
+import pl.mzebrows.shoots.ui.GameScreen;
+import pl.mzebrows.shoots.app.GameSettings;
+import pl.mzebrows.shoots.ui.RoundEnum;
 import pl.mzebrows.shoots.input.GameAction;
 import pl.mzebrows.shoots.input.InputBridge;
 import pl.mzebrows.shoots.world.PlayInput;
@@ -193,7 +193,7 @@ public final class PlayingState implements GameState {
         if (settings.getActualRound().isRoundEnd()) {
             settings.setPlayerKeyboardAvailable(false);
             if (countActiveDiscs() == 0) {
-                settings.getActualRound().roundEndTimeDelay++;
+                settings.getActualRound().setRoundEndTimeDelay(settings.getActualRound().getRoundEndTimeDelay() + 1);
                 if (settings.getActualRound().getRoundEndTimeDelay() >= settings.getRoundEndDelay()) {
                     requestNextPhase = true;
                 }

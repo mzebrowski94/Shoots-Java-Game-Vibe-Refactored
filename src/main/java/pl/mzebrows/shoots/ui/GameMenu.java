@@ -1,5 +1,8 @@
+// pl/mzebrows/shoots/ui/GameMenu.java
+package pl.mzebrows.shoots.ui;
 
-package pl.mzebrows.shoots.game.logic;
+import pl.mzebrows.shoots.app.GameSettings;
+import pl.mzebrows.shoots.app.Round;
 
 import pl.mzebrows.shoots.input.GameAction;
 import pl.mzebrows.shoots.world.PlayWorld;
@@ -10,19 +13,14 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 
-/**
- * Klasa odpowiadając za interfejs menu gry, zmienę ustawień menu, obsługę
- * klawiatury w menu oraz wyświetlenie wyników końcowych
- *
- * @author Mateusz Żebrowski, Nr albumu: 95281
- */
+/** The game menu: renders the menu UI, applies setting changes, handles menu input, and shows final results. */
 public class GameMenu {
 
     int width;
-    int hight;
-    int textPostion;
+    int height;
+    int textPosition;
     int nextLine;
-    int menuHight;
+    int menuHeight;
     int menuScoreHigh;
     MenuEnum menuOption;
     GameSettings gS;
@@ -54,19 +52,19 @@ public class GameMenu {
         menuOption = MenuEnum.START_NEW_GAME;
         gS = gameSettings;
         width = gS.getDEFAULT_WIDTH();
-        hight = gS.getDEFAULT_HIGHT();
+        height = gS.getDEFAULT_HEIGHT();
         nextLine = 50;
-        menuHight = 150;
+        menuHeight = 150;
         menuScoreHigh = 100;
-        textPostion = (width / 2) - 50;
+        textPosition = (width / 2) - 50;
         menuFont = gS.getMenuFont().deriveFont(30f);
         winTextColor = gS.getColorScheme().getBackgroundFontColor();
     }
 
     /**
-     * Metoda rysująca na ekranie interfejs menu gry
+     * Draws the menu UI.
      *
-     * @param g2d parametr pobierający obiekt Graphic2D który rysuje elementy
+     * @param g2d the Graphics2D used to draw the elements
      * menu
      */
     public void drawMenu(Graphics2D g2d, PlayWorld world) {
@@ -80,21 +78,21 @@ public class GameMenu {
         drawSelectionHighlight(g2d);
 
         Color purple = gS.getColorScheme().getDeadLineColor();
-        shadowString(g2d, stringNewGame, textPostion, menuHight + 3 * nextLine, purple);
-        shadowString(g2d, stringPlayerNumberText, textPostion, menuHight + 4 * nextLine, purple);
-        shadowString(g2d, stringPlayerNumber, textPostion, menuHight + 5 * nextLine, purple);
-        shadowString(g2d, stringRoundLimitText, textPostion, menuHight + 6 * nextLine, purple);
-        shadowString(g2d, stringRoundNumber, textPostion, menuHight + 7 * nextLine, purple);
-        shadowString(g2d, stringRoundTimeText, textPostion, menuHight + 8 * nextLine, purple);
-        shadowString(g2d, stringRoundTime, textPostion, menuHight + 9 * nextLine, purple);
-        shadowString(g2d, stringQuit, textPostion, menuHight + 12 * nextLine, purple);
+        shadowString(g2d, stringNewGame, textPosition, menuHeight + 3 * nextLine, purple);
+        shadowString(g2d, stringPlayerNumberText, textPosition, menuHeight + 4 * nextLine, purple);
+        shadowString(g2d, stringPlayerNumber, textPosition, menuHeight + 5 * nextLine, purple);
+        shadowString(g2d, stringRoundLimitText, textPosition, menuHeight + 6 * nextLine, purple);
+        shadowString(g2d, stringRoundNumber, textPosition, menuHeight + 7 * nextLine, purple);
+        shadowString(g2d, stringRoundTimeText, textPosition, menuHeight + 8 * nextLine, purple);
+        shadowString(g2d, stringRoundTime, textPosition, menuHeight + 9 * nextLine, purple);
+        shadowString(g2d, stringQuit, textPosition, menuHeight + 12 * nextLine, purple);
 
         if (gS.getActualRoundNumber() == 0) {
-            shadowString(g2d, stringContinue, textPostion, menuHight, gS.getColorScheme().getBackgroundFontColor());
+            shadowString(g2d, stringContinue, textPosition, menuHeight, gS.getColorScheme().getBackgroundFontColor());
         } else if (gS.isGameEnd()) {
             drawGameEnd(g2d, world);
         } else {
-            shadowString(g2d, stringContinue, textPostion, menuHight, purple);
+            shadowString(g2d, stringContinue, textPosition, menuHeight, purple);
         }
 
         drawChoosenMenuOption(g2d);
@@ -140,7 +138,7 @@ public class GameMenu {
     /** Left edge of the menu panel: centred on the (left-aligned) menu text block, clamped on-screen. */
     private int panelLeft(Graphics2D g2d) {
         FontMetrics fm = g2d.getFontMetrics(menuFont);
-        int menuCentre = textPostion + fm.stringWidth(stringNewGame) / 2;
+        int menuCentre = textPosition + fm.stringWidth(stringNewGame) / 2;
         int w = panelWidth(g2d);
         int x = menuCentre - w / 2;
         int maxX = width - PANEL_SCREEN_MARGIN - w;
@@ -150,8 +148,8 @@ public class GameMenu {
     /** Dark, slightly transparent rounded panel behind the menu items to lift text contrast. */
     private void drawMenuBackdrop(Graphics2D g2d) {
         int pad = 24;
-        int top = menuHight - 3 * nextLine;            // above the WINNER/CONTINUE line
-        int bottom = menuHight + 12 * nextLine + pad;  // below QUIT
+        int top = menuHeight - 3 * nextLine;            // above the WINNER/CONTINUE line
+        int bottom = menuHeight + 12 * nextLine + pad;  // below QUIT
         int x = panelLeft(g2d);
         int w = panelWidth(g2d);
         int h = bottom - top;
@@ -176,7 +174,7 @@ public class GameMenu {
             return;
         }
         FontMetrics fm = g2d.getFontMetrics(menuFont);
-        int y = menuHight + row * nextLine;
+        int y = menuHeight + row * nextLine;
         int barX = panelLeft(g2d) + 10;
         int barW = panelWidth(g2d) - 20;
         int barY = y - fm.getAscent();
@@ -185,7 +183,7 @@ public class GameMenu {
         g2d.fillRoundRect(barX, barY, barW, barH, 14, 14);
     }
 
-    /** Row index (in nextLine units from menuHight) of the selected option, or -1 if none. */
+    /** Row index (in nextLine units from menuHeight) of the selected option, or -1 if none. */
     private int selectedRow() {
         return switch (menuOption) {
             case CONTINUE -> 0;
@@ -199,10 +197,9 @@ public class GameMenu {
     }
 
     /**
-     * Metoda odpowiedzialna za rysowanie wyników końcowych gry
+     * Draws the end-of-game results.
      *
-     * @param g2d parametr pobierający obiekt Graphic2D który rysuje odpowiednie
-     * elementy na ekranie gry menu
+     * @param g2d the Graphics2D used to draw the elements
      */
     public void drawGameEnd(Graphics2D g2d, PlayWorld world) {
         // Lay the scoreboard out INSIDE the centred panel: the row labels sit at the panel\'s left padding
@@ -240,7 +237,7 @@ public class GameMenu {
         FontMetrics fm = g2d.getFontMetrics(menuFont);
         String winner = "WINNER(s) !";
         int winnerX = panelX + (panelW - fm.stringWidth(winner)) / 2;
-        shadowString(g2d, winner, winnerX, menuHight - 2 * nextLine, winTextColor);
+        shadowString(g2d, winner, winnerX, menuHeight - 2 * nextLine, winTextColor);
 
         // Distribute up to MAX_PLAYERS columns evenly across [colsLeft, colsRight]; draw only active ones.
         int players = world.playerCount();
@@ -331,10 +328,7 @@ public class GameMenu {
         return defaultValue;
     }
 
-    /**
-     * Metoda służaca do zmiany podświetlanego elementu menu przy zmianię opcji
-     * menu w górę
-     */
+    /** Moves the menu selection to the next option. */
     public void changeMenuOptionDown() {
 
         if (menuOption == MenuEnum.CONTINUE) {
@@ -357,10 +351,7 @@ public class GameMenu {
 
     }
 
-    /**
-     * Metoda służaca do zmiany podświetlanego elementu menu przy zmianię opcji
-     * menu w dół
-     */
+    /** Moves the menu selection to the previous option. */
     public void changeMenuOptionUp() {
 
         if (menuOption == MenuEnum.CONTINUE) {
@@ -384,25 +375,24 @@ public class GameMenu {
     }
 
     /**
-     * Metoda odpowiedzialna za podświetlenie aktualnie wybranego elementu menu
+     * Highlights the currently selected menu option.
      *
-     * @param g2d parametr pobierający obiekt Graphic2D który rysuje odpowiednie
-     * elementy na ekranie gry
+     * @param g2d the Graphics2D used to draw the elements
      */
     public void drawChoosenMenuOption(Graphics2D g2d) {
         // Keep the same green/yellow selection colours; only add the shared drop shadow for legibility.
         if (menuOption == MenuEnum.CONTINUE) {
-            shadowString(g2d, stringContinue, textPostion, menuHight, Color.green);
+            shadowString(g2d, stringContinue, textPosition, menuHeight, Color.green);
         } else if (menuOption == MenuEnum.START_NEW_GAME) {
-            shadowString(g2d, stringNewGame, textPostion, menuHight + 3 * nextLine, Color.green);
+            shadowString(g2d, stringNewGame, textPosition, menuHeight + 3 * nextLine, Color.green);
         } else if (menuOption == MenuEnum.PLAYER_NUMBER_OPTION) {
-            shadowString(g2d, stringPlayerNumber, textPostion, menuHight + 5 * nextLine, Color.yellow);
+            shadowString(g2d, stringPlayerNumber, textPosition, menuHeight + 5 * nextLine, Color.yellow);
         } else if (menuOption == MenuEnum.ROUND_NUMBER_OPTION) {
-            shadowString(g2d, stringRoundNumber, textPostion, menuHight + 7 * nextLine, Color.yellow);
+            shadowString(g2d, stringRoundNumber, textPosition, menuHeight + 7 * nextLine, Color.yellow);
         } else if (menuOption == MenuEnum.ROUND_TIME_OPTION) {
-            shadowString(g2d, stringRoundTime, textPostion, menuHight + 9 * nextLine, Color.yellow);
+            shadowString(g2d, stringRoundTime, textPosition, menuHeight + 9 * nextLine, Color.yellow);
         } else if (menuOption == MenuEnum.QUIT) {
-            shadowString(g2d, stringQuit, textPostion, menuHight + 12 * nextLine, Color.green);
+            shadowString(g2d, stringQuit, textPosition, menuHeight + 12 * nextLine, Color.green);
         }
     }
 }

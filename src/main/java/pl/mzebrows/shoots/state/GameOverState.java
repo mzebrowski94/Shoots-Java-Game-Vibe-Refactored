@@ -3,9 +3,9 @@ package pl.mzebrows.shoots.state;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import pl.mzebrows.shoots.game.logic.GameScreen;
-import pl.mzebrows.shoots.game.logic.GameSettings;
-import pl.mzebrows.shoots.game.logic.MenuEnum;
+import pl.mzebrows.shoots.ui.GameScreen;
+import pl.mzebrows.shoots.app.GameSettings;
+import pl.mzebrows.shoots.ui.MenuEnum;
 import pl.mzebrows.shoots.input.InputBridge;
 
 /**

@@ -1,5 +1,7 @@
+// pl/mzebrows/shoots/ui/GameCounter.java
+package pl.mzebrows.shoots.ui;
 
-package pl.mzebrows.shoots.game.logic;
+import pl.mzebrows.shoots.app.GameSettings;
 
 import java.awt.Color;
 import java.awt.Dimension;
@@ -8,12 +10,7 @@ import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 
-/**
- * Klasa rozrzeszająca klasę abstrakcyjną GameCanvas, górny panel gry,
- * wyświetlający pasek czasu gry
- *
- * @author Mateusz Żebrowski, Nr albumu: 95281
- */
+/** Extends {@link GameCanvas}: the top panel that displays the round-time bar. */
 public class GameCounter extends GameCanvas {
 
     //LayoutSizes
@@ -23,9 +20,9 @@ public class GameCounter extends GameCanvas {
     int borderSpace = 8;
     int timeBarWidth;
     int timeBarHalfWidth;
-    int timeBarHight;
+    int timeBarHeight;
     int timeBarLeftWidth;
-    int timeBarUpperHight;
+    int timeBarUpperHeight;
 
     Color deadLineColor;
     Color deadLineBackgroundColor;
@@ -43,18 +40,18 @@ public class GameCounter extends GameCanvas {
         super(gameSettings);
 
         this.width = gS.getDEFAULT_WIDTH();
-        this.hight = gS.getDEFAULT_COUNTER_HIGHT();
+        this.height = gS.getDEFAULT_COUNTER_HEIGHT();
         this.longWidth = gS.getDEFAULT_COUNTER_WIDTH();
         this.timeBarWidth = (int) (0.75 * width);
         this.timeBarHalfWidth = (int) (0.5 * timeBarWidth);
-        this.timeBarHight = (int) (0.25 * hight);
-        this.timeBarUpperHight = (int) (0.5 * hight - timeBarHight * 0.5);
+        this.timeBarHeight = (int) (0.25 * height);
+        this.timeBarUpperHeight = (int) (0.5 * height - timeBarHeight * 0.5);
         this.timeBarLeftWidth = (int) (0.5 * width - 0.5 * timeBarWidth);
 
-        setPreferredSize(new Dimension(gS.getDEFAULT_WIDTH(), gS.getDEFAULT_COUNTER_HIGHT()));
+        setPreferredSize(new Dimension(gS.getDEFAULT_WIDTH(), gS.getDEFAULT_COUNTER_HEIGHT()));
         deadLineColor = gS.getColorScheme().getDeadLineColor();
         deadLineBackgroundColor = gS.getColorScheme().getDeadLineBackgroundColor();
-        animatedElementLenght = timeBarHalfWidth;
+        animatedElementLength = timeBarHalfWidth;
         animationTime = gS.getRoundTime();
     }
 
@@ -101,19 +98,18 @@ public class GameCounter extends GameCanvas {
     }
 
     /**
-     * Metoda rysująca ramkę panelu GameCounter
+     * Draws the GameCounter panel border.
      *
-     * @param g2d parametr pobierajacy obiekt Graphics2D, który rysuje elementy
-     * na ekranie
-     * @param roundState parametr pobierający aktualny stan rundy
+     * @param g2d        the Graphics2D used to draw the elements
+     * @param roundState the current round phase
      */
     public void drawBorder(Graphics2D g2d, RoundEnum roundState) {
         g2d.setColor(standardColor);
-        g2d.fillRect(0, 0, borderSize, hight);
-        g2d.fillRect(longWidth - borderSize, 0, borderSize, hight);
-        g2d.fillRect(width, 0, borderSize, hight);
+        g2d.fillRect(0, 0, borderSize, height);
+        g2d.fillRect(longWidth - borderSize, 0, borderSize, height);
+        g2d.fillRect(width, 0, borderSize, height);
         g2d.fillRect(0, 0, longWidth, borderSize);
-        g2d.fillRect(0, hight - borderSize, longWidth, borderSize);
+        g2d.fillRect(0, height - borderSize, longWidth, borderSize);
 
         drawCounterDeadLine(g2d, roundState);
         drawTitle(g2d);
@@ -123,17 +119,16 @@ public class GameCounter extends GameCanvas {
     @Override
     public void tick() {
         timeElapsed += 0.008;
-        animatedElementElapsed = (int) (animatedElementLenght * (timeElapsed * 1f / animationTime * 1f));
+        animatedElementElapsed = (int) (animatedElementLength * (timeElapsed * 1f / animationTime * 1f));
         if (timeElapsed > animationTime) {
             animationEnd = true;
         }
     }
 
     /**
-     * Metoda wyświetlająca tytuł gry w prawym górnym rogu ekranu
+     * Draws the game title in the top-right corner.
      *
-     * @param gd2 parametr pobierajacy obiekt Graphics2D, który rysuje elementy
-     * na ekranie
+     * @param gd2 the Graphics2D used to draw the elements
      */
     public void drawTitle(Graphics2D gd2) {
         g2d.setColor(deadLineBackgroundColor);
@@ -148,22 +143,21 @@ public class GameCounter extends GameCanvas {
     @Override
     public void initializeLayout() {
         //CounterBorder
-        counterBorder = new Rectangle(timeBarLeftWidth - borderSpace, timeBarUpperHight - borderSpace, timeBarWidth + borderSpace + borderSpace, timeBarHight + borderSpace + borderSpace);
+        counterBorder = new Rectangle(timeBarLeftWidth - borderSpace, timeBarUpperHeight - borderSpace, timeBarWidth + borderSpace + borderSpace, timeBarHeight + borderSpace + borderSpace);
         //DeadLine
-        leftDeadLine = new Rectangle(timeBarLeftWidth, timeBarUpperHight, timeBarHalfWidth, timeBarHight);
-        rightDeadLine = new Rectangle(timeBarLeftWidth + timeBarHalfWidth, timeBarUpperHight, timeBarHalfWidth, timeBarHight);
-        leftDeadLineBackground = new Rectangle(timeBarLeftWidth, timeBarUpperHight, timeBarHalfWidth, timeBarHight);
-        rightDeadLineBackground = new Rectangle(timeBarLeftWidth + timeBarHalfWidth, timeBarUpperHight, timeBarHalfWidth, timeBarHight);
+        leftDeadLine = new Rectangle(timeBarLeftWidth, timeBarUpperHeight, timeBarHalfWidth, timeBarHeight);
+        rightDeadLine = new Rectangle(timeBarLeftWidth + timeBarHalfWidth, timeBarUpperHeight, timeBarHalfWidth, timeBarHeight);
+        leftDeadLineBackground = new Rectangle(timeBarLeftWidth, timeBarUpperHeight, timeBarHalfWidth, timeBarHeight);
+        rightDeadLineBackground = new Rectangle(timeBarLeftWidth + timeBarHalfWidth, timeBarUpperHeight, timeBarHalfWidth, timeBarHeight);
         //Text
         g2d.setFont(gS.getGameFont().deriveFont(fontSize));
         g2d.setFont(new Font(gS.getGameFont().getFontName(), 100, 25));
     }
 
     /**
-     * Metoda rysująca pasku czasu
+     * Draws the time bar.
      *
-     * @param gd2 parametr pobierajacy obiekt Graphics2D, który rysuje elementy
-     * na ekranie
+     * @param gd2 the Graphics2D used to draw the elements
      */
     private void drawCounterDeadLine(Graphics2D g2d, RoundEnum roundState) {
         //RIGHT SIDE OF BAR - deadlinebackground increasing
@@ -174,16 +168,16 @@ public class GameCounter extends GameCanvas {
             g2d.setColor(deadLineBackgroundColor);
             g2d.fill(rightDeadLineBackground);
             g2d.setColor(deadLineColor);
-            g2d.fillRect(timeBarLeftWidth + timeBarHalfWidth, timeBarUpperHight, timeBarHalfWidth - animatedElementElapsed, timeBarHight);
+            g2d.fillRect(timeBarLeftWidth + timeBarHalfWidth, timeBarUpperHeight, timeBarHalfWidth - animatedElementElapsed, timeBarHeight);
             //LEFT SIDE OF BAR - deadline decreasing
             g2d.setColor(deadLineColor);
             g2d.fill(leftDeadLine);
             g2d.setColor(deadLineBackgroundColor);
-            g2d.fillRect(timeBarLeftWidth, timeBarUpperHight, animatedElementElapsed, timeBarHight);
+            g2d.fillRect(timeBarLeftWidth, timeBarUpperHeight, animatedElementElapsed, timeBarHeight);
 
         } else {
             g2d.setColor(deadLineBackgroundColor);
-            g2d.fillRect(timeBarLeftWidth, timeBarUpperHight, timeBarWidth, timeBarHight);
+            g2d.fillRect(timeBarLeftWidth, timeBarUpperHeight, timeBarWidth, timeBarHeight);
         }
         g2d.setColor(standardColor);
 
@@ -202,11 +196,11 @@ public class GameCounter extends GameCanvas {
         if (gS.getActualRoundNumber() > 0 || gS.isGameEnd()) {
             drawRoundContinues();
         } else {
-            g2d.setColor(gS.getColorScheme().getBackgroudColor());
-            g2d.fillRect(0, 0, gS.getDEFAULT_COUNTER_WIDTH(), gS.getDEFAULT_COUNTER_HIGHT());
+            g2d.setColor(gS.getColorScheme().getBackgroundColor());
+            g2d.fillRect(0, 0, gS.getDEFAULT_COUNTER_WIDTH(), gS.getDEFAULT_COUNTER_HEIGHT());
         }
         g2d.setColor(gS.getColorScheme().getMenuStandardColor());
-        g2d.fillRect(0, 0, gS.getDEFAULT_COUNTER_WIDTH(), gS.getDEFAULT_COUNTER_HIGHT());
+        g2d.fillRect(0, 0, gS.getDEFAULT_COUNTER_WIDTH(), gS.getDEFAULT_COUNTER_HEIGHT());
     }
 
     @Override
@@ -214,8 +208,8 @@ public class GameCounter extends GameCanvas {
         // Re-apply the title font every frame: graphics are now re-acquired per frame, so a font set only
         // at init would be lost and the title would fall back to the default AWT font.
         g2d.setFont(new Font(gS.getGameFont().getFontName(), 100, 25));
-        g2d.setColor(gS.getColorScheme().getBackgroudColor());
-        g2d.fillRect(0, 0, gS.getDEFAULT_COUNTER_WIDTH(), gS.getDEFAULT_COUNTER_HIGHT());
+        g2d.setColor(gS.getColorScheme().getBackgroundColor());
+        g2d.fillRect(0, 0, gS.getDEFAULT_COUNTER_WIDTH(), gS.getDEFAULT_COUNTER_HEIGHT());
 
         drawBorder(g2d, actualRoundState);
     }
@@ -223,18 +217,13 @@ public class GameCounter extends GameCanvas {
     @Override
     public void drawRoundBegining() {
         animationElementEnd = true;
-        //System.out.println("ROUND COUNTER BEGIN");
     }
 
     @Override
     public void drawRoundEnding() {
         animationElementEnd = true;
-        //System.out.println("ROUND COUNTER END");
     }
 
-    public int getRoundTimeInSeconds() {
-        return roundTimeInSeconds;
-    }
 
     public void setRoundTimeInSeconds(int roundTimeInSeconds) {
         this.roundTimeInSeconds = roundTimeInSeconds;

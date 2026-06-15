@@ -1,5 +1,9 @@
+// pl/mzebrows/shoots/app/GameSettings.java
+package pl.mzebrows.shoots.app;
 
-package pl.mzebrows.shoots.game.logic;
+import pl.mzebrows.shoots.ui.ColorScheme;
+import pl.mzebrows.shoots.ui.GameScreen;
+import pl.mzebrows.shoots.ui.PSConst;
 
 import pl.mzebrows.shoots.input.InputBridge;
 
@@ -32,12 +36,12 @@ public class GameSettings {
     private Font menuFont;
 
     // Window sizing (derived from PSConst; immutable once constructed).
-    private final int DEFAULT_WIDTH = PSConst.UNIT.getValue() * PSConst.WINDOWWIDTH.getValue();
-    private final int DEFAULT_HIGHT = PSConst.UNIT.getValue() * PSConst.WINDOWWIDTH.getValue();
-    private final int DEFAULT_COUNTER_HIGHT = PSConst.UNIT.getValue() * 2;
-    private final int DEFAULT_POINTER_WIGHT = PSConst.UNIT.getValue() * 4;
-    private final int DEFAULT_COUNTER_WIDTH = DEFAULT_WIDTH + DEFAULT_POINTER_WIGHT;
-    private final int DEFAULT_POINTER_HIGHT = PSConst.UNIT.getValue() * PSConst.WINDOWWIDTH.getValue();
+    private final int DEFAULT_WIDTH = PSConst.UNIT.getValue() * PSConst.WINDOW_TILES.getValue();
+    private final int DEFAULT_HEIGHT = PSConst.UNIT.getValue() * PSConst.WINDOW_TILES.getValue();
+    private final int DEFAULT_COUNTER_HEIGHT = PSConst.UNIT.getValue() * 2;
+    private final int DEFAULT_POINTER_WIDTH = PSConst.UNIT.getValue() * 4;
+    private final int DEFAULT_COUNTER_WIDTH = DEFAULT_WIDTH + DEFAULT_POINTER_WIDTH;
+    private final int DEFAULT_POINTER_HEIGHT = PSConst.UNIT.getValue() * PSConst.WINDOW_TILES.getValue();
 
     private final int SIZE = PSConst.TABLESIZE.getValue();
     private final int UNIT = PSConst.UNIT.getValue();

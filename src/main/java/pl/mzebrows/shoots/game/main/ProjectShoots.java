@@ -1,7 +1,7 @@
 
 package pl.mzebrows.shoots.game.main;
 
-import pl.mzebrows.shoots.game.logic.GameLoop;
+import pl.mzebrows.shoots.app.GameLoop;
 
 /** Application entry point: constructs the game loop and starts it on its own thread. */
 public class ProjectShoots {

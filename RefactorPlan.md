@@ -172,15 +172,66 @@
 - [x] **Game-end backdrop width + `GameSettings` refactor.** The menu backdrop was sized to the widest menu row, so on the scoreboard screen the player columns overflowed it. `panelWidth` is now game-end aware: it widens to contain all four player columns (always sized for `MAX_PLAYERS=4` so the layout is stable regardless of count), with the scoreboard column offsets/step promoted to shared constants. `GameSettings` refactored to convention: Lombok `@Getter`/`@Setter` (read-only `@Setter(NONE)` on `actualRound`/`previousRound`), `@Slf4j` logging replacing `printStackTrace`, no `@author` (244 -> ~112 lines; getter/setter API unchanged, including the `getDEFAULT_*` window-size accessors).
 - [x] **Menu backdrop centring + 4-player scoreboard fit.** The panel was anchored to the left-aligned menu text and the scoreboard used fixed left-to-right column offsets, so the backdrop drifted off-centre and P3/P4 columns ran off the right edge (P4 missing for 4 players). Reworked the geometry: the panel is now centred on the menu block and clamped on-screen (`panelLeft`/`panelWidth` with a screen margin), and `drawGameEnd` distributes up to `MAX_PLAYERS` score columns evenly across the panel's inner width, each cell centred, with the WINNER title centred over the panel too. All four columns now fit inside the centred backdrop.
 
-## [ ] 13. Legacy Deletion (remove superseded classes once nothing references them)
+## [x] 13. Legacy Deletion (remove superseded classes once nothing references them)
 > Deferred until after playtest bug fixing (c12) so legacy code stays available as a behavioural
 > reference while diagnosing gameplay bugs. Pure removal pass; no behavioural change.
-- [ ] **Migration gate (do FIRST):** re-verify every legacy `game.logic` responsibility is fully
+- [x] **Migration gate (do FIRST):** re-verify every legacy `game.logic` responsibility is fully
       migrated to the new model and that NO production/test code references a deletion target except
       the targets themselves. If anything is still wired in, STOP — add a cluster (or sub-items) to
       finish that migration and do it before any deletion. Record the check result in `STATE.md`.
-- [ ] Delete the now-unreferenced legacy classes (`Disc`/`ColisionCalculator`/`ColisionPoint`/
+      **[DONE — gate PASSED: only Javadoc `{@code}` mentions remain; 153 tests green. Recorded in STATE.md.]**
+- [x] Delete the now-unreferenced legacy classes (`Disc`/`ColisionCalculator`/`ColisionPoint`/
       `MapMatrix`/`PointList`/`PointField`/`PlayerLaser`/`PlayerCursor`/`LightEffect`/`KeyboardInput`,
-      `Drawable`/`DrawableEffect`/`Block`/`PlayerBase` if dead, `Player`) + any residual dead
-      fields/getters on `Round`/`GameSettings`. Verify clean compile + tests; no behavioural change.
-- [ ] Final integration pass: wire remaining loose ends, run `./mvnw clean test` end-to-end.
+      `Drawable`/`DrawableEffect`/`Block`/`PlayerBase`, `Player`) + residual dead fields/getters on
+      `Round`/`GameSettings`. **[DONE — user deleted all 15 files on Windows; `pom.xml` `<excludes>`
+      removed; 153 tests green, no behavioural change.]**
+- [x] Final integration pass: wire remaining loose ends, run `./mvnw clean test` end-to-end. **[DONE — 153 tests green.]**
+
+## [x] 14. Package Restructure (retire `game.logic` grab-bag)
+> The legacy `game.logic` package is now just the live AWT shell + app wiring mixed together. Split it
+> into cohesive packages so structure matches responsibility. Do this BEFORE the Javadoc/var passes so
+> those land on final locations. Pure move + import/package-line updates; no behavioural change.
+- [x] Create `...ui` and move the AWT panels/frame into it: `GameFrame`, `GameCanvas`, `GameCounter`,
+      `GamePointer`, `GameScreen`, `GameMenu`. Update package lines + all imports + the file-path header
+      comments. Verify clean compile + 153 tests. **[DONE — 153 tests green.]**
+- [x] Create `...app` and move app/loop/config-state classes into it: `GameLoop`, `GameSettings`,
+      `Round`; UI enums/palette (`MenuEnum`, `RoundEnum`, `PSConst`, `ColorScheme`) placed in `...ui`
+      (recorded in STATE.md). `game.logic` emptied to inert stubs (Windows-locked; user deletes the
+      folder on Windows). Verify clean compile + tests. **[DONE — 153 tests green.]**
+
+## [ ] 15. Naming Audit (class + variable names to convention)
+> Sweep the WHOLE codebase for names that don't follow Java/Clean-Code convention. No pattern-driven
+> renames here (that's cluster 16c) — just plain convention fixes. Behaviour unchanged.
+- [ ] Fix non-conventional CLASS names that are abbreviations/unclear (e.g. `PSConst` -> a clear name
+      like `GameUnits`/`GameDimensions`). Update all references; record old->new in STATE.md.
+- [ ] Fix non-conventional VARIABLE/field/constant names: SCREAMING_SNAKE used on non-static fields,
+      remaining abbreviations, and any misspellings missed earlier. Static finals stay UPPER_SNAKE;
+      instance fields/locals become lowerCamelCase. Verify clean compile + tests.
+
+## [ ] 16. Design-Pattern Documentation & Pattern-Driven Renames (educational pass)
+> Big educational cluster. Make the design patterns in the codebase explicit in the class Javadoc, and
+> rename classes whose name hides the pattern they implement. General, textbook descriptions of each
+> pattern (not tied to our specifics). Game-dev patterns count (State, Strategy, Object Pool, ECS/
+> Component, Facade, Adapter, Game Loop, Spatial Partition, Observer/event-sink, Factory/Spawner).
+- [ ] **Pattern audit table** in STATE.md: list each class that implements a recognised pattern and
+      which pattern it is (Strategy: `*Strategy`; State: `*State`/`GameStateMachine`; Object Pool:
+      `ObjectPool`; Facade: `PlayWorld`; Adapter: `PlayInput`/`AwtRenderer`; Game Loop: `GameLoop`/
+      `FixedTimestep`; Spatial Partition: `UniformGridCollider`; Observer: `DiscEventSink`; Factory/
+      Spawner: `EntitySpawner`/`CombatSystem`; etc.). This drives 16b and 16c.
+- [ ] **Pattern one-liner in class Javadoc**: for every class whose name indicates a pattern, add one
+      general sentence describing what that pattern does, e.g.
+      `// Pattern "Strategy" — enkapsuluje wymienny algorytm za interfejsem, by zmieniać zachowanie w
+      czasie działania.` (in Polish per cluster 17). Applied to all pattern classes from 16a.
+- [ ] **Pattern-driven renames**: rename classes whose name doesn't reflect their pattern where it
+      clearly improves clarity (propose each; e.g. consider `*System` vs ECS-system naming, panel names).
+      Keep already-clear pattern names (`AimController`, `DiscAttackStrategy`, `MapGenerator`). Update all
+      references; record old->new in STATE.md. Verify clean compile + tests.
+
+## [ ] 17. Polish Javadoc Translation (educational; all non-test main classes)
+> Translate ALL Javadoc in `src/main` (class + method + field) into Polish for educational purposes;
+> leave test classes' comments as-is. Code identifiers stay English; only doc prose is Polish. Must run
+> AFTER clusters 14-16 so it lands on final names/locations and includes the pattern one-liners (16b).
+- [ ] Translate class-level + method-level + field Javadoc across every `src/main` package (config,
+      entity, input, loop, pool, render, score, spatial, state, system, world, ui, app) into Polish,
+      preserving `@param`/`@return`/`{@link}`/`{@code}` tags and the pattern one-liners from 16b.
+      Verify clean compile + 153 tests (Javadoc-only change).

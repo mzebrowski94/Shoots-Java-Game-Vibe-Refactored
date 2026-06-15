@@ -1,11 +1,11 @@
 // src/main/java/pl/mzebrows/shoots/render/AwtRenderer.java
 package pl.mzebrows.shoots.render;
 
-import pl.mzebrows.shoots.game.logic.GameCounter;
-import pl.mzebrows.shoots.game.logic.GameFrame;
-import pl.mzebrows.shoots.game.logic.GamePointer;
-import pl.mzebrows.shoots.game.logic.GameScreen;
-import pl.mzebrows.shoots.game.logic.RoundEnum;
+import pl.mzebrows.shoots.ui.GameCounter;
+import pl.mzebrows.shoots.ui.GameFrame;
+import pl.mzebrows.shoots.ui.GamePointer;
+import pl.mzebrows.shoots.ui.GameScreen;
+import pl.mzebrows.shoots.ui.RoundEnum;
 import pl.mzebrows.shoots.world.PlayWorld;
 
 /**

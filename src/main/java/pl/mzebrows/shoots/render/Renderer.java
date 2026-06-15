@@ -1,7 +1,7 @@
 // src/main/java/pl/mzebrows/shoots/render/Renderer.java
 package pl.mzebrows.shoots.render;
 
-import pl.mzebrows.shoots.game.logic.RoundEnum;
+import pl.mzebrows.shoots.ui.RoundEnum;
 import pl.mzebrows.shoots.world.PlayWorld;
 
 /**

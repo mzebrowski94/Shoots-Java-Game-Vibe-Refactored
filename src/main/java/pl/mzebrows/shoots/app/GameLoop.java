@@ -1,5 +1,8 @@
-// pl/mzebrows/shoots/game/logic/GameLoop.java
-package pl.mzebrows.shoots.game.logic;
+// pl/mzebrows/shoots/app/GameLoop.java
+package pl.mzebrows.shoots.app;
+
+import pl.mzebrows.shoots.ui.GameFrame;
+import pl.mzebrows.shoots.ui.RoundEnum;
 
 import java.awt.GraphicsConfiguration;
 import org.slf4j.Logger;
@@ -111,8 +114,8 @@ public final class GameLoop implements Runnable {
 
     private void initializeLogic() {
         playingState = new PlayingState(gameSettings, gameFrame);
-        var pausedState = new PausedState(gameSettings, gameFrame.gameScreen, playingState);
-        var gameOverState = new GameOverState(gameSettings, gameFrame.gameScreen, playingState);
+        var pausedState = new PausedState(gameSettings, gameFrame.getGameScreen(), playingState);
+        var gameOverState = new GameOverState(gameSettings, gameFrame.getGameScreen(), playingState);
 
         playingState.setPausedState(pausedState);
         playingState.setGameOverState(gameOverState);

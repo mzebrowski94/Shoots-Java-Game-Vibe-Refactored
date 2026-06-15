@@ -1,9 +1,9 @@
 // pl/mzebrows/shoots/state/PausedState.java
 package pl.mzebrows.shoots.state;
 
-import pl.mzebrows.shoots.game.logic.GameScreen;
-import pl.mzebrows.shoots.game.logic.GameSettings;
-import pl.mzebrows.shoots.game.logic.MenuEnum;
+import pl.mzebrows.shoots.ui.GameScreen;
+import pl.mzebrows.shoots.app.GameSettings;
+import pl.mzebrows.shoots.ui.MenuEnum;
 import pl.mzebrows.shoots.input.InputBridge;
 
 /**

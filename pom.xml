@@ -80,20 +80,6 @@
         <version>3.14.0</version>
         <configuration>
           <release>25</release>
-          <!--
-            Legacy reference files: superseded by the world/score/entity/spatial model and kept on
-            disk only as a behavioural reference while fixing playtest bugs (RefactorPlan cluster 12).
-            Excluded from compilation so the build stays green; deleted in cluster 13.
-          -->
-          <excludes>
-            <exclude>**/game/logic/Player.java</exclude>
-            <exclude>**/game/logic/PointList.java</exclude>
-            <exclude>**/game/logic/MapMatrix.java</exclude>
-            <exclude>**/game/logic/ColisionCalculator.java</exclude>
-            <exclude>**/game/logic/ColisionPoint.java</exclude>
-            <exclude>**/game/logic/KeyboardInput.java</exclude>
-            <exclude>**/game/logic/Drawables/*.java</exclude>
-          </excludes>
           <annotationProcessorPaths>
             <path>
               <groupId>org.projectlombok</groupId>
