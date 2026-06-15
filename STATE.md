@@ -69,8 +69,8 @@
 - **DONE c9-c11** (134 tests, BUILD SUCCESS): round/win wiring, render migration, legacy model
   decommission. Live game runs entirely on the `world`/`score`/`entity`/`spatial` model.
 - **NOW: c12 Playtest Bug Fixing** — user playtests + reports bugs; legacy KEPT as reference (see Legacy
-  Code Map), deleted in c13. Audio -> `NewFeatures.md` (cluster A). 151 tests green. Fixes logged in
-  `RefactorPlan.md` c12: disc-retire crash, 45-deg corner penetration, capture +1/hit & disc-consume,
+  Code Map), deleted in c13. Audio -> `NewFeatures.md` (cluster A). 153 tests green. Fixes logged in
+  `RefactorPlan.md` c12: disc-retire crash, 45-deg corner penetration, capture +1/hit & disc-consume, tug-of-war erode-before-steal,
   player-base render + placement (1 tile from border) + spawn-alignment + world rebuilt from menu player count (P3/P4); tunables `disc.maxBounces`/`disc.maxPerPlayer`/`laser.maxBounces`; block-hit flash (`onWallHit`->`BlockHitEffect`, legacy `LightEffect` port).
 - **BUILD ENV**: `./mvnw` auto-detects the vendored offline toolchain in `tools/` (JDK 26 +
   Maven 3.9 + pre-seeded `.m2`) and builds fully offline IN THE SANDBOX. Always run `./mvnw test`

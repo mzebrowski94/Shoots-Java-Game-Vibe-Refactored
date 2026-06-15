@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 
-/** Graphics-free tests for the one-level-per-hit capture/steal/cap rules and tile-indexed resolution. */
+/** Graphics-free tests for the tug-of-war capture/erode/cap rules and tile-indexed resolution. */
 class CaptureScoringTest {
 
     @Test
@@ -41,14 +41,51 @@ class CaptureScoringTest {
     }
 
     @Test
-    void aHitFromAnotherPlayerStealsBackToLevelOne() {
+    void aForeignHitErodesTheOwnerOneLevelBeforeTakingIt() {
         var point = new CapturePoint(5, 5);
         point.tryCapture(1); // p1 level 1
         point.tryCapture(1); // p1 level 2
+        point.tryCapture(1); // p1 level 3
 
-        boolean changed = point.tryCapture(2); // steal
+        // First foreign hit: owner stays, level drops 3 -> 2 (does NOT capture outright).
+        assertThat(point.tryCapture(2)).isTrue();
+        assertThat(point.getOwnerId()).isEqualTo(1);
+        assertThat(point.getLevel()).isEqualTo(2);
+
+        // Second foreign hit: level drops 2 -> 1, still owned by p1.
+        assertThat(point.tryCapture(2)).isTrue();
+        assertThat(point.getOwnerId()).isEqualTo(1);
+        assertThat(point.getLevel()).isEqualTo(1);
+    }
+
+    @Test
+    void theForeignHitThatEmptiesTheOwnerRetakesThePoint() {
+        var point = new CapturePoint(5, 5);
+        point.tryCapture(1); // p1 level 1 (lowest non-neutral level)
+
+        // The hit that would drop p1 below level 1 flips ownership to the attacker at level 1.
+        boolean changed = point.tryCapture(2);
 
         assertThat(changed).isTrue();
+        assertThat(point.getOwnerId()).isEqualTo(2);
+        assertThat(point.getLevel()).isEqualTo(1);
+    }
+
+    @Test
+    void erodingAMaxedPointTakesFourForeignHitsToFlip() {
+        var point = new CapturePoint(5, 5);
+        for (int i = 0; i < CapturePoint.MAX_LEVEL; i++) {
+            point.tryCapture(1); // p1 -> level 4
+        }
+
+        // 3 hits erode 4 -> 1 without changing owner; the 4th retakes for p2.
+        for (int expectedLevel = CapturePoint.MAX_LEVEL - 1; expectedLevel >= 1; expectedLevel--) {
+            assertThat(point.tryCapture(2)).isTrue();
+            assertThat(point.getOwnerId()).isEqualTo(1);
+            assertThat(point.getLevel()).isEqualTo(expectedLevel);
+        }
+
+        assertThat(point.tryCapture(2)).isTrue();
         assertThat(point.getOwnerId()).isEqualTo(2);
         assertThat(point.getLevel()).isEqualTo(1);
     }

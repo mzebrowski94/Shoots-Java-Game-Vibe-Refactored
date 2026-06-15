@@ -11,4 +11,4 @@ claude --permission-mode acceptEdits -p "@RefactorPrompt.md @GameRules.md @Refac
 6. For each sub-item you completed and verified, change its [ ] to [x] in RefactorPlan.md. Mark the cluster header [x] only when every sub-item under it is [x].
 7. Update STATE.md in place (Package Map / Established Contracts / Legacy Code Map / Open Decisions). Remove entries that are no longer relevant. Keep the whole file under ~120 lines.
 8. Prepare files for commit and ask user to commit with a message containing cluster title.
-If every cluster in Refact
+If every cluster in RefactorPlan.md is [x], output <promise>COMPLETE</promise>."

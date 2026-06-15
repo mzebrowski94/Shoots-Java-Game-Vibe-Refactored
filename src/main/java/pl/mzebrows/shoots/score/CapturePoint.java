@@ -31,10 +31,12 @@ public final class CapturePoint {
     }
 
     /**
-     * Applies a single disc hit by {@code playerId}. Each hit advances the point by exactly ONE level so
-     * a point needs {@link #MAX_LEVEL} hits to be fully controlled (per the game rules):
-     * a neutral point is captured at level 1; the current owner raises the level by 1 up to
-     * {@link #MAX_LEVEL}; a different player STEALS it, resetting it to level 1 under the new owner.
+     * Applies a single disc hit by {@code playerId} under a tug-of-war capture model. Each hit moves the
+     * point by exactly ONE level (per the game rules):
+     * a neutral point is captured at level 1 by the attacker; the current owner raises the level by 1 up
+     * to {@link #MAX_LEVEL}; a DIFFERENT player does NOT steal outright -- they first ERODE the owner's
+     * level by 1 per hit, and only the hit that would drop it below level 1 flips the point to the
+     * attacker at level 1 (i.e. an owned point must be worn down to neutral before it is retaken).
      * A hit by the owner on an already-maxed point changes nothing.
      *
      * @return {@code true} if ownership or level changed (the disc is then consumed by the hit)
@@ -46,17 +48,21 @@ public final class CapturePoint {
             level = 1;
             return true;
         }
-        if (ownerId != playerId) {
-            // Steal: a hit from another player takes the point back to level 1 under the new owner.
-            ownerId = playerId;
-            level = 1;
+        if (ownerId == playerId) {
+            if (level < MAX_LEVEL) {
+                level++;
+                return true;
+            }
+            return false; // owner hitting an already-maxed point: no change, disc passes through
+        }
+        // Foreign hit: erode the owner one level at a time; the hit that empties it retakes the point.
+        if (level > 1) {
+            level--;
             return true;
         }
-        if (level < MAX_LEVEL) {
-            level++;
-            return true;
-        }
-        return false; // owner hitting an already-maxed point: no change, disc passes through
+        ownerId = playerId;
+        level = 1;
+        return true;
     }
 
     /** Points this capture point currently awards its owner (0 when neutral). */
