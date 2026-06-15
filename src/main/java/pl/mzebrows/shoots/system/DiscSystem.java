@@ -21,8 +21,12 @@ public final class DiscSystem {
 
     /** Callback for disc events so scoring/effects stay decoupled from disc physics. */
     public interface DiscEventSink {
-        /** A disc struck a capture-point tile at the given tile indices. */
-        void onCapturePointHit(Entity disc, int tileX, int tileY);
+        /**
+         * A disc struck a capture-point tile at the given indices.
+         * @return {@code true} if the hit changed the point (the disc is consumed and should retire);
+         *         {@code false} if nothing changed (the disc passes through).
+         */
+        boolean onCapturePointHit(Entity disc, int tileX, int tileY);
 
         /** A disc exhausted its bounce budget and was returned to the pool. */
         void onDiscRetired(Entity disc);
@@ -30,7 +34,7 @@ public final class DiscSystem {
 
     /** No-op sink for headless tests or when no listener is required. */
     public static final DiscEventSink NO_OP = new DiscEventSink() {
-        @Override public void onCapturePointHit(Entity disc, int tileX, int tileY) { }
+        @Override public boolean onCapturePointHit(Entity disc, int tileX, int tileY) { return false; }
         @Override public void onDiscRetired(Entity disc) { }
     };
 
@@ -63,7 +67,13 @@ public final class DiscSystem {
 
             CollisionResult result = collider.resolve(disc);
             if (result.collided() && result.tile().isCapturePoint()) {
-                sink.onCapturePointHit(disc, result.tileX(), result.tileY());
+                // A hit that captures/levels-up/steals the point consumes the disc; an ineffective
+                // hit (owner on an already-maxed point) returns false so the disc passes through.
+                if (sink.onCapturePointHit(disc, result.tileX(), result.tileY())) {
+                    combatSystem.retire(disc);
+                    sink.onDiscRetired(disc);
+                    continue;
+                }
             }
 
             if (combatSystem.isSpent(disc)) {

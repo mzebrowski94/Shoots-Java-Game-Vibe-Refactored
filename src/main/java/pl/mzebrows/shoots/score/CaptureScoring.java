@@ -9,7 +9,7 @@ import java.util.Collection;
  * AWT-free capture-point bookkeeping for a round: owns the {@link CapturePoint}s and resolves disc
  * hits in O(1) by tile index, replacing the legacy {@code PointList} O(N&sup2;) per-disc scan.
  *
- * <p>A point is keyed by its packed tile coordinate; {@link #resolveHit(int, int, int, int)} looks it
+ * <p>A point is keyed by its packed tile coordinate; {@link #resolveHit(int, int, int)} looks it
  * up directly instead of scanning every field. Per-player totals are derived from the points' current
  * capture state, matching the legacy "recompute on change" behaviour without touching rendering.
  */
@@ -35,14 +35,15 @@ public final class CaptureScoring {
     }
 
     /**
-     * Resolves a disc hit at ({@code tileX},{@code tileY}) by {@code playerId} after {@code bounces}
-     * reflections. No-ops (returns {@code false}) when no capture point sits on that tile.
+     * Resolves a single disc hit at ({@code tileX},{@code tileY}) by {@code playerId}. No-ops (returns
+     * {@code false}) when no capture point sits on that tile, or when the hit changes nothing (owner
+     * hitting an already-maxed point) -- in which case the disc passes through.
      *
-     * @return {@code true} if the hit captured or stole the point
+     * @return {@code true} if the hit captured, levelled-up, or stole the point
      */
-    public boolean resolveHit(int tileX, int tileY, int playerId, int bounces) {
+    public boolean resolveHit(int tileX, int tileY, int playerId) {
         CapturePoint point = pointsByTile.get(key(tileX, tileY));
-        return point != null && point.tryCapture(playerId, bounces);
+        return point != null && point.tryCapture(playerId);
     }
 
     /** Total points currently controlled by {@code playerId} across all capture points. */

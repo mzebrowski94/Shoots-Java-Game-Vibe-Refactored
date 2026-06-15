@@ -72,8 +72,8 @@ public final class PlayWorld {
     private final Entity fireSource = new Entity();
 
     private final DiscSystem.DiscEventSink sink = new DiscSystem.DiscEventSink() {
-        @Override public void onCapturePointHit(Entity disc, int tileX, int tileY) {
-            scoring.resolveHit(tileX, tileY, disc.getOwnerId(), disc.getBounces());
+        @Override public boolean onCapturePointHit(Entity disc, int tileX, int tileY) {
+            return scoring.resolveHit(tileX, tileY, disc.getOwnerId());
         }
         @Override public void onDiscRetired(Entity disc) {
             Integer owner = discOwners.remove(disc);

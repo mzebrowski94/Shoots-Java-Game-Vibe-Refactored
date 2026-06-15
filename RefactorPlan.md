@@ -174,6 +174,16 @@
       `laserMaxBounces` to `DiscConfig` (validated >= 0), wired via `GameConfigLoader`; `GameScreen`
       lazily sizes its laser polyline buffers to `1 + laserMaxBounces` (was hard-coded 16) so the
       preview shows exactly that many predicted reflections.
+- [x] **Bug: a single disc instantly maxed a capture point (4 points at once), and discs did not
+      disappear on capture.** Two fixes. (1) Capture rule: `CapturePoint.tryCapture` previously set
+      `level = min(bounces, MAX_LEVEL)`, so a disc that had bounced >=4 times jumped a fresh point
+      straight to level 4. Now each hit advances the level by exactly ONE (neutral->capture at 1,
+      owner->+1 up to MAX_LEVEL, other player->steal back to 1); bounce count no longer gates
+      capture, matching 'multiple hits to capture'. Dropped the `bounces` arg from `tryCapture`/
+      `resolveHit`. (2) Disc lifecycle: `DiscSystem.DiscEventSink.onCapturePointHit` now returns
+      whether the hit changed the point; `DiscSystem` retires the disc on a consumed hit (it
+      disappears) and lets it pass through when the hit changes nothing (owner on a maxed point).
+      `PlayWorld`'s sink returns `scoring.resolveHit(...)`. Tests in `CaptureScoringTest`/`DiscSystemTest`.
 
 ## [ ] 13. Legacy Deletion (remove superseded classes once nothing references them)
 > Deferred until after playtest bug fixing (c12) so legacy code stays available as a behavioural

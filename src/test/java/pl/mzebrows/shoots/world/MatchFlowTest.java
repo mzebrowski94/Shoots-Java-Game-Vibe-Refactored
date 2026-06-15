@@ -18,9 +18,9 @@ class MatchFlowTest {
     @Test
     void syncsCurrentPointsFromCaptureScoring() {
         var scoring = new CaptureScoring();
-        // Player 0 captures a point at (3,3); a 1-bounce hit awards level-1 points.
+        // Player 0 captures a point at (3,3); each hit awards one level.
         scoring.register(3, 3);
-        scoring.resolveHit(3, 3, 0, 1);
+        scoring.resolveHit(3, 3, 0);
 
         var flow = flow(2, 2);
         flow.syncCurrentPoints(scoring);

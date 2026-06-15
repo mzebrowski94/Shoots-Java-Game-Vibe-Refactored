@@ -57,9 +57,16 @@ tools/.m2/repository/        # pre-seeded local repo (all deps + plugins, offlin
    wc -l FILE; grep -c '{' FILE; grep -c '}' FILE; grep -aP '\x00' FILE | wc -l
    Braces must balance and NUL count must be 0. (Note: grep -c $'\x00' is a FALSE
    FRIEND — the empty pattern matches every line. Use grep -aP '\x00' | wc -l.)
-3. Prefer heredoc writes for large/rewritten files (cat > FILE <<'EOF' ... EOF).
-   This write path proved reliable; the editor tool and python open().write() were
-   the ones that truncated. Always re-verify per step 2.
+3. **DEFAULT TO SHELL WRITES FOR EVERY EDIT — do NOT use the Edit/Write file tools on this
+   mount.** They silently truncate the file tail (compiler: "reached end of file while
+   parsing") or inject NUL bytes, and still report success. This has recurred across many
+   sessions on `.java`, `.properties`, AND `.md` files (size is not a reliable predictor —
+   even small markdown edits truncated). The reliable path is writing through `bash`:
+   a heredoc (`cat > FILE <<'EOF' ... EOF`) for new/rewritten files, or `python3` doing a
+   string-replace read+write for surgical edits (anchor on a unique substring, assert it
+   matches exactly once, then write the whole file back). Always re-verify per step 2.
+   If a file DID truncate, restore it from git (`git show HEAD:PATH > PATH`) and re-apply
+   the edit through bash — do not try to repair the truncated tail by hand.
 4. Treat "my change had no effect on test output" as a build-cache smell. Suspect
    stale classes immediately; run ./mvnw clean test, don't keep editing.
 5. Git locks: if git says index.lock: File exists or index file corrupt and you

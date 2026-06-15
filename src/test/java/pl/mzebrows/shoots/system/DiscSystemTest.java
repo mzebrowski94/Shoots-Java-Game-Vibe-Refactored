@@ -99,13 +99,57 @@ class DiscSystemTest {
         }
         // Sink mirrors PlayWorld: remove the retired disc from the list mid-update.
         DiscSystem.DiscEventSink removingSink = new DiscSystem.DiscEventSink() {
-            @Override public void onCapturePointHit(Entity disc, int tileX, int tileY) { }
+            @Override public boolean onCapturePointHit(Entity disc, int tileX, int tileY) { return false; }
             @Override public void onDiscRetired(Entity disc) { discs.remove(disc); }
         };
 
         system.update(discs, removingSink); // must not throw
 
         assertThat(discs).isEmpty();
+    }
+
+    @Test
+    void discRetiresWhenCaptureHitIsConsumed() {
+        // A capture hit that changes the point (sink returns true) consumes the disc: it is retired
+        // and reported, and does NOT keep flying. Mirrors PlayWorld returning resolveHit(...).
+        var tiles = emptyField();
+        tiles[12][13] = TileType.CAPTURE_POINT;
+        var combat = new CombatSystem(pool(), DISC);
+        var system = new DiscSystem(new UniformGridCollider(tiles, grid, collision), combat);
+        // Land inside the capture tile after one +Y step.
+        Entity disc = combat.spawnDisc(12 * UNIT + UNIT / 2.0, 13 * UNIT + UNIT / 2.0, 0, 1);
+        var discs = new java.util.ArrayList<Entity>();
+        discs.add(disc);
+        DiscSystem.DiscEventSink consumingSink = new DiscSystem.DiscEventSink() {
+            @Override public boolean onCapturePointHit(Entity d, int tileX, int tileY) { return true; }
+            @Override public void onDiscRetired(Entity d) { discs.remove(d); }
+        };
+
+        system.update(discs, consumingSink);
+
+        assertThat(disc.isActive()).isFalse();
+        assertThat(discs).isEmpty();
+    }
+
+    @Test
+    void discPassesThroughWhenCaptureHitChangesNothing() {
+        // An ineffective capture hit (sink returns false) leaves the disc active and flying.
+        var tiles = emptyField();
+        tiles[12][13] = TileType.CAPTURE_POINT;
+        var combat = new CombatSystem(pool(), DISC);
+        var system = new DiscSystem(new UniformGridCollider(tiles, grid, collision), combat);
+        Entity disc = combat.spawnDisc(12 * UNIT + UNIT / 2.0, 13 * UNIT + UNIT / 2.0, 0, 1);
+        var discs = new java.util.ArrayList<Entity>();
+        discs.add(disc);
+        DiscSystem.DiscEventSink passThroughSink = new DiscSystem.DiscEventSink() {
+            @Override public boolean onCapturePointHit(Entity d, int tileX, int tileY) { return false; }
+            @Override public void onDiscRetired(Entity d) { discs.remove(d); }
+        };
+
+        system.update(discs, passThroughSink);
+
+        assertThat(disc.isActive()).isTrue();
+        assertThat(discs).containsExactly(disc);
     }
 
     @Test
