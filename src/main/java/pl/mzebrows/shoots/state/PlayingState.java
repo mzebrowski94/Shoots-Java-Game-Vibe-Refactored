@@ -33,7 +33,7 @@ public final class PlayingState implements GameState {
     private final GamePointer pointer;
 
     /** Headless simulation of the new model (aiming, pooled discs, bounces, capture scoring). */
-    private final PlayWorld world;
+    private PlayWorld world;
 
     private GameState pausedState;
     private GameState gameOverState;
@@ -218,10 +218,28 @@ public final class PlayingState implements GameState {
 
     private void doRestartGame() {
         settings.restartGame();
+        rebuildWorldForSelectedPlayers();
         world.resetMatch();
         pointer.restartGamePointer();
         counter.restartAnimationTime();
         settings.startNewRound(screen);
         log.info("Game restarted");
+    }
+
+    /**
+     * Rebuilds {@link #world} so its player count matches the menu selection
+     * ({@code settings.getPlayerNumber()}); the initial world is built from {@code game.properties},
+     * which would otherwise ignore a 3- or 4-player choice (bases/discs for P3/P4 never appear).
+     */
+    private void rebuildWorldForSelectedPlayers() {
+        GameConfig base = GameConfigLoader.load();
+        int selected = Math.max(1, Math.min(4, settings.getPlayerNumber()));
+        if (selected != base.playerNumber()) {
+            base = new GameConfig(selected, base.grid(), base.disc(), base.collision(),
+                    base.round(), base.palette());
+        }
+        world = new PlayWorld(base);
+        screen.setWorld(world, 0.0);
+        pointer.setWorld(world);
     }
 }

@@ -57,6 +57,33 @@ class PlayWorldTest {
     }
 
     @Test
+    void fourPlayerWorldHasFourDistinctBases() {
+        var world = world(4);
+        assertThat(world.playerCount()).isEqualTo(4);
+        for (int p = 0; p < 4; p++) {
+            assertThat(world.baseOf(p)).isNotNull();
+        }
+        // Each player can fire its own disc -> P3/P4 actually spawn, not just P1/P2.
+        for (int p = 0; p < 4; p++) {
+            assertThat(world.fire(p)).isTrue();
+            assertThat(world.activeDiscs(p)).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void baseSpawnPixelIsTheCentreOfTheBaseTile() {
+        // The disc/laser origin (pixelX/pixelY) must be the CENTRE of the base tile so it lines up with
+        // the drawn base rings. Regression for the earlier X/Y swap that spawned discs at the wrong tile.
+        var world = world(2);
+        int unit = world.unit();
+        for (int p = 0; p < world.playerCount(); p++) {
+            var base = world.baseOf(p);
+            assertThat(base.pixelX()).isEqualTo(base.tileX() * unit + unit / 2);
+            assertThat(base.pixelY()).isEqualTo(base.tileY() * unit + unit / 2);
+        }
+    }
+
+    @Test
     void locatesOneBasePerPlayer() {
         var world = world(2);
         assertThat(world.playerCount()).isEqualTo(2);

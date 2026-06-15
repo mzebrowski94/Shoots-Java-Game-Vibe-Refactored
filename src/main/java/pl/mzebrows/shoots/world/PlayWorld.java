@@ -269,7 +269,13 @@ public final class PlayWorld {
         for (int i = 0; i < tiles.length && found < playerCount; i++) {
             for (int j = 0; j < tiles[i].length && found < playerCount; j++) {
                 if (tiles[i][j] == TileType.PLAYER_BASE) {
-                    result[found] = new BasePlacement(found, i, j, j * unit, i * unit,
+                    // Gameplay+render convention: entity X = first tile index (i), Y = second (j); the
+                    // collider indexes tiles[getX()/unit][getY()/unit] and walls draw tiles[i][j] at
+                    // pixel (i*unit, j*unit). So the spawn/laser origin is the CENTRE of the base tile:
+                    // pixelX = i*unit + unit/2, pixelY = j*unit + unit/2. (Was swapped, so discs spawned
+                    // at the wrong tile, away from the drawn base.)
+                    result[found] = new BasePlacement(found, i, j,
+                            i * unit + unit / 2, j * unit + unit / 2,
                             SHOOT_DIRECTIONS[Math.min(found, SHOOT_DIRECTIONS.length - 1)]);
                     found++;
                 }

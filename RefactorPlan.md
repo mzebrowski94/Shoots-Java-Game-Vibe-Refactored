@@ -152,38 +152,15 @@
 > compare behaviour against the original implementation while diagnosing. Each reported bug becomes
 > a sub-item below with a short repro + root cause + fix; add a regression test where practical.
 > Do NOT delete legacy classes until this cluster is complete (deletion is the next cluster).
-- [x] **Crash: `IndexOutOfBoundsException` in `DiscSystem.update` after a disc hits a block.**
-      Repro: fire discs; when one exhausts its bounce budget on a wall it is retired, and the
-      retirement sink (`PlayWorld`) calls `discs.remove(disc)` mid-iteration. Root cause: the loop
-      cached `n = discs.size()` and iterated forward, so the post-removal shrink left `discs.get(i)`
-      reading past the end. Fix: iterate from the end (`i = size()-1; i >= 0; i--`) so a removal only
-      shifts the already-visited tail. Regression test in `DiscSystemTest`.
-- [x] **Tunable: max disc bounces + max discs per player externalized to `game.properties`.**
-      `disc.maxBounces` already existed and was wired (`DiscConfig`->`CombatSystem`); added a comment.
-      `disc.maxPerPlayer` was hard-coded as `MAX_DISCS_PER_PLAYER = 3` in `PlayWorld` — moved into
-      `DiscConfig` (validated >= 1), wired through `GameConfigLoader`, defaulted to 3, and now read by
-      `PlayWorld` for both the pool size and per-player `DiscAttackStrategy` cap.
-- [x] **Bug: discs/laser hitting a block corner at 45 degrees pass into the block and bounce stuck
-      inside.** Root cause: `UniformGridCollider.resolve` only handled a corner when the diagonal AND
-      both orthogonal neighbours were solid; a clean 45 deg hit on a block corner (only the diagonal
-      tile solid) matched no branch and returned `none()`, so the disc kept its diagonal heading into
-      the solid tile. Fix: when in the tolerance band on both axes, reflect both axes for an inner
-      corner (both sides solid) OR a diagonal-only corner (diagonal solid, both sides empty); else
-      fall through to the single-axis branches. Regression test `diagonalOnlyCornerFlipsBothAxes...`.
-- [x] **Tunable: aiming-laser preview length externalized as `laser.maxBounces=4`.** Added
-      `laserMaxBounces` to `DiscConfig` (validated >= 0), wired via `GameConfigLoader`; `GameScreen`
-      lazily sizes its laser polyline buffers to `1 + laserMaxBounces` (was hard-coded 16) so the
-      preview shows exactly that many predicted reflections.
-- [x] **Bug: a single disc instantly maxed a capture point (4 points at once), and discs did not
-      disappear on capture.** Two fixes. (1) Capture rule: `CapturePoint.tryCapture` previously set
-      `level = min(bounces, MAX_LEVEL)`, so a disc that had bounced >=4 times jumped a fresh point
-      straight to level 4. Now each hit advances the level by exactly ONE (neutral->capture at 1,
-      owner->+1 up to MAX_LEVEL, other player->steal back to 1); bounce count no longer gates
-      capture, matching 'multiple hits to capture'. Dropped the `bounces` arg from `tryCapture`/
-      `resolveHit`. (2) Disc lifecycle: `DiscSystem.DiscEventSink.onCapturePointHit` now returns
-      whether the hit changed the point; `DiscSystem` retires the disc on a consumed hit (it
-      disappears) and lets it pass through when the hit changes nothing (owner on a maxed point).
-      `PlayWorld`'s sink returns `scoring.resolveHit(...)`. Tests in `CaptureScoringTest`/`DiscSystemTest`.
+- [x] **Crash after disc hits a block.** `DiscSystem.update` cached list size and iterated forward; the retire sink removed the disc mid-loop -> `IndexOutOfBoundsException`. Fix: iterate back-to-front.
+- [x] **Tunables `disc.maxBounces` / `disc.maxPerPlayer`.** Moved hard-coded per-player cap (3) into `DiscConfig`/`game.properties`; both now drive `PlayWorld` pool size + fire cap.
+- [x] **Discs/laser stuck inside a block at 45 deg.** `UniformGridCollider` ignored diagonal-only corners; now reflects both axes for them.
+- [x] **Tunable `laser.maxBounces=4`.** Laser preview length is config-driven; `GameScreen` sizes its polyline to `1 + laserMaxBounces` (was hard-coded 16).
+- [x] **One disc maxed a capture point + discs didn't vanish on capture.** `CapturePoint.tryCapture` now adds one level per hit (no bounce-count jump); a consumed hit retires the disc, an ineffective one passes through.
+- [x] **Player bases: invisible, blocks spawning on them, wrong flank geometry.** `GameScreen` never drew bases -> added `drawBases` (two counter-rotating dashed rings in player colour, per legacy `PlayerBase`). `MapGenerator` now carves each base's box + forward firing lane (two passes so P1/P2 and P3/P4 shared lanes don't clear each other) and places a flanking wall exactly one tile to each side of the base centre. Tests in `MapGeneratorTest`.
+- [x] **Player bases (round 2, vs real refactored-build screenshot).** Base graphic and disc spawn were in different places: `BasePlacement.pixelX/pixelY` were swapped vs the gameplay convention (entity X = first tile index = screen X), so discs spawned at the wrong tile. Fixed `locateBases` to spawn at the base tile CENTRE (`i*unit+unit/2`, `j*unit+unit/2`). Enlarged base rings to 25/15 px (legacy size). Moved flanking blocks to TWO tiles aside (`FLANK_OFFSET=2`). The 5x5 area around each base is cleared so the shooting area is free. Tests: `baseSpawnPixelIsTheCentreOfTheBaseTile`, `tilesImmediatelyAroundEachBaseAreClearOfBlocks`, updated flank test.
+- [x] **Player bases (round 3): too far from border, P3/P4 never spawned, colour check.** Moved all four base centres to 1 tile from their border (`{12,23}`,`{12,1}`,`{1,12}`,`{23,12}`) so the flanking blocks sit against the border. P3/P4 didn't work because `PlayWorld` was built once from `game.properties` (playerNumber=2), ignoring the menu choice — `PlayingState.doRestartGame` now rebuilds the world from `settings.getPlayerNumber()` (1-4) and re-pushes it to the panels. Confirmed `color.player1..4` are read from `game.properties` per player (was a symptom of P3/P4 not spawning). Tests: `threeAndFourPlayerMapsPlaceTheExtraBases`, `fourPlayerWorldHasFourDistinctBases`, all-4-colour check.
+- [x] **Firing path no longer carved across the whole map.** `MapGenerator.carveBaseArea` cleared a 3-wide lane from each base to the far wall, which removed the blocks needed for indirect bounce shots (the core mechanic). Now it only clears the small spawn box (+-2 tiles) around the base; the path ahead keeps its blocks. Test renamed `onlyTheSpawnAreaAheadOfEachBaseIsCleared`.
 
 ## [ ] 13. Legacy Deletion (remove superseded classes once nothing references them)
 > Deferred until after playtest bug fixing (c12) so legacy code stays available as a behavioural

@@ -2,7 +2,7 @@
 
 > Rewrite sections **in place** as the refactor progresses. Don't turn this into a
 > history log. Promote permanent items to "Established Contracts"; delete resolved
-> ones. Target: whole file under ~80 lines.
+> ones. Target: whole file under ~120 lines.
 
 ## Package Map
 - Root: `pl.mzebrows.shoots`. Legacy in `...game.logic` (+ `.Drawables`) and `...game.main`.
@@ -68,14 +68,10 @@
 ## Open Decisions / Backlog
 - **DONE c9-c11** (134 tests, BUILD SUCCESS): round/win wiring, render migration, legacy model
   decommission. Live game runs entirely on the `world`/`score`/`entity`/`spatial` model.
-- **NOW: c12 Playtest Bug Fixing** — user playtests and reports gameplay bugs; legacy classes are
-  RETAINED as a behavioural reference (see Legacy Code Map). Deletion deferred to c13. Audio moved to
-  `NewFeatures.md` (cluster A). Fixed (139 tests): (1) `DiscSystem.update` crash — iterates discs
-  back-to-front. (2) `UniformGridCollider` 45-degree corner — diagonal-only corners reflect both axes.
-  (3) Tunables in `DiscConfig`/`game.properties`: `disc.maxBounces`, `disc.maxPerPlayer` (was 3 in
-  `PlayWorld`), `laser.maxBounces=4` (`GameScreen` polyline = `1 + laserMaxBounces`). (4) Capture rule:
-  `CapturePoint.tryCapture(playerId)` now adds ONE level per hit (no more bounce-count jump to 4); the
-  disc is retired on a hit that changes the point, and passes through when it doesn't.
+- **NOW: c12 Playtest Bug Fixing** — user playtests + reports bugs; legacy KEPT as reference (see Legacy
+  Code Map), deleted in c13. Audio -> `NewFeatures.md` (cluster A). 146 tests green. Fixes logged in
+  `RefactorPlan.md` c12: disc-retire crash, 45-deg corner penetration, capture +1/hit & disc-consume,
+  player-base render + placement (1 tile from border) + spawn-alignment + world rebuilt from menu player count (P3/P4); tunables `disc.maxBounces`/`disc.maxPerPlayer`/`laser.maxBounces`.
 - **BUILD ENV**: `./mvnw` auto-detects the vendored offline toolchain in `tools/` (JDK 26 +
   Maven 3.9 + pre-seeded `.m2`) and builds fully offline IN THE SANDBOX. Always run `./mvnw test`
   from the project root to verify — do NOT assume it can't run. (System `java` is 11; ignore it.)

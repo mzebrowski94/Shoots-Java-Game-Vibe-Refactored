@@ -11,6 +11,7 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.geom.AffineTransform;
 import java.awt.geom.Area;
 import java.awt.geom.Ellipse2D;
 
@@ -36,6 +37,7 @@ public class GameScreen extends GameCanvas {
     private int[] laserX;
     private int[] laserY;
     private float dashPhase = 0f;
+    private int baseRotation = 0;
 
     GameScreen(GameSettings gameSettings) {
         super(gameSettings);
@@ -102,6 +104,7 @@ public class GameScreen extends GameCanvas {
         }
         drawWalls(world);
         drawCapturePoints(world);
+        drawBases(world);
         drawLasers(world);
         drawDiscs(world);
     }
@@ -171,6 +174,37 @@ public class GameScreen extends GameCanvas {
                 g2d.drawPolyline(laserX, laserY, n);
             }
         }
+    }
+
+    /**
+     * Draws each player base as two counter-rotating dashed concentric rings in the player colour,
+     * centred on the base tile (mirrors the legacy {@code PlayerBase} drawable).
+     */
+    private void drawBases(PlayWorld world) {
+        int unit = world.unit();
+        int rBig = 25;
+        int rSmall = 15;
+        var dashed = new BasicStroke(2.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND,
+                10.0f, new float[]{6.9f}, 1.0f);
+        g2d.setStroke(dashed);
+        baseRotation++;
+        for (int p = 0; p < world.playerCount(); p++) {
+            PlayWorld.BasePlacement base = world.baseOf(p);
+            // Screen convention: tile (i,j) -> pixel (i*unit, j*unit); base centre is the tile centre.
+            int cx = base.tileX() * unit + unit / 2;
+            int cy = base.tileY() * unit + unit / 2;
+            g2d.setColor(world.playerColor(p));
+            drawRotatedRing(cx, cy, rBig, baseRotation);
+            drawRotatedRing(cx, cy, rSmall, -baseRotation);
+        }
+    }
+
+    /** Draws one dashed ring of {@code radius} centred at ({@code cx},{@code cy}), rotated by degrees. */
+    private void drawRotatedRing(int cx, int cy, int radius, int rotationDegrees) {
+        AffineTransform old = g2d.getTransform();
+        g2d.rotate(Math.toRadians(rotationDegrees), cx, cy);
+        g2d.draw(new Ellipse2D.Double(cx - radius, cy - radius, 2.0 * radius, 2.0 * radius));
+        g2d.setTransform(old);
     }
 
     /** Draws each active disc as a ring in its owner's colour, interpolated by the loop alpha. */

@@ -36,7 +36,11 @@ class GameConfigLoaderTest {
 
         assertThat(config.grid().unit()).isEqualTo(36);
         assertThat(config.disc().bigRadius()).isEqualTo(18);
+        // All four player colours come straight from game.properties (color.player1..4).
         assertThat(config.palette().playerColor(1)).isEqualTo(new RgbColor(124, 252, 0));
+        assertThat(config.palette().playerColor(2)).isEqualTo(new RgbColor(48, 213, 200));
+        assertThat(config.palette().playerColor(3)).isEqualTo(new RgbColor(252, 3, 0));
+        assertThat(config.palette().playerColor(4)).isEqualTo(new RgbColor(237, 26, 116));
     }
 
     @Test
