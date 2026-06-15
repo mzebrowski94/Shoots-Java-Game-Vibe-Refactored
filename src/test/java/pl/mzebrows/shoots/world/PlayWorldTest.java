@@ -30,7 +30,7 @@ class PlayWorldTest {
                         new RgbColor(252, 3, 0, 255), new RgbColor(237, 26, 116, 255)));
         return new GameConfig(players,
                 new GridConfig(36, 25),
-                new DiscConfig(18, 10, 2.0, 7, 3),
+                new DiscConfig(18, 10, 2.0, 7, 3, 4),
                 new CollisionConfig(4),
                 new RoundConfig(15, 2, 2, 1),
                 palette);

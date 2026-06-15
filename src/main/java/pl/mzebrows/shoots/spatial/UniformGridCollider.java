@@ -70,13 +70,23 @@ public final class UniformGridCollider implements SpatialCollider {
         int stepX = nearLeft ? -1 : (nearRight ? 1 : 0);
         int stepY = nearTop ? -1 : (nearBottom ? 1 : 0);
 
-        // Corner: both neighbours solid -> reflect on both axes.
-        if (stepX != 0 && stepY != 0 && tileAt(inX + stepX, inY + stepY).isSolid()
-                && tileAt(inX + stepX, inY).isSolid() && tileAt(inX, inY + stepY).isSolid()) {
-            entity.setDirectionX(-entity.getDirectionX());
-            entity.setDirectionY(-entity.getDirectionY());
-            entity.setBounces(entity.getBounces() + 1);
-            return CollisionResult.hit(TileType.WALL, inX + stepX, inY + stepY);
+        // Corner: when the disc is in the tolerance band on both axes, decide the bounce from the
+        // three neighbours in its travel quadrant. If only the diagonal tile is solid (a 45-degree
+        // hit straight at a block corner), reflect BOTH axes -- otherwise the disc would keep its
+        // diagonal heading, penetrate the solid corner tile, and bounce around stuck inside it.
+        if (stepX != 0 && stepY != 0) {
+            boolean sideX = tileAt(inX + stepX, inY).isSolid();
+            boolean sideY = tileAt(inX, inY + stepY).isSolid();
+            boolean diag = tileAt(inX + stepX, inY + stepY).isSolid();
+            // Inner corner (both sides solid) or a clean diagonal-only corner -> flip both axes.
+            if ((sideX && sideY) || (diag && !sideX && !sideY)) {
+                entity.setDirectionX(-entity.getDirectionX());
+                entity.setDirectionY(-entity.getDirectionY());
+                entity.setBounces(entity.getBounces() + 1);
+                return CollisionResult.hit(TileType.WALL, inX + stepX, inY + stepY);
+            }
+            // Otherwise exactly one side is solid: fall through to the single-axis branches below,
+            // which reflect off that wall and let the disc slide along it.
         }
 
         if (stepX != 0 && tileAt(inX + stepX, inY).isSolid()) {

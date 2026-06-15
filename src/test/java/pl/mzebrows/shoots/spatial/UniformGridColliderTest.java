@@ -133,6 +133,25 @@ class UniformGridColliderTest {
     }
 
     @Test
+    void diagonalOnlyCornerFlipsBothAxesInsteadOfPenetrating() {
+        // Bug: a disc heading diagonally straight at a block CORNER -- only the diagonal neighbour
+        // is solid, both orthogonal neighbours empty -- matched no branch, kept its diagonal heading,
+        // entered the solid tile and bounced around stuck inside. It must now reflect on both axes.
+        var tiles = emptyField();
+        tiles[6][6] = TileType.WALL; // diagonal block only; (6,5) and (5,6) stay EMPTY
+        var collider = new UniformGridCollider(tiles, grid, collision);
+        var disc = discAt(5 * UNIT + (UNIT - 1), 5 * UNIT + (UNIT - 1)); // bottom-right band of (5,5)
+
+        var result = collider.resolve(disc);
+
+        assertThat(result.collided()).isTrue();
+        assertThat(result.tile()).isEqualTo(TileType.WALL);
+        assertThat(disc.getDirectionX()).isEqualTo(-1);
+        assertThat(disc.getDirectionY()).isEqualTo(-1);
+        assertThat(disc.getBounces()).isEqualTo(1);
+    }
+
+    @Test
     void capturePointTileIsReportedWithoutReflection() {
         var tiles = emptyField();
         tiles[5][5] = TileType.CAPTURE_POINT;

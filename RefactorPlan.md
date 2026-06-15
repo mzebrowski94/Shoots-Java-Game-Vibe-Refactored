@@ -163,6 +163,17 @@
       `disc.maxPerPlayer` was hard-coded as `MAX_DISCS_PER_PLAYER = 3` in `PlayWorld` — moved into
       `DiscConfig` (validated >= 1), wired through `GameConfigLoader`, defaulted to 3, and now read by
       `PlayWorld` for both the pool size and per-player `DiscAttackStrategy` cap.
+- [x] **Bug: discs/laser hitting a block corner at 45 degrees pass into the block and bounce stuck
+      inside.** Root cause: `UniformGridCollider.resolve` only handled a corner when the diagonal AND
+      both orthogonal neighbours were solid; a clean 45 deg hit on a block corner (only the diagonal
+      tile solid) matched no branch and returned `none()`, so the disc kept its diagonal heading into
+      the solid tile. Fix: when in the tolerance band on both axes, reflect both axes for an inner
+      corner (both sides solid) OR a diagonal-only corner (diagonal solid, both sides empty); else
+      fall through to the single-axis branches. Regression test `diagonalOnlyCornerFlipsBothAxes...`.
+- [x] **Tunable: aiming-laser preview length externalized as `laser.maxBounces=4`.** Added
+      `laserMaxBounces` to `DiscConfig` (validated >= 0), wired via `GameConfigLoader`; `GameScreen`
+      lazily sizes its laser polyline buffers to `1 + laserMaxBounces` (was hard-coded 16) so the
+      preview shows exactly that many predicted reflections.
 
 ## [ ] 13. Legacy Deletion (remove superseded classes once nothing references them)
 > Deferred until after playtest bug fixing (c12) so legacy code stays available as a behavioural

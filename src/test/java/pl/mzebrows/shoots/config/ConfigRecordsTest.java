@@ -37,7 +37,7 @@ class ConfigRecordsTest {
 
     @Test
     void discConfigRejectsSmallRadiusNotLessThanBig() {
-        assertThatThrownBy(() -> new DiscConfig(10, 10, 2.0, 7, 3))
+        assertThatThrownBy(() -> new DiscConfig(10, 10, 2.0, 7, 3, 4))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

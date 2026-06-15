@@ -69,10 +69,11 @@
   decommission. Live game runs entirely on the `world`/`score`/`entity`/`spatial` model.
 - **NOW: c12 Playtest Bug Fixing** — user playtests and reports gameplay bugs; legacy classes are
   RETAINED as a behavioural reference (see Legacy Code Map). Deletion deferred to c13. Audio moved to
-  `NewFeatures.md` (cluster A). Fixed so far (135 tests): (1) `DiscSystem.update` crash — now iterates
-  discs back-to-front so the retirement sink can `discs.remove` mid-step safely. (2) Disc tunables: both
-  `disc.maxBounces` and the new `disc.maxPerPlayer` (was hard-coded 3 in `PlayWorld`) live in
-  `DiscConfig`/`game.properties`; `PlayWorld` reads `maxPerPlayer` for pool size + per-player cap.
+  `NewFeatures.md` (cluster A). Fixed (136 tests): (1) `DiscSystem.update` crash — iterates discs
+  back-to-front so the retire sink can `discs.remove` mid-step. (2) `UniformGridCollider` 45-degree
+  corner bug — diagonal-only corners now reflect both axes (no penetration). (3) Tunables in
+  `DiscConfig`/`game.properties`: `disc.maxBounces`, `disc.maxPerPlayer` (was 3 in `PlayWorld`), and
+  `laser.maxBounces=4` (`GameScreen` sizes laser polyline to `1 + laserMaxBounces`, was 16).
 - **BUILD ENV**: `./mvnw` auto-detects the vendored offline toolchain in `tools/` (JDK 26 +
   Maven 3.9 + pre-seeded `.m2`) and builds fully offline IN THE SANDBOX. Always run `./mvnw test`
   from the project root to verify — do NOT assume it can't run. (System `java` is 11; ignore it.)

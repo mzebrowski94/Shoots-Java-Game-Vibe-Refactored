@@ -22,7 +22,6 @@ import java.awt.geom.Ellipse2D;
 public class GameScreen extends GameCanvas {
 
     private static final Color WALL_COLOR = new Color(25, 25, 25);
-    private static final int MAX_LASER_POINTS = 16;
 
     private GameMenu menuLayout;
 
@@ -30,9 +29,12 @@ public class GameScreen extends GameCanvas {
     private PlayWorld world;
     private double alpha;
 
-    /** Reusable laser-polyline scratch buffers, sized once to avoid per-frame allocation. */
-    private final int[] laserX = new int[MAX_LASER_POINTS];
-    private final int[] laserY = new int[MAX_LASER_POINTS];
+    /**
+     * Reusable laser-polyline scratch buffers, lazily sized from {@code laser.maxBounces} (origin +
+     * N reflection points) on first use so the preview length is config-driven, not hard-coded.
+     */
+    private int[] laserX;
+    private int[] laserY;
     private float dashPhase = 0f;
 
     GameScreen(GameSettings gameSettings) {
@@ -153,6 +155,12 @@ public class GameScreen extends GameCanvas {
 
     /** Draws each player's predicted aiming laser as a dashed polyline in the player colour. */
     private void drawLasers(PlayWorld world) {
+        // Origin point + one point per predicted reflection (laser.maxBounces).
+        int laserPoints = 1 + world.config().disc().laserMaxBounces();
+        if (laserX == null || laserX.length != laserPoints) {
+            laserX = new int[laserPoints];
+            laserY = new int[laserPoints];
+        }
         var dashed = new BasicStroke(2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND,
                 5.0f, new float[]{6f}, dashPhase);
         g2d.setStroke(dashed);
@@ -160,7 +168,7 @@ public class GameScreen extends GameCanvas {
             int n = world.predictLaser(p, laserX, laserY);
             if (n >= 2) {
                 g2d.setColor(world.playerColor(p));
-                g2d.drawPolyline(laserX, laserY, Math.min(n, MAX_LASER_POINTS));
+                g2d.drawPolyline(laserX, laserY, n);
             }
         }
     }
