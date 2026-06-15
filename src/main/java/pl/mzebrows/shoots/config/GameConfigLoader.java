@@ -52,7 +52,8 @@ public final class GameConfigLoader {
                 intValue(props, "disc.bigRadius", defaults.disc().bigRadius()),
                 intValue(props, "disc.smallRadius", defaults.disc().smallRadius()),
                 doubleValue(props, "disc.moveSpeed", defaults.disc().moveSpeed()),
-                intValue(props, "disc.maxBounces", defaults.disc().maxBounces()));
+                intValue(props, "disc.maxBounces", defaults.disc().maxBounces()),
+                intValue(props, "disc.maxPerPlayer", defaults.disc().maxPerPlayer()));
 
         var collision = new CollisionConfig(
                 intValue(props, "collision.ballCollisionSize", defaults.collision().ballCollisionSize()));
@@ -73,7 +74,7 @@ public final class GameConfigLoader {
     /** Built-in defaults mirroring the legacy hard-coded values. */
     public static GameConfig defaults() {
         var grid = new GridConfig(36, 25);
-        var disc = new DiscConfig(18, 10, 2.0, 7);
+        var disc = new DiscConfig(18, 10, 2.0, 7, 3);
         var collision = new CollisionConfig(4);
         var round = new RoundConfig(15, 2, 2, 1);
         var palette = new ColorPalette(

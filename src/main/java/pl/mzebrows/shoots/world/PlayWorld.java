@@ -41,7 +41,6 @@ public final class PlayWorld {
     public record BasePlacement(int playerId, int tileX, int tileY, int pixelX, int pixelY, int shootDirection) { }
 
     private static final int[] SHOOT_DIRECTIONS = {180, 0, -90, 90};
-    private static final int MAX_DISCS_PER_PLAYER = 3;
 
     private final GameConfig config;
     private final int playerCount;
@@ -114,7 +113,8 @@ public final class PlayWorld {
         this.collider = new UniformGridCollider(tiles, config.grid(), config.collision());
 
         int unit = config.grid().unit();
-        this.discPool = new ObjectPool<>(MAX_DISCS_PER_PLAYER * playerCount, Entity::new, Entity::reset);
+        int maxDiscsPerPlayer = config.disc().maxPerPlayer();
+        this.discPool = new ObjectPool<>(maxDiscsPerPlayer * playerCount, Entity::new, Entity::reset);
         this.discs = new ArrayList<>(discPool.capacity());
         this.combatSystem = new CombatSystem(discPool, config.disc());
         this.discSystem = new DiscSystem(collider, combatSystem);
@@ -127,7 +127,7 @@ public final class PlayWorld {
 
         for (int p = 0; p < playerCount; p++) {
             aim[p] = new AimController(bases[p].shootDirection(), config.disc().bigRadius() * 5.0, 1.0);
-            attack[p] = new DiscAttackStrategy(MAX_DISCS_PER_PLAYER);
+            attack[p] = new DiscAttackStrategy(maxDiscsPerPlayer);
         }
 
         registerCapturePoints();

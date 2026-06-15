@@ -1,8 +1,8 @@
 // src/main/java/pl/mzebrows/shoots/config/DiscConfig.java
 package pl.mzebrows.shoots.config;
 
-/** Tunables for a player disc (projectile): geometry, speed, and bounce limit. */
-public record DiscConfig(int bigRadius, int smallRadius, double moveSpeed, int maxBounces) {
+/** Tunables for a player disc (projectile): geometry, speed, bounce limit, and concurrent-disc cap. */
+public record DiscConfig(int bigRadius, int smallRadius, double moveSpeed, int maxBounces, int maxPerPlayer) {
 
     public DiscConfig {
         if (bigRadius <= 0) {
@@ -16,6 +16,9 @@ public record DiscConfig(int bigRadius, int smallRadius, double moveSpeed, int m
         }
         if (maxBounces < 0) {
             throw new IllegalArgumentException("maxBounces must be non-negative: " + maxBounces);
+        }
+        if (maxPerPlayer < 1) {
+            throw new IllegalArgumentException("maxPerPlayer must be at least 1: " + maxPerPlayer);
         }
     }
 }

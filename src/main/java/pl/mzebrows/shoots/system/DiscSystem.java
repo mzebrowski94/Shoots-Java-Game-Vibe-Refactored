@@ -43,11 +43,17 @@ public final class DiscSystem {
     }
 
     /**
-     * Advances and collides every active disc in {@code discs}, retiring spent ones. Iterates by
-     * index and reuses the entity instances; the only allocation is the immutable hit result.
+     * Advances and collides every active disc in {@code discs}, retiring spent ones. Reuses the
+     * entity instances; the only allocation is the immutable hit result.
+     *
+     * <p>Iterates from the end so the retirement {@link DiscEventSink} can remove the spent disc from
+     * {@code discs} in place without corrupting the loop: a removal at index {@code i} shifts only the
+     * already-visited tail, leaving lower indices valid. The earlier forward loop that cached
+     * {@code size()} threw {@link IndexOutOfBoundsException} once a block bounce retired a disc and the
+     * sink shrank the list mid-iteration.
      */
     public void update(List<Entity> discs, DiscEventSink sink) {
-        for (int i = 0, n = discs.size(); i < n; i++) {
+        for (int i = discs.size() - 1; i >= 0; i--) {
             Entity disc = discs.get(i);
             if (!disc.isActive()) {
                 continue;

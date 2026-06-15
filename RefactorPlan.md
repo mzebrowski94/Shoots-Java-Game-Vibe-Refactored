@@ -152,7 +152,17 @@
 > compare behaviour against the original implementation while diagnosing. Each reported bug becomes
 > a sub-item below with a short repro + root cause + fix; add a regression test where practical.
 > Do NOT delete legacy classes until this cluster is complete (deletion is the next cluster).
-- [ ] (bugs will be appended here as the user reports them during playtesting)
+- [x] **Crash: `IndexOutOfBoundsException` in `DiscSystem.update` after a disc hits a block.**
+      Repro: fire discs; when one exhausts its bounce budget on a wall it is retired, and the
+      retirement sink (`PlayWorld`) calls `discs.remove(disc)` mid-iteration. Root cause: the loop
+      cached `n = discs.size()` and iterated forward, so the post-removal shrink left `discs.get(i)`
+      reading past the end. Fix: iterate from the end (`i = size()-1; i >= 0; i--`) so a removal only
+      shifts the already-visited tail. Regression test in `DiscSystemTest`.
+- [x] **Tunable: max disc bounces + max discs per player externalized to `game.properties`.**
+      `disc.maxBounces` already existed and was wired (`DiscConfig`->`CombatSystem`); added a comment.
+      `disc.maxPerPlayer` was hard-coded as `MAX_DISCS_PER_PLAYER = 3` in `PlayWorld` — moved into
+      `DiscConfig` (validated >= 1), wired through `GameConfigLoader`, defaulted to 3, and now read by
+      `PlayWorld` for both the pool size and per-player `DiscAttackStrategy` cap.
 
 ## [ ] 13. Legacy Deletion (remove superseded classes once nothing references them)
 > Deferred until after playtest bug fixing (c12) so legacy code stays available as a behavioural

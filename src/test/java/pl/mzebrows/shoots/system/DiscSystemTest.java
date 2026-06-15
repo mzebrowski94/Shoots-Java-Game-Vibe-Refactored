@@ -21,7 +21,7 @@ class DiscSystemTest {
 
     private static final int UNIT = 36;
     private static final int SIZE = 25;
-    private static final DiscConfig DISC = new DiscConfig(18, 10, 2.0, 7);
+    private static final DiscConfig DISC = new DiscConfig(18, 10, 2.0, 7, 3);
 
     private final GridConfig grid = new GridConfig(UNIT, SIZE);
     private final CollisionConfig collision = new CollisionConfig(4);
@@ -82,6 +82,30 @@ class DiscSystemTest {
         system.update(List.of(disc), sink);
 
         verify(sink).onCapturePointHit(disc, 12, 13);
+    }
+
+    @Test
+    void retiringDiscsMidUpdateDoesNotCorruptIteration() {
+        // Regression: the retirement sink removes the spent disc from the live list (as PlayWorld
+        // does). The old forward loop cached size() and threw IndexOutOfBoundsException once a disc
+        // was removed mid-iteration (e.g. right after a block bounce exhausted its bounce budget).
+        var combat = new CombatSystem(pool(), DISC);
+        var system = new DiscSystem(new UniformGridCollider(emptyField(), grid, collision), combat);
+        var discs = new java.util.ArrayList<Entity>();
+        for (int k = 0; k < 4; k++) {
+            Entity d = combat.spawnDisc(12 * UNIT, 12 * UNIT, 0, 1);
+            d.setBounces(DISC.maxBounces()); // every disc is already spent -> all retire this step
+            discs.add(d);
+        }
+        // Sink mirrors PlayWorld: remove the retired disc from the list mid-update.
+        DiscSystem.DiscEventSink removingSink = new DiscSystem.DiscEventSink() {
+            @Override public void onCapturePointHit(Entity disc, int tileX, int tileY) { }
+            @Override public void onDiscRetired(Entity disc) { discs.remove(disc); }
+        };
+
+        system.update(discs, removingSink); // must not throw
+
+        assertThat(discs).isEmpty();
     }
 
     @Test
