@@ -1,5 +1,5 @@
 
-package pl.mzebrows.shoots.game.main;
+package pl.mzebrows.shoots;
 
 import pl.mzebrows.shoots.app.GameLoop;
 

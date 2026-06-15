@@ -199,39 +199,15 @@
       (recorded in STATE.md). `game.logic` emptied to inert stubs (Windows-locked; user deletes the
       folder on Windows). Verify clean compile + tests. **[DONE — 153 tests green.]**
 
-## [ ] 15. Naming Audit (class + variable names to convention)
+## [x] 15. Naming Audit (class + variable names to convention)
 > Sweep the WHOLE codebase for names that don't follow Java/Clean-Code convention. No pattern-driven
 > renames here (that's cluster 16c) — just plain convention fixes. Behaviour unchanged.
-- [ ] Fix non-conventional CLASS names that are abbreviations/unclear (e.g. `PSConst` -> a clear name
+- [x] Fix non-conventional CLASS names that are abbreviations/unclear (e.g. `PSConst` -> a clear name
       like `GameUnits`/`GameDimensions`). Update all references; record old->new in STATE.md.
-- [ ] Fix non-conventional VARIABLE/field/constant names: SCREAMING_SNAKE used on non-static fields,
+      **[DONE — `PSConst` -> `GameDimensions`; enum const `TABLESIZE` -> `TABLE_SIZE`.]**
+- [x] Fix non-conventional VARIABLE/field/constant names: SCREAMING_SNAKE used on non-static fields,
       remaining abbreviations, and any misspellings missed earlier. Static finals stay UPPER_SNAKE;
       instance fields/locals become lowerCamelCase. Verify clean compile + tests.
-
-## [ ] 16. Design-Pattern Documentation & Pattern-Driven Renames (educational pass)
-> Big educational cluster. Make the design patterns in the codebase explicit in the class Javadoc, and
-> rename classes whose name hides the pattern they implement. General, textbook descriptions of each
-> pattern (not tied to our specifics). Game-dev patterns count (State, Strategy, Object Pool, ECS/
-> Component, Facade, Adapter, Game Loop, Spatial Partition, Observer/event-sink, Factory/Spawner).
-- [ ] **Pattern audit table** in STATE.md: list each class that implements a recognised pattern and
-      which pattern it is (Strategy: `*Strategy`; State: `*State`/`GameStateMachine`; Object Pool:
-      `ObjectPool`; Facade: `PlayWorld`; Adapter: `PlayInput`/`AwtRenderer`; Game Loop: `GameLoop`/
-      `FixedTimestep`; Spatial Partition: `UniformGridCollider`; Observer: `DiscEventSink`; Factory/
-      Spawner: `EntitySpawner`/`CombatSystem`; etc.). This drives 16b and 16c.
-- [ ] **Pattern one-liner in class Javadoc**: for every class whose name indicates a pattern, add one
-      general sentence describing what that pattern does, e.g.
-      `// Pattern "Strategy" — enkapsuluje wymienny algorytm za interfejsem, by zmieniać zachowanie w
-      czasie działania.` (in Polish per cluster 17). Applied to all pattern classes from 16a.
-- [ ] **Pattern-driven renames**: rename classes whose name doesn't reflect their pattern where it
-      clearly improves clarity (propose each; e.g. consider `*System` vs ECS-system naming, panel names).
-      Keep already-clear pattern names (`AimController`, `DiscAttackStrategy`, `MapGenerator`). Update all
-      references; record old->new in STATE.md. Verify clean compile + tests.
-
-## [ ] 17. Polish Javadoc Translation (educational; all non-test main classes)
-> Translate ALL Javadoc in `src/main` (class + method + field) into Polish for educational purposes;
-> leave test classes' comments as-is. Code identifiers stay English; only doc prose is Polish. Must run
-> AFTER clusters 14-16 so it lands on final names/locations and includes the pattern one-liners (16b).
-- [ ] Translate class-level + method-level + field Javadoc across every `src/main` package (config,
-      entity, input, loop, pool, render, score, spatial, state, system, world, ui, app) into Polish,
-      preserving `@param`/`@return`/`{@link}`/`{@code}` tags and the pattern one-liners from 16b.
-      Verify clean compile + 153 tests (Javadoc-only change).
+      **[DONE — `GameSettings.DEFAULT_*`/`SIZE`/`UNIT` instance fields -> camelCase (Lombok getters
+      now `getDefaultWidth()` etc.); `gS` -> `gameSettings` (100 refs); `gd2` -> `g2d`; `var` applied
+      to obvious-type locals. 153 tests green.]**

@@ -23,7 +23,7 @@ public class GameMenu {
     int menuHeight;
     int menuScoreHigh;
     MenuEnum menuOption;
-    GameSettings gS;
+    GameSettings gameSettings;
     Font menuFont;
     int iterator = 50;
     boolean textBrighter = true;
@@ -50,15 +50,15 @@ public class GameMenu {
 
     GameMenu(GameSettings gameSettings) {
         menuOption = MenuEnum.START_NEW_GAME;
-        gS = gameSettings;
-        width = gS.getDEFAULT_WIDTH();
-        height = gS.getDEFAULT_HEIGHT();
+        this.gameSettings = gameSettings;
+        width = gameSettings.getDefaultWidth();
+        height = gameSettings.getDefaultHeight();
         nextLine = 50;
         menuHeight = 150;
         menuScoreHigh = 100;
         textPosition = (width / 2) - 50;
-        menuFont = gS.getMenuFont().deriveFont(30f);
-        winTextColor = gS.getColorScheme().getBackgroundFontColor();
+        menuFont = gameSettings.getMenuFont().deriveFont(30f);
+        winTextColor = gameSettings.getColorScheme().getBackgroundFontColor();
     }
 
     /**
@@ -77,7 +77,7 @@ public class GameMenu {
         // Subtle highlight bar behind the currently selected row, for clear focus.
         drawSelectionHighlight(g2d);
 
-        Color purple = gS.getColorScheme().getDeadLineColor();
+        Color purple = gameSettings.getColorScheme().getDeadLineColor();
         shadowString(g2d, stringNewGame, textPosition, menuHeight + 3 * nextLine, purple);
         shadowString(g2d, stringPlayerNumberText, textPosition, menuHeight + 4 * nextLine, purple);
         shadowString(g2d, stringPlayerNumber, textPosition, menuHeight + 5 * nextLine, purple);
@@ -87,9 +87,9 @@ public class GameMenu {
         shadowString(g2d, stringRoundTime, textPosition, menuHeight + 9 * nextLine, purple);
         shadowString(g2d, stringQuit, textPosition, menuHeight + 12 * nextLine, purple);
 
-        if (gS.getActualRoundNumber() == 0) {
-            shadowString(g2d, stringContinue, textPosition, menuHeight, gS.getColorScheme().getBackgroundFontColor());
-        } else if (gS.isGameEnd()) {
+        if (gameSettings.getActualRoundNumber() == 0) {
+            shadowString(g2d, stringContinue, textPosition, menuHeight, gameSettings.getColorScheme().getBackgroundFontColor());
+        } else if (gameSettings.isGameEnd()) {
             drawGameEnd(g2d, world);
         } else {
             shadowString(g2d, stringContinue, textPosition, menuHeight, purple);
@@ -126,7 +126,7 @@ public class GameMenu {
      */
     private int panelWidth(Graphics2D g2d) {
         int w = menuRowsWidth(g2d);
-        if (gS.isGameEnd()) {
+        if (gameSettings.isGameEnd()) {
             FontMetrics fm = g2d.getFontMetrics(menuFont);
             int scoreboard = SCORE_LABEL_WIDTH + MAX_PLAYERS * (fm.stringWidth("00") + 44)
                     + 2 * PANEL_PAD_X;
@@ -211,7 +211,7 @@ public class GameMenu {
         int colsLeft = labelX + SCORE_LABEL_WIDTH;
         int colsRight = panelX + panelW - PANEL_PAD_X;
 
-        Color labelColor = gS.getColorScheme().getBackgroundFontColor();
+        Color labelColor = gameSettings.getColorScheme().getBackgroundFontColor();
         shadowString(g2d, "Rounds: ", labelX, menuScoreHigh + 50, labelColor);
         shadowString(g2d, "Points: ", labelX, menuScoreHigh + 100, labelColor);
 
@@ -245,7 +245,7 @@ public class GameMenu {
         for (int i = 0; i < players; i++) {
             var score = world.matchFlow().scoreOf(i);
             int colCentre = colsLeft + slotWidth * i + slotWidth / 2;
-            Color scoreColor = score.isWinner() ? winTextColor : gS.getColorScheme().getDeadLineColor();
+            Color scoreColor = score.isWinner() ? winTextColor : gameSettings.getColorScheme().getDeadLineColor();
             drawScoreCell(g2d, "P" + (i + 1), colCentre, menuScoreHigh, scoreColor, fm);
             drawScoreCell(g2d, "" + score.getRoundsWon(), colCentre, menuScoreHigh + 50, scoreColor, fm);
             drawScoreCell(g2d, "" + score.getTotalPoints(), colCentre, menuScoreHigh + 100, scoreColor, fm);
@@ -278,9 +278,9 @@ public class GameMenu {
         } else if (menuOption == MenuEnum.START_NEW_GAME) {
             if (input.isJustPressed(GameAction.CONFIRM)) {
                 choosenOption = MenuEnum.START_NEW_GAME;
-                gS.setRoundTime(roundTime);
-                gS.setPlayerNumber(playerNumber);
-                gS.setRoundLimit(roundNumber);
+                gameSettings.setRoundTime(roundTime);
+                gameSettings.setPlayerNumber(playerNumber);
+                gameSettings.setRoundLimit(roundNumber);
             }
         } else if (menuOption == MenuEnum.PLAYER_NUMBER_OPTION) {
             playerNumber = changeNumber(input, playerNumber, playerLimit, 1);
@@ -342,7 +342,7 @@ public class GameMenu {
         } else if (menuOption == MenuEnum.ROUND_TIME_OPTION) {
             menuOption = MenuEnum.QUIT;
         } else if (menuOption == MenuEnum.QUIT) {
-            if (gS.getActualRoundNumber() != 0 && !gS.isGameEnd()) {
+            if (gameSettings.getActualRoundNumber() != 0 && !gameSettings.isGameEnd()) {
                 menuOption = MenuEnum.CONTINUE;
             } else {
                 menuOption = MenuEnum.START_NEW_GAME;
@@ -357,7 +357,7 @@ public class GameMenu {
         if (menuOption == MenuEnum.CONTINUE) {
             menuOption = MenuEnum.QUIT;
         } else if (menuOption == MenuEnum.START_NEW_GAME) {
-            if (gS.getActualRoundNumber() != 0 && !gS.isGameEnd()) {
+            if (gameSettings.getActualRoundNumber() != 0 && !gameSettings.isGameEnd()) {
                 menuOption = MenuEnum.CONTINUE;
             } else {
                 menuOption = MenuEnum.QUIT;

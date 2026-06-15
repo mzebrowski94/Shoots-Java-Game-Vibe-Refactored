@@ -39,20 +39,20 @@ public class GameCounter extends GameCanvas {
     GameCounter(GameSettings gameSettings) {
         super(gameSettings);
 
-        this.width = gS.getDEFAULT_WIDTH();
-        this.height = gS.getDEFAULT_COUNTER_HEIGHT();
-        this.longWidth = gS.getDEFAULT_COUNTER_WIDTH();
+        this.width = gameSettings.getDefaultWidth();
+        this.height = gameSettings.getDefaultCounterHeight();
+        this.longWidth = gameSettings.getDefaultCounterWidth();
         this.timeBarWidth = (int) (0.75 * width);
         this.timeBarHalfWidth = (int) (0.5 * timeBarWidth);
         this.timeBarHeight = (int) (0.25 * height);
         this.timeBarUpperHeight = (int) (0.5 * height - timeBarHeight * 0.5);
         this.timeBarLeftWidth = (int) (0.5 * width - 0.5 * timeBarWidth);
 
-        setPreferredSize(new Dimension(gS.getDEFAULT_WIDTH(), gS.getDEFAULT_COUNTER_HEIGHT()));
-        deadLineColor = gS.getColorScheme().getDeadLineColor();
-        deadLineBackgroundColor = gS.getColorScheme().getDeadLineBackgroundColor();
+        setPreferredSize(new Dimension(gameSettings.getDefaultWidth(), gameSettings.getDefaultCounterHeight()));
+        deadLineColor = gameSettings.getColorScheme().getDeadLineColor();
+        deadLineBackgroundColor = gameSettings.getColorScheme().getDeadLineBackgroundColor();
         animatedElementLength = timeBarHalfWidth;
-        animationTime = gS.getRoundTime();
+        animationTime = gameSettings.getRoundTime();
     }
 
     @Override
@@ -130,7 +130,7 @@ public class GameCounter extends GameCanvas {
      *
      * @param gd2 the Graphics2D used to draw the elements
      */
-    public void drawTitle(Graphics2D gd2) {
+    public void drawTitle(Graphics2D g2d) {
         g2d.setColor(deadLineBackgroundColor);
         g2d.drawString("Project", width + fontFreeSpace, 30 + textOffset);
         g2d.drawString(" Shooots!", width + fontFreeSpace, 55 + textOffset);
@@ -150,8 +150,8 @@ public class GameCounter extends GameCanvas {
         leftDeadLineBackground = new Rectangle(timeBarLeftWidth, timeBarUpperHeight, timeBarHalfWidth, timeBarHeight);
         rightDeadLineBackground = new Rectangle(timeBarLeftWidth + timeBarHalfWidth, timeBarUpperHeight, timeBarHalfWidth, timeBarHeight);
         //Text
-        g2d.setFont(gS.getGameFont().deriveFont(fontSize));
-        g2d.setFont(new Font(gS.getGameFont().getFontName(), 100, 25));
+        g2d.setFont(gameSettings.getGameFont().deriveFont(fontSize));
+        g2d.setFont(new Font(gameSettings.getGameFont().getFontName(), 100, 25));
     }
 
     /**
@@ -193,23 +193,23 @@ public class GameCounter extends GameCanvas {
         // During pause / win (a round has been played) redraw the normal counter so it shows faintly
         // through the near-transparent menu tint, matching the play-screen translucent look. On a fresh
         // start there is no game behind the menu, so clear to an opaque background instead.
-        if (gS.getActualRoundNumber() > 0 || gS.isGameEnd()) {
+        if (gameSettings.getActualRoundNumber() > 0 || gameSettings.isGameEnd()) {
             drawRoundContinues();
         } else {
-            g2d.setColor(gS.getColorScheme().getBackgroundColor());
-            g2d.fillRect(0, 0, gS.getDEFAULT_COUNTER_WIDTH(), gS.getDEFAULT_COUNTER_HEIGHT());
+            g2d.setColor(gameSettings.getColorScheme().getBackgroundColor());
+            g2d.fillRect(0, 0, gameSettings.getDefaultCounterWidth(), gameSettings.getDefaultCounterHeight());
         }
-        g2d.setColor(gS.getColorScheme().getMenuStandardColor());
-        g2d.fillRect(0, 0, gS.getDEFAULT_COUNTER_WIDTH(), gS.getDEFAULT_COUNTER_HEIGHT());
+        g2d.setColor(gameSettings.getColorScheme().getMenuStandardColor());
+        g2d.fillRect(0, 0, gameSettings.getDefaultCounterWidth(), gameSettings.getDefaultCounterHeight());
     }
 
     @Override
     public void drawRoundContinues() {
         // Re-apply the title font every frame: graphics are now re-acquired per frame, so a font set only
         // at init would be lost and the title would fall back to the default AWT font.
-        g2d.setFont(new Font(gS.getGameFont().getFontName(), 100, 25));
-        g2d.setColor(gS.getColorScheme().getBackgroundColor());
-        g2d.fillRect(0, 0, gS.getDEFAULT_COUNTER_WIDTH(), gS.getDEFAULT_COUNTER_HEIGHT());
+        g2d.setFont(new Font(gameSettings.getGameFont().getFontName(), 100, 25));
+        g2d.setColor(gameSettings.getColorScheme().getBackgroundColor());
+        g2d.fillRect(0, 0, gameSettings.getDefaultCounterWidth(), gameSettings.getDefaultCounterHeight());
 
         drawBorder(g2d, actualRoundState);
     }

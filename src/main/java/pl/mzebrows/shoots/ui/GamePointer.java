@@ -2,10 +2,8 @@
 package pl.mzebrows.shoots.ui;
 
 import pl.mzebrows.shoots.app.GameSettings;
-import pl.mzebrows.shoots.app.Round;
 
 import pl.mzebrows.shoots.score.CapturePoint;
-import pl.mzebrows.shoots.world.MatchFlow;
 import pl.mzebrows.shoots.world.PlayWorld;
 
 import java.awt.BasicStroke;
@@ -50,22 +48,22 @@ public class GamePointer extends GameCanvas {
         super(gameSettings);
         fontSize = 25;
         textOffset = 1;
-        this.gS = gameSettings;
+        this.gameSettings = gameSettings;
 
-        setPreferredSize(new Dimension(gS.getDEFAULT_POINTER_WIDTH(), gS.getDEFAULT_POINTER_HEIGHT()));
+        setPreferredSize(new Dimension(gameSettings.getDefaultPointerWidth(), gameSettings.getDefaultPointerHeight()));
         playerPointBarsList = new ArrayList<>();
         playerPointBarElapsed = new ArrayList<>();
-        for (int i = 0; i < gS.getPlayerNumber(); i++) {
+        for (int i = 0; i < gameSettings.getPlayerNumber(); i++) {
             playerPointBarsList.add(0);
             playerPointBarElapsed.add(0);
         }
 
-        width = gS.getDEFAULT_POINTER_WIDTH();
-        height = gS.getDEFAULT_POINTER_HEIGHT();
+        width = gameSettings.getDefaultPointerWidth();
+        height = gameSettings.getDefaultPointerHeight();
         pointBarSize = width - (5 * borderSize) - (statsStartPosiotionWidth + borderSize);
-        textFont = gS.getGameFont();
-        standardColor = gS.getColorScheme().getStandardColor();
-        roundTimeInSeconds = gS.getRoundTime();
+        textFont = gameSettings.getGameFont();
+        standardColor = gameSettings.getColorScheme().getStandardColor();
+        roundTimeInSeconds = gameSettings.getRoundTime();
     }
 
     /** Receives the live model for this frame from the renderer. */
@@ -75,7 +73,7 @@ public class GamePointer extends GameCanvas {
 
     /** Number of players to render stats for, from the live model. */
     private int playerCount() {
-        return world != null ? world.playerCount() : gS.getPlayerNumber();
+        return world != null ? world.playerCount() : gameSettings.getPlayerNumber();
     }
 
     /** Current-round points controlled by a 0-based player. */
@@ -117,7 +115,7 @@ public class GamePointer extends GameCanvas {
 
     /** Resets the bars that visualise each player's captured points. */
     public void restartGamePointer() {
-        for (int i = 0; i < gS.getPlayerNumber(); i++) {
+        for (int i = 0; i < gameSettings.getPlayerNumber(); i++) {
             playerPointBarsList.add(0);
             playerPointBarElapsed.add(0);
         }
@@ -128,12 +126,10 @@ public class GamePointer extends GameCanvas {
         //DATA
 
         //Text
-        textFont = new Font(gS.getGameFont().getFontName(), 100, fontSize);
+        textFont = new Font(gameSettings.getGameFont().getFontName(), 100, fontSize);
         g2d.setFont(textFont);
         roundTextFont = textFont.deriveFont(80f);
         authorTextFont = textFont.deriveFont(20f);
-        //FIRST RENDER
-        // drawUpdate();
     }
 
     @Override
@@ -152,8 +148,8 @@ public class GamePointer extends GameCanvas {
                 if (roundState == RoundEnum.ROUND_PAUSED) {
                     drawRoundPaused();
                 } else {
-                    g2d.setColor(gS.getColorScheme().getBackgroundColor());
-                    g2d.fillRect(0, 0, gS.getDEFAULT_POINTER_WIDTH(), gS.getDEFAULT_POINTER_HEIGHT());
+                    g2d.setColor(gameSettings.getColorScheme().getBackgroundColor());
+                    g2d.fillRect(0, 0, gameSettings.getDefaultPointerWidth(), gameSettings.getDefaultPointerHeight());
                     drawBorder(g2d);
                     drawRoundCounter(g2d);
                     if (world != null) {
@@ -186,18 +182,18 @@ public class GamePointer extends GameCanvas {
      * @param g2d        the Graphics2D used to draw the elements
      */
     public void drawRoundCounter(Graphics2D g2d) {
-        g2d.setColor(gS.getColorScheme().getBackgroundFontColor());
+        g2d.setColor(gameSettings.getColorScheme().getBackgroundFontColor());
         g2d.drawString("Round", roundPositionWidth + textOffset, roundPositionHight + textOffset);
         g2d.setColor(standardColor);
         g2d.drawString("Round", roundPositionWidth, roundPositionHight);
 
         g2d.setFont(roundTextFont);
-        g2d.setColor(gS.getColorScheme().getBackgroundFontColor());
+        g2d.setColor(gameSettings.getColorScheme().getBackgroundFontColor());
         g2d.drawString("}", roundPositionWidth + freeSpace + textOffset - 10, roundPositionHight + freeSpace * 2 + textOffset);
-        g2d.drawString("" + gS.getActualRoundNumber(), roundPositionWidth + freeSpace - 15 + textOffset, roundPositionHight + freeSpace * 2 + textOffset);
+        g2d.drawString("" + gameSettings.getActualRoundNumber(), roundPositionWidth + freeSpace - 15 + textOffset, roundPositionHight + freeSpace * 2 + textOffset);
         g2d.setColor(standardColor);
         g2d.drawString("}", roundPositionWidth + freeSpace - 10, roundPositionHight + freeSpace * 2);
-        g2d.drawString("" + gS.getActualRoundNumber(), roundPositionWidth + freeSpace - 15, roundPositionHight + freeSpace * 2);
+        g2d.drawString("" + gameSettings.getActualRoundNumber(), roundPositionWidth + freeSpace - 15, roundPositionHight + freeSpace * 2);
         g2d.setFont(textFont);
     }
 
@@ -227,7 +223,7 @@ public class GamePointer extends GameCanvas {
             int prev = previousPoints(i);
             if (prev > 0) {
                 double prevoiusPointPercent = (double) prev / maxPoints();
-                g2d.setColor(gS.getColorScheme().getBackgroundPointBarColor());
+                g2d.setColor(gameSettings.getColorScheme().getBackgroundPointBarColor());
                 g2d.fillRect(actualLeftWidth + frameWidth, actualHight + freeSpace + 3, (int) (pointBarSize * prevoiusPointPercent), 10);
             }
             if (roundState == RoundEnum.ROUND_CONTINUES) {
@@ -251,10 +247,10 @@ public class GamePointer extends GameCanvas {
        
             for (int i = 0; i < playerCount(); i++) {
 
-                    g2d.setColor(gS.getColorScheme().getWinBlockColor());
+                    g2d.setColor(gameSettings.getColorScheme().getWinBlockColor());
                     g2d.fillRect((width / 2) - winBlockSize / 2, winBlockPositionHight + (i * (freeSpace + 10)), winBlockSize, winBlockSize);
                     g2d.setColor(standardColor);
-                    g2d.setStroke(new BasicStroke(borderSize / 2));
+                    g2d.setStroke(new BasicStroke((float) borderSize / 2));
                     g2d.drawRect((width / 2) - winBlockSize / 2, winBlockPositionHight + (i * (freeSpace + 10)), winBlockSize, winBlockSize);
                     g2d.setColor(playerColor(i).darker());
                     g2d.drawString(""+roundsWon(i), (width / 2) - winBlockSize / 4 , winBlockPositionHight + winBlockSize - 5 + (i*winBlockSize + i*10));
@@ -283,7 +279,6 @@ public class GamePointer extends GameCanvas {
         g2d.setColor(standardColor);
         g2d.fillRect(0, 0, borderSize, height);
         g2d.fillRect(width - borderSize, 0, borderSize, height);
-        //g2d.fillRect(0, 0, width, borderSize);
         g2d.fillRect(0, height - borderSize, width, borderSize);
         g2d.fillRect(0, height - freeSpace * 3, width, borderSize);
 
@@ -294,20 +289,20 @@ public class GamePointer extends GameCanvas {
         // During pause / win (a round has been played, world present) redraw the normal stats panel so it
         // shows faintly through the near-transparent menu tint, matching the play-screen translucent look.
         // On a fresh start there is no game behind the menu, so clear to an opaque background instead.
-        if (world != null && (gS.getActualRoundNumber() > 0 || gS.isGameEnd())) {
-            g2d.setColor(gS.getColorScheme().getBackgroundColor());
-            g2d.fillRect(0, 0, gS.getDEFAULT_POINTER_WIDTH(), gS.getDEFAULT_POINTER_HEIGHT());
+        if (world != null && (gameSettings.getActualRoundNumber() > 0 || gameSettings.isGameEnd())) {
+            g2d.setColor(gameSettings.getColorScheme().getBackgroundColor());
+            g2d.fillRect(0, 0, gameSettings.getDefaultPointerWidth(), gameSettings.getDefaultPointerHeight());
             drawBorder(g2d);
             drawRoundCounter(g2d);
             drawPlayerStats(g2d, RoundEnum.ROUND_PAUSED);
             drawRoundCounterBlocks(g2d, RoundEnum.ROUND_PAUSED);
             drawAuthor(g2d);
         } else {
-            g2d.setColor(gS.getColorScheme().getBackgroundColor());
-            g2d.fillRect(0, 0, gS.getDEFAULT_POINTER_WIDTH(), gS.getDEFAULT_POINTER_HEIGHT());
+            g2d.setColor(gameSettings.getColorScheme().getBackgroundColor());
+            g2d.fillRect(0, 0, gameSettings.getDefaultPointerWidth(), gameSettings.getDefaultPointerHeight());
         }
-        g2d.setColor(gS.getColorScheme().getMenuStandardColor());
-        g2d.fillRect(0, 0, gS.getDEFAULT_POINTER_WIDTH(), gS.getDEFAULT_POINTER_HEIGHT());
+        g2d.setColor(gameSettings.getColorScheme().getMenuStandardColor());
+        g2d.fillRect(0, 0, gameSettings.getDefaultPointerWidth(), gameSettings.getDefaultPointerHeight());
     }
 
     @Override

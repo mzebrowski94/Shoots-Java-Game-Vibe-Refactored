@@ -17,7 +17,7 @@ import lombok.Setter;
 public abstract class GameCanvas extends Canvas {
 
     // Game settings/config
-    GameSettings gS;
+    GameSettings gameSettings;
 
     // Graphics
     Graphics2D g2d;
@@ -45,12 +45,12 @@ public abstract class GameCanvas extends Canvas {
     int playerNamesTextSize = 30;
 
     GameCanvas(GameSettings gameSettings) {
-        gS = gameSettings;
-        animationTime = gS.getAnimationTime();
-        this.setBackground(gS.getColorScheme().getBackgroundColor());
-        this.addKeyListener(gS.getInputBridge());
-        standardColor = gS.getColorScheme().getStandardColor();
-        roundTimeInSeconds = gS.getRoundTime();
+        this.gameSettings = gameSettings;
+        animationTime = gameSettings.getAnimationTime();
+        this.setBackground(gameSettings.getColorScheme().getBackgroundColor());
+        this.addKeyListener(gameSettings.getInputBridge());
+        standardColor = gameSettings.getColorScheme().getStandardColor();
+        roundTimeInSeconds = gameSettings.getRoundTime();
         this.setFocusable(true);
     }
 
@@ -86,7 +86,7 @@ public abstract class GameCanvas extends Canvas {
 
     /** Restarts the menu-element animation timer. */
     public void restartAnimationTime() {
-        animationTime = gS.getRoundTime();
+        animationTime = gameSettings.getRoundTime();
     }
 
     /**

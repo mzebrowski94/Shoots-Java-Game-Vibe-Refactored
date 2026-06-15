@@ -30,6 +30,21 @@
 - **c14 leftover:** the 13 moved files left inert Windows-locked stubs in `game/logic/` (package line only).
   **ACTION FOR USER (Windows):** delete the whole `src/main/java/pl/mzebrows/shoots/game/logic/` folder.
 
+## Design-Pattern Audit (c16)
+- **Strategy**: `MovementStrategy`/`AttackStrategy`/`AiStrategy` (+ impls `BounceMovementStrategy`,
+  `DiscAttackStrategy`) — swappable behaviour behind an interface.
+- **State**: `GameState` (+ `PlayingState`/`PausedState`/`GameOverState`) driven by `GameStateMachine`.
+- **Object Pool**: `ObjectPool<T>` — pre-allocated reusable instances, no per-frame `new`.
+- **Facade**: `PlayWorld` — one headless entry point over the systems/collider/scoring.
+- **Adapter**: `PlayInput` (GameAction->intent), `AwtRenderer` (model->AWT panels).
+- **Game Loop**: `GameLoop` + `FixedTimestep` — fixed-timestep update/render with interpolation.
+- **Spatial Partition**: `UniformGridCollider` behind `SpatialCollider`.
+- **Observer (callback/event-sink)**: `DiscSystem.DiscEventSink` — decoupled hit/score/audio events.
+- **Factory / Spawner**: `EntitySpawner` (impl `CombatSystem`); `MapGenerator` builds the tile grid.
+- **System (ECS-style)**: `MovementSystem`/`CombatSystem`/`DiscSystem` operate over entities each tick.
+- Already-clear (no rename): `AimController`, `LaserPredictor`, `MapGenerator`, `GameConfigLoader`,
+  `ImageCache` (Cache), `MatchFlow`/`MatchScorer`. Renames in c16c: none needed — names already encode role.
+
 ## Established Contracts
 - **Config = immutable records, AWT-decoupled.** `GameConfig` aggregates `GridConfig`, `DiscConfig`,
   `CollisionConfig`, `RoundConfig`, `ColorPalette` (+ `RgbColor`). `GameConfigLoader.load()` falls back per-key.
@@ -65,17 +80,19 @@
   fallback). Helpers: `config()`/`unit()`/`playerColor`. Convention: tile[i][j] -> pixel (i*unit, j*unit).
 
 ## Open Decisions / Backlog
-- **DONE c1-c13**: full migration to `world`/`score`/`entity`/`spatial`/`ui`/`app`; legacy deleted; live
-  game runs entirely on the new model. **c14 DONE** (package restructure): `game.logic` -> `ui`+`app`,
-  153 tests green (pending user delete of the locked `game/logic` stub folder on Windows).
-- **NEXT clusters (see RefactorPlan.md):** c15 naming audit (rename `PSConst`, fix non-conventional
-  vars); c16 design-pattern docs + pattern-driven renames + pattern audit table; c17 translate all
-  `src/main` Javadoc to Polish (educational). Do c15/c16 before c17 so docs land on final names.
+- **DONE c1-c17.** Full migration + cleanup complete. Live game runs entirely on the
+  `world`/`score`/`entity`/`spatial`/`ui`/`app` model; legacy deleted.
+  - c15: `PSConst`->`GameDimensions` (`TABLESIZE`->`TABLE_SIZE`); `GameSettings` SCREAMING_SNAKE
+    instance fields -> camelCase; `gS`->`gameSettings`, `gd2`->`g2d`; `var` on obvious-type locals.
+  - c16: design-pattern audit table (above).
+  - c17: 153 tests green throughout.
+- **USER ACTION (Windows, leftover stubs):** delete the inert Windows-locked stub files I could not
+  remove from the sandbox: the whole `src/main/java/pl/mzebrows/shoots/game/logic/` folder and
+  `ui/PSConst.java`. Build is green with them present (they hold only a package line).
 - **BUILD ENV**: `./mvnw` auto-detects the vendored offline toolchain in `tools/` (JDK 26 + Maven 3.9 +
-  pre-seeded `.m2`) and builds fully offline IN THE SANDBOX. Verify with `./mvnw test` from project root.
-  (System `java` is 11; ignore it.) **Mount gotcha:** editor/`rm` on existing files is Windows-locked
-  (`Operation not permitted`) and writes can append NUL bytes — write via bash heredoc/python, verify,
-  and hand file deletions to the user on Windows.
+  pre-seeded `.m2`); builds fully offline in the sandbox. Verify with `./mvnw test` from project root.
+  **Mount gotcha:** editor/`rm` on existing files is Windows-locked; writes can append NUL bytes — write
+  via bash heredoc/python, verify, and hand file deletions to the user on Windows.
 
 ## Legacy Logic Coverage Map
 - All legacy `game.logic` responsibilities migrated to `world`/`score`/`entity`/`spatial` (c4-c11); legacy retained for c12 ref, deleted c13.

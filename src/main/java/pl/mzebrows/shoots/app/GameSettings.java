@@ -3,7 +3,7 @@ package pl.mzebrows.shoots.app;
 
 import pl.mzebrows.shoots.ui.ColorScheme;
 import pl.mzebrows.shoots.ui.GameScreen;
-import pl.mzebrows.shoots.ui.PSConst;
+import pl.mzebrows.shoots.ui.GameDimensions;
 
 import pl.mzebrows.shoots.input.InputBridge;
 
@@ -35,16 +35,16 @@ public class GameSettings {
     private Font gameFont;
     private Font menuFont;
 
-    // Window sizing (derived from PSConst; immutable once constructed).
-    private final int DEFAULT_WIDTH = PSConst.UNIT.getValue() * PSConst.WINDOW_TILES.getValue();
-    private final int DEFAULT_HEIGHT = PSConst.UNIT.getValue() * PSConst.WINDOW_TILES.getValue();
-    private final int DEFAULT_COUNTER_HEIGHT = PSConst.UNIT.getValue() * 2;
-    private final int DEFAULT_POINTER_WIDTH = PSConst.UNIT.getValue() * 4;
-    private final int DEFAULT_COUNTER_WIDTH = DEFAULT_WIDTH + DEFAULT_POINTER_WIDTH;
-    private final int DEFAULT_POINTER_HEIGHT = PSConst.UNIT.getValue() * PSConst.WINDOW_TILES.getValue();
+    // Window sizing (derived from GameDimensions; immutable once constructed).
+    private final int defaultWidth = GameDimensions.UNIT.getValue() * GameDimensions.WINDOW_TILES.getValue();
+    private final int defaultHeight = GameDimensions.UNIT.getValue() * GameDimensions.WINDOW_TILES.getValue();
+    private final int defaultCounterHeight = GameDimensions.UNIT.getValue() * 2;
+    private final int defaultPointerWidth = GameDimensions.UNIT.getValue() * 4;
+    private final int defaultCounterWidth = defaultWidth + defaultPointerWidth;
+    private final int defaultPointerHeight = GameDimensions.UNIT.getValue() * GameDimensions.WINDOW_TILES.getValue();
 
-    private final int SIZE = PSConst.TABLESIZE.getValue();
-    private final int UNIT = PSConst.UNIT.getValue();
+    private final int size = GameDimensions.TABLE_SIZE.getValue();
+    private final int unit = GameDimensions.UNIT.getValue();
 
     private int roundTime;
     private ArrayList<Round> roundList;
@@ -82,9 +82,9 @@ public class GameSettings {
     public void initializeFont() {
         try {
             GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
-            File loadedGameFont = new File("src/main/resources/fonts/13_Misa.TTF");
+            var loadedGameFont = new File("src/main/resources/fonts/13_Misa.TTF");
             gameFont = Font.createFont(Font.TRUETYPE_FONT, loadedGameFont).deriveFont(12f);
-            File loadedMenuFont = new File("src/main/resources/fonts/GeosansLight.ttf");
+            var loadedMenuFont = new File("src/main/resources/fonts/GeosansLight.ttf");
             menuFont = Font.createFont(Font.TRUETYPE_FONT, loadedMenuFont).deriveFont(25f);
             ge.registerFont(Font.createFont(Font.TRUETYPE_FONT, loadedGameFont));
             ge.registerFont(Font.createFont(Font.TRUETYPE_FONT, loadedMenuFont));
@@ -99,7 +99,7 @@ public class GameSettings {
      */
     public void startNewRound(GameScreen gameScreen) {
         actualRoundNumber++;
-        Round newRound = new Round(this, actualRoundNumber);
+        var newRound = new Round(this, actualRoundNumber);
         if (roundList != null && !roundList.isEmpty()) {
             previousRound = roundList.get(roundList.size() - 1);
         }

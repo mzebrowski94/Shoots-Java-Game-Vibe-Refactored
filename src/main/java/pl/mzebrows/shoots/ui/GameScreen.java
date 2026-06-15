@@ -1,6 +1,8 @@
 // pl/mzebrows/shoots/ui/GameScreen.java
 package pl.mzebrows.shoots.ui;
 
+import lombok.Getter;
+import lombok.Setter;
 import pl.mzebrows.shoots.app.GameSettings;
 
 import pl.mzebrows.shoots.entity.Entity;
@@ -27,7 +29,7 @@ public class GameScreen extends GameCanvas {
 
     private static final Color WALL_COLOR = new Color(25, 25, 25);
 
-    private GameMenu menuLayout;
+    @Getter @Setter private GameMenu menuLayout;
 
     /** Live simulation pushed by the renderer each frame (null when not playing). */
     private PlayWorld world;
@@ -45,9 +47,9 @@ public class GameScreen extends GameCanvas {
     GameScreen(GameSettings gameSettings) {
         super(gameSettings);
 
-        width = gS.getDEFAULT_WIDTH();
-        height = gS.getDEFAULT_HEIGHT();
-        menuLayout = new GameMenu(gS);
+        width = gameSettings.getDefaultWidth();
+        height = gameSettings.getDefaultHeight();
+        menuLayout = new GameMenu(gameSettings);
 
         setPreferredSize(new Dimension(width, height));
         animatedElementLength = width / 2;
@@ -112,23 +114,23 @@ public class GameScreen extends GameCanvas {
         if (hasGameBehindMenu()) {
             drawRoundContinues();
         } else {
-            g2d.setColor(gS.getColorScheme().getBackgroundColor());
+            g2d.setColor(gameSettings.getColorScheme().getBackgroundColor());
             g2d.fillRect(0, 0, width, height);
         }
-        g2d.setColor(gS.getColorScheme().getMenuStandardColor());
+        g2d.setColor(gameSettings.getColorScheme().getMenuStandardColor());
         g2d.fillRect(0, 0, width, height);
-        g2d.setColor(gS.getColorScheme().getDeadLineColor());
+        g2d.setColor(gameSettings.getColorScheme().getDeadLineColor());
         g2d.setFont(textFont);
     }
 
     /** True when a game frame should show through the translucent menu (pause mid-game or win screen). */
     private boolean hasGameBehindMenu() {
-        return world != null && (gS.getActualRoundNumber() > 0 || gS.isGameEnd());
+        return world != null && (gameSettings.getActualRoundNumber() > 0 || gameSettings.isGameEnd());
     }
 
     @Override
     public void drawRoundContinues() {
-        g2d.setColor(gS.getColorScheme().getBackgroundColor());
+        g2d.setColor(gameSettings.getColorScheme().getBackgroundColor());
         g2d.fillRect(0, 0, width, height);
         if (world == null) {
             return;
@@ -277,7 +279,7 @@ public class GameScreen extends GameCanvas {
             }
             double dx = disc.interpolatedX(alpha);
             double dy = disc.interpolatedY(alpha);
-            Area outer = new Area(new Ellipse2D.Double(dx - halfBig, dy - halfBig, big, big));
+            var outer = new Area(new Ellipse2D.Double(dx - halfBig, dy - halfBig, big, big));
             outer.subtract(new Area(new Ellipse2D.Double(dx - halfSmall, dy - halfSmall, small, small)));
             g2d.setColor(world.playerColor(disc.getOwnerId()));
             g2d.fill(outer);
@@ -286,7 +288,7 @@ public class GameScreen extends GameCanvas {
 
     @Override
     public void drawRoundBegining() {
-        g2d.setColor(gS.getColorScheme().getStandardColor());
+        g2d.setColor(gameSettings.getColorScheme().getStandardColor());
         g2d.fillRect(0, 0, animatedElementLength - animatedElementElapsed, height);
         g2d.fillRect(animatedElementLength + animatedElementElapsed, 0, animatedElementLength - animatedElementElapsed, height);
         g2d.fillRect(0, 0, width, animatedElementLength - animatedElementElapsed);
@@ -299,7 +301,7 @@ public class GameScreen extends GameCanvas {
 
     @Override
     public void drawRoundEnding() {
-        g2d.setColor(gS.getColorScheme().getStandardColor());
+        g2d.setColor(gameSettings.getColorScheme().getStandardColor());
         g2d.fillRect(0, 0, animatedElementElapsed, height);
         g2d.fillRect(width - animatedElementElapsed, 0, animatedElementElapsed, height);
         g2d.fillRect(0, 0, width, animatedElementElapsed);
@@ -312,21 +314,5 @@ public class GameScreen extends GameCanvas {
 
     @Override
     public void initializeLayout() {
-    }
-
-    public GameMenu getMenuLayout() {
-        return menuLayout;
-    }
-
-    public void setMenuLayout(GameMenu menuLayout) {
-        this.menuLayout = menuLayout;
-    }
-
-    public GameSettings getGameSettings() {
-        return gS;
-    }
-
-    public void setGameSettings(GameSettings gS) {
-        this.gS = gS;
     }
 }

@@ -22,14 +22,14 @@ public class Round {
     private int roundEndTimeDelay;
     private boolean animationEnded;
 
-    private final GameSettings gS;
+    private final GameSettings gameSettings;
 
     /**
      * @param gameSettings shared settings (round duration)
      * @param roundNumber  this round's 1-based index
      */
     public Round(GameSettings gameSettings, int roundNumber) {
-        gS = gameSettings;
+        this.gameSettings = gameSettings;
         this.roundNumber = roundNumber;
         this.roundEnd = false;
         this.roundEndTimeDelay = 0;
@@ -40,7 +40,7 @@ public class Round {
     /** Advances the round clock; flags the round as ended once it reaches the configured duration. */
     public void roundTick() {
         roundTime++;
-        if (roundTime >= gS.getRoundTime()) {
+        if (roundTime >= gameSettings.getRoundTime()) {
             roundEnd = true;
         }
     }
