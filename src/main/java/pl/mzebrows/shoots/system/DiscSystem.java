@@ -28,6 +28,9 @@ public final class DiscSystem {
          */
         boolean onCapturePointHit(Entity disc, int tileX, int tileY);
 
+        /** A disc bounced off a solid wall/block tile at the given indices (for the hit-flash effect). */
+        default void onWallHit(Entity disc, int tileX, int tileY) { }
+
         /** A disc exhausted its bounce budget and was returned to the pool. */
         void onDiscRetired(Entity disc);
     }
@@ -74,6 +77,9 @@ public final class DiscSystem {
                     sink.onDiscRetired(disc);
                     continue;
                 }
+            } else if (result.collided() && result.tile() == pl.mzebrows.shoots.spatial.TileType.WALL) {
+                // A wall/block bounce: notify so the renderer can flash the block in the disc colour.
+                sink.onWallHit(disc, result.tileX(), result.tileY());
             }
 
             if (combatSystem.isSpent(disc)) {

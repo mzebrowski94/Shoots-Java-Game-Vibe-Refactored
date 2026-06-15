@@ -17,7 +17,7 @@
 - `...pool` — `ObjectPool<T>` (c4). `...system` — `MovementSystem`, `CombatSystem` (c4); `DiscSystem` (c6).
 - `...spatial` — `SpatialCollider`, `UniformGridCollider`, `TileType`, `CollisionResult` (c5); `MapGenerator` (c7).
 - `...score` — `CapturePoint`, `CaptureScoring`, `PlayerScore`, `MatchScorer` (c7).
-- `...world` — `PlayWorld` facade + `PlayInput` adapter (c8); `MatchFlow` round/match scorer (c9).
+- `...world` — `PlayWorld` facade + `PlayInput` adapter (c8); `MatchFlow` round/match scorer (c9); `BlockHitEffect` (c12).
 
 ## Legacy Code Map (live game off legacy; legacy KEPT as reference during c12 bug fixing)
 - **Live AWT shell (kept)**: `GameFrame`/`GameCanvas`/`GameCounter`/`GameScreen`/`GamePointer`/`GameMenu`
@@ -69,9 +69,9 @@
 - **DONE c9-c11** (134 tests, BUILD SUCCESS): round/win wiring, render migration, legacy model
   decommission. Live game runs entirely on the `world`/`score`/`entity`/`spatial` model.
 - **NOW: c12 Playtest Bug Fixing** — user playtests + reports bugs; legacy KEPT as reference (see Legacy
-  Code Map), deleted in c13. Audio -> `NewFeatures.md` (cluster A). 146 tests green. Fixes logged in
+  Code Map), deleted in c13. Audio -> `NewFeatures.md` (cluster A). 151 tests green. Fixes logged in
   `RefactorPlan.md` c12: disc-retire crash, 45-deg corner penetration, capture +1/hit & disc-consume,
-  player-base render + placement (1 tile from border) + spawn-alignment + world rebuilt from menu player count (P3/P4); tunables `disc.maxBounces`/`disc.maxPerPlayer`/`laser.maxBounces`.
+  player-base render + placement (1 tile from border) + spawn-alignment + world rebuilt from menu player count (P3/P4); tunables `disc.maxBounces`/`disc.maxPerPlayer`/`laser.maxBounces`; block-hit flash (`onWallHit`->`BlockHitEffect`, legacy `LightEffect` port).
 - **BUILD ENV**: `./mvnw` auto-detects the vendored offline toolchain in `tools/` (JDK 26 +
   Maven 3.9 + pre-seeded `.m2`) and builds fully offline IN THE SANDBOX. Always run `./mvnw test`
   from the project root to verify — do NOT assume it can't run. (System `java` is 11; ignore it.)

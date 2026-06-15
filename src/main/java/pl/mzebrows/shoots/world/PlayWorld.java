@@ -57,6 +57,10 @@ public final class PlayWorld {
     private final ObjectPool<Entity> discPool;
     private final List<Entity> discs;
 
+    /** Active block-hit flashes (transient wall-tile effects), advanced each step and pruned when done. */
+    private final List<BlockHitEffect> blockHits = new ArrayList<>();
+    private final Map<Long, BlockHitEffect> blockHitByTile = new java.util.HashMap<>();
+
     /**
      * Disc-instance -> owning player, kept by identity. {@link CombatSystem#retire} returns the disc
      * to the pool (which resets its fields, wiping {@code ownerId}) before the retirement sink runs,
@@ -74,6 +78,9 @@ public final class PlayWorld {
     private final DiscSystem.DiscEventSink sink = new DiscSystem.DiscEventSink() {
         @Override public boolean onCapturePointHit(Entity disc, int tileX, int tileY) {
             return scoring.resolveHit(tileX, tileY, disc.getOwnerId());
+        }
+        @Override public void onWallHit(Entity disc, int tileX, int tileY) {
+            spawnBlockHit(tileX, tileY, disc.getOwnerId());
         }
         @Override public void onDiscRetired(Entity disc) {
             Integer owner = discOwners.remove(disc);
@@ -151,6 +158,7 @@ public final class PlayWorld {
     /** Advances all active discs by one fixed step (movement + collision + retire), then refreshes scores. */
     public void step() {
         discSystem.update(discs, sink);
+        advanceBlockHits();
         matchFlow.syncCurrentPoints(scoring);
     }
 
@@ -201,6 +209,8 @@ public final class PlayWorld {
         }
         discs.clear();
         discOwners.clear();
+        blockHits.clear();
+        blockHitByTile.clear();
         for (int p = 0; p < playerCount; p++) {
             aim[p].reset();
             while (attack[p].activeDiscs() > 0) {
@@ -233,6 +243,9 @@ public final class PlayWorld {
 
     public List<Entity> discs() { return discs; }
 
+    /** Active block-hit flashes for the renderer to draw over wall tiles. */
+    public List<BlockHitEffect> blockHits() { return blockHits; }
+
     public CaptureScoring scoring() { return scoring; }
 
     public AimController aimOf(int playerId) { return aim[playerId]; }
@@ -253,7 +266,33 @@ public final class PlayWorld {
 
     // -- internals ----------------------------------------------------------
 
-       private void registerCapturePoints() {
+       /** Starts (or restarts in place) the hit flash on a wall tile in the disc owner's colour. */
+    private void spawnBlockHit(int tileX, int tileY, int ownerId) {
+        long key = (((long) tileX) << 32) ^ (tileY & 0xFFFFFFFFL);
+        BlockHitEffect existing = blockHitByTile.get(key);
+        if (existing != null) {
+            existing.restart(ownerId); // same tile hit again -> retrigger the flash, no allocation
+            return;
+        }
+        var effect = new BlockHitEffect(tileX, tileY, ownerId);
+        blockHits.add(effect);
+        blockHitByTile.put(key, effect);
+    }
+
+    /** Advances every active block-hit flash one tick and prunes finished ones (index loop, no iterator). */
+    private void advanceBlockHits() {
+        for (int i = blockHits.size() - 1; i >= 0; i--) {
+            BlockHitEffect effect = blockHits.get(i);
+            effect.advance();
+            if (effect.isDone()) {
+                long key = (((long) effect.tileX()) << 32) ^ (effect.tileY() & 0xFFFFFFFFL);
+                blockHitByTile.remove(key);
+                blockHits.remove(i);
+            }
+        }
+    }
+
+    private void registerCapturePoints() {
         for (int i = 0; i < tiles.length; i++) {
             for (int j = 0; j < tiles[i].length; j++) {
                 if (tiles[i][j] == TileType.CAPTURE_POINT) {

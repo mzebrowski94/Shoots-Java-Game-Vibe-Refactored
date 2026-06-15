@@ -149,6 +149,30 @@ class PlayWorldTest {
     }
 
     @Test
+    void wallBounceRegistersABlockHitFlash() {
+        var world = world(1);
+        assertThat(world.blockHits()).isEmpty();
+
+        // Drive a disc into the outer border so the collider reports a WALL hit. Heading -X with the
+        // disc near the left edge, one step pushes its tile index to 0 (the border), which the
+        // collider treats as a wall bounce -> onWallHit -> a block-hit flash is registered.
+        world.fire(0);
+        var disc = world.discs().get(0);
+        int unit = world.unit();
+        disc.setX(1.2 * unit);          // inside tile column 1, near the left border (column 0)
+        disc.setY(12 * unit + unit / 2.0);
+        disc.setAngle(90);              // BounceMovementStrategy: X = dirX*speed*sin(-90) = -speed -> -X
+        disc.setDirectionX(1);
+        disc.setDirectionY(1);
+        disc.setMoveSpeed(2 * unit);    // one step crosses into the border tile (index <= 0)
+
+        world.step();
+
+        assertThat(world.blockHits()).isNotEmpty();
+        assertThat(world.blockHits().get(0).ownerId()).isEqualTo(0);
+    }
+
+    @Test
     void capturePointHitIsScoredThroughTheSink() {
         var world = world(1);
         // Find a capture point tile and drop a disc onto it, then step.

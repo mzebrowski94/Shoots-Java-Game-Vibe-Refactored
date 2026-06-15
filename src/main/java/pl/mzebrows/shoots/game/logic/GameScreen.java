@@ -4,6 +4,7 @@ package pl.mzebrows.shoots.game.logic;
 import pl.mzebrows.shoots.entity.Entity;
 import pl.mzebrows.shoots.score.CapturePoint;
 import pl.mzebrows.shoots.spatial.TileType;
+import pl.mzebrows.shoots.world.BlockHitEffect;
 import pl.mzebrows.shoots.world.PlayWorld;
 
 import java.awt.BasicStroke;
@@ -103,6 +104,7 @@ public class GameScreen extends GameCanvas {
             return;
         }
         drawWalls(world);
+        drawBlockHits(world);
         drawCapturePoints(world);
         drawBases(world);
         drawLasers(world);
@@ -173,6 +175,30 @@ public class GameScreen extends GameCanvas {
                 g2d.setColor(world.playerColor(p));
                 g2d.drawPolyline(laserX, laserY, n);
             }
+        }
+    }
+
+    /**
+     * Draws the transient block-hit flash over each struck wall tile, mirroring the legacy
+     * {@code LightEffect}: a short grey ramp-up, then the disc owner's colour fading out.
+     */
+    private void drawBlockHits(PlayWorld world) {
+        int unit = world.unit();
+        g2d.setStroke(new BasicStroke());
+        var effects = world.blockHits();
+        for (int i = 0, n = effects.size(); i < n; i++) {
+            BlockHitEffect e = effects.get(i);
+            int px = e.tileX() * unit;
+            int py = e.tileY() * unit;
+            if (e.phase() == BlockHitEffect.Phase.GREY) {
+                int g = e.greyLevel();
+                g2d.setColor(new Color(g, g, g));
+            } else {
+                Color owner = world.playerColor(e.ownerId());
+                int a = Math.max(0, Math.min(255, e.colorAlpha()));
+                g2d.setColor(new Color(owner.getRed(), owner.getGreen(), owner.getBlue(), a));
+            }
+            g2d.fillRect(px, py, unit, unit);
         }
     }
 
