@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import pl.mzebrows.shoots.config.GameConfig;
 import pl.mzebrows.shoots.config.GameConfigLoader;
+import pl.mzebrows.shoots.config.RoundConfig;
 import pl.mzebrows.shoots.ui.GameCounter;
 import pl.mzebrows.shoots.ui.GameFrame;
 import pl.mzebrows.shoots.ui.GamePointer;
@@ -234,12 +235,28 @@ public final class PlayingState implements GameState {
     private void rebuildWorldForSelectedPlayers() {
         GameConfig base = GameConfigLoader.load();
         int selected = Math.max(1, Math.min(4, settings.getPlayerNumber()));
-        if (selected != base.playerNumber()) {
+        RoundConfig round = applySelectedRoundSettings(base.round(),
+                settings.getRoundLimit(), settings.getRoundTime());
+        if (selected != base.playerNumber() || round != base.round()) {
             base = new GameConfig(selected, base.grid(), base.disc(), base.collision(),
-                    base.round(), base.palette());
+                    round, base.palette());
         }
         world = new PlayWorld(base);
         screen.setWorld(world, 0.0);
         pointer.setWorld(world);
+    }
+
+    /**
+     * Overlays the menu-selected round limit and round time onto the loaded {@link RoundConfig} so the
+     * match runs for the number of rounds chosen in the menu instead of the {@code game.properties}
+     * default; returns the original config unchanged if the menu values are non-positive or identical.
+     */
+    static RoundConfig applySelectedRoundSettings(RoundConfig defaults, int selectedRoundLimit, int selectedRoundTime) {
+        int roundLimit = selectedRoundLimit > 0 ? selectedRoundLimit : defaults.roundLimit();
+        int roundTime = selectedRoundTime > 0 ? selectedRoundTime : defaults.roundTimeSeconds();
+        if (roundLimit == defaults.roundLimit() && roundTime == defaults.roundTimeSeconds()) {
+            return defaults;
+        }
+        return new RoundConfig(roundTime, roundLimit, defaults.roundEndDelay(), defaults.animationTime());
     }
 }

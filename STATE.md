@@ -86,6 +86,11 @@
     instance fields -> camelCase; `gS`->`gameSettings`, `gd2`->`g2d`; `var` on obvious-type locals.
   - c16: design-pattern audit table (above).
   - c17: 153 tests green throughout.
+- **c18 (playtest bug):** menu round-limit was ignored — every match ended at 2 rounds. The menu
+  set `GameSettings.roundLimit`, but match-end reads `RoundConfig.roundLimit()` (loaded from
+  `game.properties`). Fix: `PlayingState.rebuildWorldForSelectedPlayers` overlays the selected
+  round limit + round time onto `RoundConfig` (`applySelectedRoundSettings`) before building
+  `PlayWorld`. Tests: `PlayingStateRoundLimitTest`.
 - **USER ACTION (Windows, leftover stubs):** delete the inert Windows-locked stub files I could not
   remove from the sandbox: the whole `src/main/java/pl/mzebrows/shoots/game/logic/` folder and
   `ui/PSConst.java`. Build is green with them present (they hold only a package line).

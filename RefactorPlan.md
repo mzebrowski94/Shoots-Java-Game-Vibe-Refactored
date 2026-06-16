@@ -211,3 +211,15 @@
       **[DONE — `GameSettings.DEFAULT_*`/`SIZE`/`UNIT` instance fields -> camelCase (Lombok getters
       now `getDefaultWidth()` etc.); `gS` -> `gameSettings` (100 refs); `gd2` -> `g2d`; `var` applied
       to obvious-type locals. 153 tests green.]**
+
+## [ ] 13. Playtest Bug Fixing - Secound round
+> The migrated model now drives the live game, but manual playtesting surfaced gameplay bugs.
+- [x] **Every match ended after 2 rounds regardless of the menu.** The menu wrote the selected round
+      count to `GameSettings.roundLimit` (`setRoundLimit(roundNumber)`), but the match-end decision runs
+      entirely through `PlayWorld → MatchFlow → MatchScorer.isMatchOver`, which reads
+      `RoundConfig.roundLimit()` loaded once from `game.properties` (=2) and never overridden by the menu.
+      `rebuildWorldForSelectedPlayers` re-applied only the player count. Fix: that rebuild now overlays the
+      menu-selected round limit (and round time) onto the loaded `RoundConfig` via
+      `PlayingState.applySelectedRoundSettings` before constructing the `PlayWorld`. Regression tests in
+      `PlayingStateRoundLimitTest`.
+- [ ] (Placeholder for bugs reported by user while playtesting.)
