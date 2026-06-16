@@ -135,11 +135,22 @@ public final class MapGenerator {
      * removes any random block that landed on the base, its two flanking blocks, or its firing lane.
      */
     private static final int[][] BASE_CENTRES = {
-            {12, 23}, // P1 bottom, fires up   (1 tile from the bottom border, row 24)
-            {12, 1},  // P2 top, fires down    (1 tile from the top border, row 0)
-            {1, 12},  // P3 left, fires right  (1 tile from the left border, col 0)
-            {23, 12}, // P4 right, fires left  (1 tile from the right border, col 24)
+            {12, 23}, // P1 bottom, fires up   (1 tile from the bottom border so the base touches it)
+            {12, 1},  // P2 top, fires down    (1 tile from the top border)
+            {1, 12},  // P3 left, fires right  (1 tile from the left border)
+            {23, 12}, // P4 right, fires left  (1 tile from the right border)
     };
+
+    /**
+     * Canonical base-centre tile for a 0-based {@code playerId}, independent of player count:
+     * P0 bottom, P1 top, P2 left, P3 right. Returned as {@code [tileX, tileY]}. The renderer and
+     * {@code PlayWorld} use this so a given player ALWAYS spawns on the same side (and aims at centre)
+     * regardless of how many players are in the match.
+     */
+    public static int[] baseCentre(int playerId) {
+        int[] c = BASE_CENTRES[playerId];
+        return new int[]{c[0], c[1]};
+    }
 
     private void addPlayerBases(TileType[][] tiles, int playerNumber) {
         // Two passes so overlapping lanes (P1/P2 share column 12, P3/P4 share row 12) cannot clear

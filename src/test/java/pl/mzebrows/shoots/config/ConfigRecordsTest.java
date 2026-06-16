@@ -37,7 +37,7 @@ class ConfigRecordsTest {
 
     @Test
     void discConfigRejectsSmallRadiusNotLessThanBig() {
-        assertThatThrownBy(() -> new DiscConfig(10, 10, 2.0, 7, 3, 4))
+        assertThatThrownBy(() -> new DiscConfig(10, 10, 2.0, 7, 3, 3, 4))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -57,9 +57,9 @@ class ConfigRecordsTest {
     @Test
     void gameConfigRejectsInvalidPlayerCount() {
         var d = GameConfigLoader.defaults();
-        assertThatThrownBy(() -> new GameConfig(0, d.grid(), d.disc(), d.collision(), d.round(), d.palette()))
+        assertThatThrownBy(() -> new GameConfig(0, d.seed(), d.grid(), d.disc(), d.collision(), d.round(), d.palette(), d.ai()))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new GameConfig(5, d.grid(), d.disc(), d.collision(), d.round(), d.palette()))
+        assertThatThrownBy(() -> new GameConfig(5, d.seed(), d.grid(), d.disc(), d.collision(), d.round(), d.palette(), d.ai()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

@@ -41,12 +41,17 @@ public final class DiscSystem {
         @Override public void onDiscRetired(Entity disc) { }
     };
 
-    private final SpatialCollider collider;
+    private SpatialCollider collider;
     private final CombatSystem combatSystem;
 
     public DiscSystem(SpatialCollider collider, CombatSystem combatSystem) {
         this.collider = collider;
         this.combatSystem = combatSystem;
+    }
+
+    /** Rebinds the collider, e.g. when the world regenerates its map between rounds. */
+    public void setCollider(SpatialCollider collider) {
+        this.collider = collider;
     }
 
     /**

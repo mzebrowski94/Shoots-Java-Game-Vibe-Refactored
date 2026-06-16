@@ -42,17 +42,34 @@ public final class PlayWorld {
 
     private static final int[] SHOOT_DIRECTIONS = {180, 0, -90, 90};
 
+    /**
+     * Whether a player's LEFT/RIGHT keys are mirrored, so each HUMAN player's key turns the cursor
+     * toward their own left/right given the seated orientation of their base (legacy
+     * {@code Player.moveUnit}: P1/P3 = -1 are mirrored vs P2/P4 = +1). Indexed by 0-based player id.
+     * This is a human-input concern only; the AI drives {@link #applyInput} with absolute LEFT/RIGHT.
+     */
+    private static final boolean[] AIM_KEYS_MIRRORED = {true, false, true, false};
+
+    /** Whether {@code playerId}'s LEFT/RIGHT aim keys should be swapped to match their seated view. */
+    public static boolean aimKeysMirrored(int playerId) {
+        return AIM_KEYS_MIRRORED[playerId];
+    }
+
+    /** Max cursor rotation each way from the base firing direction, in degrees (legacy ±110 = 220° arc). */
+    private static final double AIM_ROTATION_LIMIT_DEG = 110.0;
+
     private final GameConfig config;
     private final int playerCount;
+    private final long seed;
 
-    private final SpatialCollider collider;
-    private final TileType[][] tiles;
+    private SpatialCollider collider;
+    private TileType[][] tiles;
 
     private final CombatSystem combatSystem;
     private final DiscSystem discSystem;
     private final CaptureScoring scoring = new CaptureScoring();
     private final MatchFlow matchFlow;
-    private final LaserPredictor laserPredictor;
+    private LaserPredictor laserPredictor;
 
     private final ObjectPool<Entity> discPool;
     private final List<Entity> discs;
@@ -70,7 +87,12 @@ public final class PlayWorld {
 
     private final AimController[] aim;
     private final DiscAttackStrategy[] attack;
-    private final BasePlacement[] bases;
+    private BasePlacement[] bases;
+
+    /** Base seed for map generation; each round's map uses mix(baseMapSeed, roundIndex). */
+    private final long baseMapSeed;
+    /** 0-based index of the current round, advanced each resetRound() so each round gets a new map. */
+    private int roundIndex;
 
     /** Reusable scratch source used only to feed {@link DiscAttackStrategy#attack}. */
     private final Entity fireSource = new Entity();
@@ -106,37 +128,82 @@ public final class PlayWorld {
         }
     };
 
-    /** Builds a world with a fresh, time-seeded map. */
+    /** Builds a world from the config's resolved master seed, so the whole round is reproducible. */
     public PlayWorld(GameConfig config) {
-        this(config, new Random());
+        this(config, config.seed());
     }
 
-    /** Builds a world with a seedable {@link Random} so tests are deterministic. */
-    public PlayWorld(GameConfig config, Random random) {
-        this.config = config;
-        this.playerCount = config.playerNumber();
+    /** Builds a world from an explicit master seed (seeds the map and is exposed to the AI). */
+    public PlayWorld(GameConfig config, long seed) {
+        this(config, seed, new Random(seed));
+    }
 
-        this.tiles = new MapGenerator(config.grid(), random).generate(playerCount);
-        this.collider = new UniformGridCollider(tiles, config.grid(), config.collision());
+    /**
+     * Builds a world with a caller-supplied {@link Random} so tests can drive the map directly; the
+     * recorded {@code seed} is {@code 0} (such worlds are not meant to be reproduced from a seed).
+     */
+    public PlayWorld(GameConfig config, Random random) {
+        this(config, 0L, random);
+    }
+
+    private PlayWorld(GameConfig config, long seed, Random random) {
+        this.config = config;
+        this.seed = seed;
+        this.playerCount = config.playerNumber();
+        // Base map seed: the master seed for production worlds, or a value drawn from the caller's
+        // Random for test worlds (seed==0). Each round derives its own map seed from this + roundIndex.
+        this.baseMapSeed = seed != 0 ? seed : random.nextLong();
+        this.roundIndex = 0;
 
         int unit = config.grid().unit();
         int maxDiscsPerPlayer = config.disc().maxPerPlayer();
         this.discPool = new ObjectPool<>(maxDiscsPerPlayer * playerCount, Entity::new, Entity::reset);
         this.discs = new ArrayList<>(discPool.capacity());
         this.combatSystem = new CombatSystem(discPool, config.disc());
-        this.discSystem = new DiscSystem(collider, combatSystem);
         this.matchFlow = new MatchFlow(playerCount, config.round());
-        this.laserPredictor = new LaserPredictor(collider, new BounceMovementStrategy());
 
         this.aim = new AimController[playerCount];
         this.attack = new DiscAttackStrategy[playerCount];
-        this.bases = locateBases(unit);
-
         for (int p = 0; p < playerCount; p++) {
-            aim[p] = new AimController(bases[p].shootDirection(), config.disc().bigRadius() * 5.0, 1.0);
             attack[p] = new DiscAttackStrategy(maxDiscsPerPlayer);
         }
 
+        // Build the round-0 map and everything that depends on it (collider, laser, bases, aim, points).
+        buildMap(mapSeedFor(0));
+        // DiscSystem references the collider; it is rebound on each map regeneration in buildMap.
+        this.discSystem = new DiscSystem(collider, combatSystem);
+    }
+
+    /** Per-round map seed derived from the base seed, so each round gets a fresh yet reproducible layout. */
+    private long mapSeedFor(int round) {
+        long h = baseMapSeed ^ (0x9E3779B97F4A7C15L * (round + 1));
+        h ^= (h >>> 30);
+        h *= 0xBF58476D1CE4E5B9L;
+        h ^= (h >>> 27);
+        return h;
+    }
+
+    /**
+     * (Re)builds the map and everything derived from it for the given {@code mapSeed}: tiles, collider,
+     * laser predictor, per-player bases + aim controllers, and the capture-point registry. Called once
+     * at construction and again from {@link #resetRound()} so every round is a different (reproducible)
+     * map. {@code discSystem} is rebound to the new collider here too (after the first build).
+     */
+    private void buildMap(long mapSeed) {
+        int unit = config.grid().unit();
+        this.tiles = new MapGenerator(config.grid(), new Random(mapSeed)).generate(playerCount);
+        this.collider = new UniformGridCollider(tiles, config.grid(), config.collision());
+        this.laserPredictor = new LaserPredictor(collider, new BounceMovementStrategy());
+        this.bases = locateBases(unit);
+        if (aim != null) {
+            for (int p = 0; p < playerCount; p++) {
+                aim[p] = new AimController(bases[p].shootDirection(), AIM_ROTATION_LIMIT_DEG, 1.0);
+            }
+        }
+        if (discSystem != null) {
+            discSystem.setCollider(collider);
+        }
+        scoring.clear();
         registerCapturePoints();
     }
 
@@ -181,6 +248,7 @@ public final class PlayWorld {
     /** Resets the entire match for a new game (zeroes every score tally and the round counter). */
     public void resetMatch() {
         matchFlow.resetMatch();
+        roundIndex = 0;
         resetRound();
     }
 
@@ -202,7 +270,11 @@ public final class PlayWorld {
                 aim[playerId].currentAngle(), config.disc().moveSpeed(), xs, ys);
     }
 
-    /** Retires all in-flight discs and resets aim + capture state for a new round. */
+    /**
+     * Retires all in-flight discs, resets aim + scoring, and REGENERATES the map for a new round, so
+     * every round is a different (but reproducible) layout. The map seed is derived from the base seed
+     * and the round index, then the index is advanced so the next round differs again.
+     */
     public void resetRound() {
         for (int i = discs.size() - 1; i >= 0; i--) {
             combatSystem.retire(discs.get(i));
@@ -212,18 +284,23 @@ public final class PlayWorld {
         blockHits.clear();
         blockHitByTile.clear();
         for (int p = 0; p < playerCount; p++) {
-            aim[p].reset();
             while (attack[p].activeDiscs() > 0) {
                 attack[p].onDiscRetired();
             }
         }
-        scoring.resetAll();
+        // New map for this round (also rebuilds collider/laser/bases and re-registers capture points,
+        // and resets each player's aim to the neutral firing direction).
+        buildMap(mapSeedFor(roundIndex));
+        roundIndex++;
         matchFlow.resetRound();
     }
 
     // -- queries (read by the renderer) -------------------------------------
 
     public int playerCount() { return playerCount; }
+
+    /** The master seed this world was built from (0 when built from an explicit {@link Random}). */
+    public long seed() { return seed; }
 
     /** Live round/match score driver, the queryable contract for the render layer. */
     public MatchFlow matchFlow() { return matchFlow; }
@@ -247,6 +324,9 @@ public final class PlayWorld {
     public List<BlockHitEffect> blockHits() { return blockHits; }
 
     public CaptureScoring scoring() { return scoring; }
+
+    /** The collision grid (read by the AI's reachability walk so it uses the live reflection math). */
+    public SpatialCollider collider() { return collider; }
 
     public AimController aimOf(int playerId) { return aim[playerId]; }
 
@@ -302,27 +382,25 @@ public final class PlayWorld {
         }
     }
 
+    /**
+     * Maps each {@code playerId} to its FIXED base by player id, NOT by map scan order: player N always
+     * uses {@link MapGenerator#baseCentre(int)} (P0 bottom, P1 top, P2 left, P3 right) and the matching
+     * {@link #SHOOT_DIRECTIONS} entry. This keeps each player's spawn side and neutral aim (pointing at
+     * the map centre) identical regardless of how many players are in the match.
+     *
+     * <p>Convention: entity X = first tile index, Y = second; the collider indexes
+     * {@code tiles[getX()/unit][getY()/unit]} and walls draw {@code tiles[i][j]} at pixel
+     * {@code (i*unit, j*unit)}, so the spawn/laser origin is the CENTRE of the base tile.
+     */
     private BasePlacement[] locateBases(int unit) {
         var result = new BasePlacement[playerCount];
-        int found = 0;
-        for (int i = 0; i < tiles.length && found < playerCount; i++) {
-            for (int j = 0; j < tiles[i].length && found < playerCount; j++) {
-                if (tiles[i][j] == TileType.PLAYER_BASE) {
-                    // Gameplay+render convention: entity X = first tile index (i), Y = second (j); the
-                    // collider indexes tiles[getX()/unit][getY()/unit] and walls draw tiles[i][j] at
-                    // pixel (i*unit, j*unit). So the spawn/laser origin is the CENTRE of the base tile:
-                    // pixelX = i*unit + unit/2, pixelY = j*unit + unit/2. (Was swapped, so discs spawned
-                    // at the wrong tile, away from the drawn base.)
-                    result[found] = new BasePlacement(found, i, j,
-                            i * unit + unit / 2, j * unit + unit / 2,
-                            SHOOT_DIRECTIONS[Math.min(found, SHOOT_DIRECTIONS.length - 1)]);
-                    found++;
-                }
-            }
-        }
-        for (int p = found; p < playerCount; p++) {
-            result[p] = new BasePlacement(p, 0, 0, 0, 0,
-                    SHOOT_DIRECTIONS[Math.min(p, SHOOT_DIRECTIONS.length - 1)]);
+        for (int p = 0; p < playerCount; p++) {
+            int[] centre = MapGenerator.baseCentre(p);
+            int tileX = centre[0];
+            int tileY = centre[1];
+            result[p] = new BasePlacement(p, tileX, tileY,
+                    tileX * unit + unit / 2, tileY * unit + unit / 2,
+                    SHOOT_DIRECTIONS[p]);
         }
         return result;
     }

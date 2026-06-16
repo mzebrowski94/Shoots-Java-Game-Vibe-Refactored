@@ -54,6 +54,7 @@ public final class GameConfigLoader {
                 doubleValue(props, "disc.moveSpeed", defaults.disc().moveSpeed()),
                 intValue(props, "disc.maxBounces", defaults.disc().maxBounces()),
                 intValue(props, "disc.maxPerPlayer", defaults.disc().maxPerPlayer()),
+                intValue(props, "disc.maxPerShot", defaults.disc().maxPerShot()),
                 intValue(props, "laser.maxBounces", defaults.disc().laserMaxBounces()));
 
         var collision = new CollisionConfig(
@@ -67,15 +68,21 @@ public final class GameConfigLoader {
 
         var palette = paletteFromProperties(props, defaults.palette());
 
+        var ai = new AiConfig(
+                intValue(props, "ai.scanAngles", defaults.ai().scanAngles()),
+                intValue(props, "ai.scanBudgetPerFrame", defaults.ai().scanBudgetPerFrame()),
+                boolValue(props, "ai.skillsEnabled", defaults.ai().skillsEnabled()));
+
         return new GameConfig(
                 intValue(props, "playerNumber", defaults.playerNumber()),
-                grid, disc, collision, round, palette);
+                resolveSeed(props),
+                grid, disc, collision, round, palette, ai);
     }
 
     /** Built-in defaults mirroring the legacy hard-coded values. */
     public static GameConfig defaults() {
         var grid = new GridConfig(36, 25);
-        var disc = new DiscConfig(18, 10, 2.0, 7, 3, 4);
+        var disc = new DiscConfig(18, 10, 2.0, 7, 3, 3, 4);
         var collision = new CollisionConfig(4);
         var round = new RoundConfig(15, 2, 2, 1);
         var palette = new ColorPalette(
@@ -92,7 +99,8 @@ public final class GameConfigLoader {
                         new RgbColor(48, 213, 200),
                         new RgbColor(252, 3, 0),
                         new RgbColor(237, 26, 116)));
-        return new GameConfig(2, grid, disc, collision, round, palette);
+        var ai = new AiConfig(24, 4, true);
+        return new GameConfig(2, System.nanoTime(), grid, disc, collision, round, palette, ai);
     }
 
     private static ColorPalette paletteFromProperties(Properties props, ColorPalette defaults) {
@@ -124,6 +132,31 @@ public final class GameConfigLoader {
             log.warn("Invalid int for '{}'='{}'; using {}", key, raw, fallback);
             return fallback;
         }
+    }
+
+    /**
+     * Resolves the master run seed: a parseable {@code game.seed} is used verbatim (reproducible run);
+     * a blank or absent key resolves to a fresh time-based seed (a different run each launch).
+     */
+    private static long resolveSeed(Properties props) {
+        var raw = props.getProperty("game.seed");
+        if (raw == null || raw.isBlank()) {
+            return System.nanoTime();
+        }
+        try {
+            return Long.parseLong(raw.trim());
+        } catch (NumberFormatException e) {
+            log.warn("Invalid long for 'game.seed'='{}'; using a fresh time seed", raw);
+            return System.nanoTime();
+        }
+    }
+
+    private static boolean boolValue(Properties props, String key, boolean fallback) {
+        var raw = props.getProperty(key);
+        if (raw == null || raw.isBlank()) {
+            return fallback;
+        }
+        return Boolean.parseBoolean(raw.trim());
     }
 
     private static double doubleValue(Properties props, String key, double fallback) {

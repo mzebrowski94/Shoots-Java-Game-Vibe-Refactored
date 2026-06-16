@@ -14,6 +14,7 @@ import pl.mzebrows.shoots.app.GameSettings;
 import pl.mzebrows.shoots.ui.RoundEnum;
 import pl.mzebrows.shoots.input.GameAction;
 import pl.mzebrows.shoots.input.InputBridge;
+import pl.mzebrows.shoots.ai.AiPlayers;
 import pl.mzebrows.shoots.world.PlayInput;
 import pl.mzebrows.shoots.world.PlayWorld;
 
@@ -35,6 +36,8 @@ public final class PlayingState implements GameState {
 
     /** Headless simulation of the new model (aiming, pooled discs, bounces, capture scoring). */
     private PlayWorld world;
+    /** Computer-controlled players occupying the highest slots (empty when all-human). */
+    private AiPlayers aiPlayers = AiPlayers.none();
 
     private GameState pausedState;
     private GameState gameOverState;
@@ -126,6 +129,7 @@ public final class PlayingState implements GameState {
                 settings.startNewRound(screen);
             }
             world.resetRound();
+            rebuildAiForCurrentMap();
             phaseJustEntered = false;
         }
         screen.tick();
@@ -154,6 +158,7 @@ public final class PlayingState implements GameState {
 
         if (settings.isPlayerKeyboardAvailable()) {
             PlayInput.apply(input, world);
+            aiPlayers.think(world);
         }
         world.step();
         if (requestNextPhase) {
@@ -228,6 +233,16 @@ public final class PlayingState implements GameState {
     }
 
     /**
+     * (Re)builds the AI controllers against the world's CURRENT map. Called after every
+     * {@link PlayWorld#resetRound()} (the map regenerates each round) so the AI's targeting binds to the
+     * fresh collider, and when the world itself is rebuilt for a new player selection.
+     */
+    private void rebuildAiForCurrentMap() {
+        aiPlayers = AiPlayers.build(world, settings.getAiNumber(), settings.getAiDifficulty(),
+                world.config().ai().scanAngles());
+    }
+
+    /**
      * Rebuilds {@link #world} so its player count matches the menu selection
      * ({@code settings.getPlayerNumber()}); the initial world is built from {@code game.properties},
      * which would otherwise ignore a 3- or 4-player choice (bases/discs for P3/P4 never appear).
@@ -237,11 +252,14 @@ public final class PlayingState implements GameState {
         int selected = Math.max(1, Math.min(4, settings.getPlayerNumber()));
         RoundConfig round = applySelectedRoundSettings(base.round(),
                 settings.getRoundLimit(), settings.getRoundTime());
-        if (selected != base.playerNumber() || round != base.round()) {
-            base = new GameConfig(selected, base.grid(), base.disc(), base.collision(),
-                    round, base.palette());
+        if (selected != base.playerNumber()) {
+            base = base.withPlayerNumber(selected);
+        }
+        if (round != base.round()) {
+            base = base.withRound(round);
         }
         world = new PlayWorld(base);
+        rebuildAiForCurrentMap();
         screen.setWorld(world, 0.0);
         pointer.setWorld(world);
     }

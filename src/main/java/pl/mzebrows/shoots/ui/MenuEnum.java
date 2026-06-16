@@ -22,6 +22,12 @@ public enum MenuEnum {
     /** Choose the round duration. */
     ROUND_TIME_OPTION,
 
+    /** Choose the number of AI players. */
+    AI_NUMBER_OPTION,
+
+    /** Choose the AI difficulty. */
+    AI_DIFFICULTY_OPTION,
+
     /** Show the key bindings for all players. */
     CONTROLS,
 

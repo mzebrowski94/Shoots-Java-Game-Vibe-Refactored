@@ -139,6 +139,7 @@ public class GameScreen extends GameCanvas {
         drawBlockHits(world);
         drawCapturePoints(world);
         drawBases(world);
+        drawCursors(world);
         drawLasers(world);
         drawDiscs(world);
     }
@@ -255,6 +256,50 @@ public class GameScreen extends GameCanvas {
             drawRotatedRing(cx, cy, rBig, baseRotation);
             drawRotatedRing(cx, cy, rSmall, -baseRotation);
         }
+    }
+
+    /**
+     * Draws each player's aim cursor: a filled arrowhead sitting just outside the base ring and pointing
+     * along the current shot angle (ported from the legacy {@code PlayerCursor}). Uses the same disc
+     * travel convention as movement/laser (dir = (-sin θ, cos θ)), so the arrow points exactly where a
+     * fired disc would go.
+     */
+    private void drawCursors(PlayWorld world) {
+        int unit = world.unit();
+        int size = (int) (unit * 0.5);
+        int standoff = 2 * size; // distance from base centre to the arrow tip base, matching legacy
+        var oldStroke = g2d.getStroke();
+        g2d.setStroke(new BasicStroke(1.0f));
+        for (int p = 0; p < world.playerCount(); p++) {
+            PlayWorld.BasePlacement base = world.baseOf(p);
+            int cx = base.tileX() * unit + unit / 2;
+            int cy = base.tileY() * unit + unit / 2;
+
+            double angle = Math.toRadians(-world.aimOf(p).currentAngle());
+            double dirX = Math.sin(angle);   // disc convention: x uses sin(-angle)
+            double dirY = Math.cos(angle);   // disc convention: y uses cos(-angle)
+            // Perpendicular unit vector for the arrow's width.
+            double perpX = -dirY;
+            double perpY = dirX;
+
+            // Arrow geometry: a tip ahead, two barbs to the sides, and a notch behind (4-point head).
+            double baseX = cx + dirX * standoff;
+            double baseY = cy + dirY * standoff;
+            double tipX = baseX + dirX * size;
+            double tipY = baseY + dirY * size;
+            double leftX = baseX + perpX * size;
+            double leftY = baseY + perpY * size;
+            double rightX = baseX - perpX * size;
+            double rightY = baseY - perpY * size;
+            double notchX = baseX + dirX * (0.5 * size);
+            double notchY = baseY + dirY * (0.5 * size);
+
+            int[] xs = {(int) leftX, (int) tipX, (int) rightX, (int) notchX};
+            int[] ys = {(int) leftY, (int) tipY, (int) rightY, (int) notchY};
+            g2d.setColor(world.playerColor(p));
+            g2d.fillPolygon(xs, ys, 4);
+        }
+        g2d.setStroke(oldStroke);
     }
 
     /** Draws one dashed ring of {@code radius} centred at ({@code cx},{@code cy}), rotated by degrees. */

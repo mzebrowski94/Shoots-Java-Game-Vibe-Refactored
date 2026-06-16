@@ -13,11 +13,31 @@ import pl.mzebrows.shoots.input.InputBridge;
 class PlayInputTest {
 
     @Test
-    void heldRotateLeftMapsToLeftAim() {
+    void heldRotateLeftMapsToMirroredAimForP1() {
         var input = mock(InputBridge.class);
         when(input.isHeld(GameAction.P1_ROTATE_LEFT)).thenReturn(true);
 
-        assertThat(PlayInput.aimFor(input, 0)).isEqualTo(PlayWorld.AimInput.LEFT);
+        // P1's base faces up: its keys are mirrored so the LEFT key turns the cursor to the player's
+        // own left, which is AimInput.RIGHT in absolute terms (legacy Player.moveUnit = -1).
+        assertThat(PlayInput.aimFor(input, 0)).isEqualTo(PlayWorld.AimInput.RIGHT);
+    }
+
+    @Test
+    void heldRotateLeftMapsToLeftAimForNonMirroredP2() {
+        var input = mock(InputBridge.class);
+        when(input.isHeld(GameAction.P2_ROTATE_LEFT)).thenReturn(true);
+
+        // P2 is not mirrored (legacy moveUnit = +1), so its LEFT key maps straight to AimInput.LEFT.
+        assertThat(PlayInput.aimFor(input, 1)).isEqualTo(PlayWorld.AimInput.LEFT);
+    }
+
+    @Test
+    void mirroringMatchesLegacyMoveUnitSignsForAllPlayers() {
+        // Legacy: P1=-1, P2=+1, P3=-1, P4=+1 -> P1/P3 mirrored, P2/P4 not.
+        assertThat(PlayWorld.aimKeysMirrored(0)).isTrue();
+        assertThat(PlayWorld.aimKeysMirrored(1)).isFalse();
+        assertThat(PlayWorld.aimKeysMirrored(2)).isTrue();
+        assertThat(PlayWorld.aimKeysMirrored(3)).isFalse();
     }
 
     @Test
@@ -29,12 +49,13 @@ class PlayInputTest {
     }
 
     @Test
-    void leftWinsTiesMatchingLegacyOrder() {
+    void leftKeyWinsTiesMatchingLegacyOrder() {
         var input = mock(InputBridge.class);
         when(input.isHeld(GameAction.P1_ROTATE_LEFT)).thenReturn(true);
         when(input.isHeld(GameAction.P1_ROTATE_RIGHT)).thenReturn(true);
 
-        assertThat(PlayInput.aimFor(input, 0)).isEqualTo(PlayWorld.AimInput.LEFT);
+        // The LEFT KEY still wins the tie (checked first); for mirrored P1 that resolves to RIGHT intent.
+        assertThat(PlayInput.aimFor(input, 0)).isEqualTo(PlayWorld.AimInput.RIGHT);
     }
 
     @Test

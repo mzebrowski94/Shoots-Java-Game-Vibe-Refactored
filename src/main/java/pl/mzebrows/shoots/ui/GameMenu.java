@@ -4,6 +4,7 @@ package pl.mzebrows.shoots.ui;
 import pl.mzebrows.shoots.app.GameSettings;
 import pl.mzebrows.shoots.app.Round;
 
+import pl.mzebrows.shoots.ai.AiDifficulty;
 import pl.mzebrows.shoots.input.GameAction;
 import pl.mzebrows.shoots.world.PlayWorld;
 import pl.mzebrows.shoots.input.InputBridge;
@@ -38,27 +39,34 @@ public class GameMenu {
     int roundNumber = 4;
     int roundNumberLimit = 20;
 
-    String stringContinue = "   [    CONTINUE    ]";
+    int aiNumber = 0;
+    AiDifficulty aiDifficulty = AiDifficulty.NORMAL;
+
+    String stringContinue = "[ CONTINUE ]";
     String stringNewGame = "[ START NEW GAME ]";
-    String stringPlayerNumberText = "    - Player Number: -";
-    String stringRoundLimitText = "      - Round Limit: - ";
-    String stringRoundTimeText = "      - Round Time: - ";
-    String stringQuit = "      [     QUIT     ]";
-    String stringControls = "    [    CONTROLS    ]";
+    String stringPlayerNumberText = "- Player Number -";
+    String stringRoundLimitText = "- Round Limit -";
+    String stringRoundTimeText = "- Round Time -";
+    String stringQuit = "[ QUIT ]";
+    String stringControls = "[ CONTROLS ]";
 
     /** When true, the menu shows the all-players controls panel instead of the option list. */
     boolean showingControls = false;
-    String stringPlayerNumber = "            < " + playerNumber + " >";
-    String stringRoundNumber = "            < " + roundNumber + " >";
-    String stringRoundTime = "           < " + roundTime + " >";
+    String stringPlayerNumber = optionValue(playerNumber);
+    String stringRoundNumber = optionValue(roundNumber);
+    String stringRoundTime = optionValue(roundTime);
+    String stringAiNumberText = "- AI Players -";
+    String stringAiNumber = optionValue(aiNumber);
+    String stringAiDifficultyText = "- AI Difficulty -";
+    String stringAiDifficulty = difficultyValue(aiDifficulty.getDisplayName());
 
     GameMenu(GameSettings gameSettings) {
         menuOption = MenuEnum.START_NEW_GAME;
         this.gameSettings = gameSettings;
         width = gameSettings.getDefaultWidth();
         height = gameSettings.getDefaultHeight();
-        nextLine = 50;
-        menuHeight = 150;
+        nextLine = 46;
+        menuHeight = 120;
         menuScoreHigh = 100;
         textPosition = (width / 2) - 50;
         menuFont = gameSettings.getMenuFont().deriveFont(30f);
@@ -87,22 +95,26 @@ public class GameMenu {
         drawSelectionHighlight(g2d);
 
         Color purple = gameSettings.getColorScheme().getDeadLineColor();
-        shadowString(g2d, stringNewGame, textPosition, menuHeight + 3 * nextLine, purple);
-        shadowString(g2d, stringPlayerNumberText, textPosition, menuHeight + 4 * nextLine, purple);
-        shadowString(g2d, stringPlayerNumber, textPosition, menuHeight + 5 * nextLine, purple);
-        shadowString(g2d, stringRoundLimitText, textPosition, menuHeight + 6 * nextLine, purple);
-        shadowString(g2d, stringRoundNumber, textPosition, menuHeight + 7 * nextLine, purple);
-        shadowString(g2d, stringRoundTimeText, textPosition, menuHeight + 8 * nextLine, purple);
-        shadowString(g2d, stringRoundTime, textPosition, menuHeight + 9 * nextLine, purple);
-        shadowString(g2d, stringControls, textPosition, menuHeight + 11 * nextLine, purple);
-        shadowString(g2d, stringQuit, textPosition, menuHeight + 12 * nextLine, purple);
+        shadowStringCentered(g2d, stringNewGame, menuHeight + 2 * nextLine, purple);
+        shadowStringCentered(g2d, stringPlayerNumberText, menuHeight + 3 * nextLine, purple);
+        shadowStringCentered(g2d, stringPlayerNumber, menuHeight + 4 * nextLine, purple);
+        shadowStringCentered(g2d, stringRoundLimitText, menuHeight + 5 * nextLine, purple);
+        shadowStringCentered(g2d, stringRoundNumber, menuHeight + 6 * nextLine, purple);
+        shadowStringCentered(g2d, stringRoundTimeText, menuHeight + 7 * nextLine, purple);
+        shadowStringCentered(g2d, stringRoundTime, menuHeight + 8 * nextLine, purple);
+        shadowStringCentered(g2d, stringAiNumberText, menuHeight + 9 * nextLine, purple);
+        shadowStringCentered(g2d, stringAiNumber, menuHeight + 10 * nextLine, purple);
+        shadowStringCentered(g2d, stringAiDifficultyText, menuHeight + 11 * nextLine, purple);
+        shadowStringCentered(g2d, stringAiDifficulty, menuHeight + 12 * nextLine, purple);
+        shadowStringCentered(g2d, stringControls, menuHeight + 14 * nextLine, purple);
+        shadowStringCentered(g2d, stringQuit, menuHeight + 15 * nextLine, purple);
 
         if (gameSettings.getActualRoundNumber() == 0) {
-            shadowString(g2d, stringContinue, textPosition, menuHeight, gameSettings.getColorScheme().getBackgroundFontColor());
+            shadowStringCentered(g2d, stringContinue, menuHeight, gameSettings.getColorScheme().getBackgroundFontColor());
         } else if (gameSettings.isGameEnd()) {
             drawGameEnd(g2d, world);
         } else {
-            shadowString(g2d, stringContinue, textPosition, menuHeight, purple);
+            shadowStringCentered(g2d, stringContinue, menuHeight, purple);
         }
 
         drawChoosenMenuOption(g2d);
@@ -158,8 +170,8 @@ public class GameMenu {
     /** Dark, slightly transparent rounded panel behind the menu items to lift text contrast. */
     private void drawMenuBackdrop(Graphics2D g2d) {
         int pad = 24;
-        int top = menuHeight - 3 * nextLine;            // above the WINNER/CONTINUE line
-        int bottom = menuHeight + 12 * nextLine + pad;  // below QUIT
+        int top = menuHeight - 2 * nextLine;            // a little headroom above CONTINUE
+        int bottom = menuHeight + 15 * nextLine + pad;  // below QUIT (row 15)
         int x = panelLeft(g2d);
         int w = panelWidth(g2d);
         int h = bottom - top;
@@ -175,6 +187,14 @@ public class GameMenu {
         g2d.drawString(text, x + 2, y + 2);
         g2d.setColor(color);
         g2d.drawString(text, x, y);
+    }
+
+    /** Draws {@code text} horizontally centred on the menu block (so value rows sit under their labels). */
+    private void shadowStringCentered(Graphics2D g2d, String text, int y, Color color) {
+        FontMetrics fm = g2d.getFontMetrics(menuFont);
+        int blockCentre = textPosition + fm.stringWidth(stringNewGame) / 2;
+        int x = blockCentre - fm.stringWidth(text) / 2;
+        shadowString(g2d, text, x, y, color);
     }
 
     /** Soft filled bar behind the selected row so the green/yellow choice reads as focused. */
@@ -197,12 +217,14 @@ public class GameMenu {
     private int selectedRow() {
         return switch (menuOption) {
             case CONTINUE -> 0;
-            case START_NEW_GAME -> 3;
-            case PLAYER_NUMBER_OPTION -> 5;
-            case ROUND_NUMBER_OPTION -> 7;
-            case ROUND_TIME_OPTION -> 9;
-            case CONTROLS -> 11;
-            case QUIT -> 12;
+            case START_NEW_GAME -> 2;
+            case PLAYER_NUMBER_OPTION -> 4;
+            case ROUND_NUMBER_OPTION -> 6;
+            case ROUND_TIME_OPTION -> 8;
+            case AI_NUMBER_OPTION -> 10;
+            case AI_DIFFICULTY_OPTION -> 12;
+            case CONTROLS -> 14;
+            case QUIT -> 15;
             default -> -1;
         };
     }
@@ -300,19 +322,29 @@ public class GameMenu {
                 gameSettings.setRoundTime(roundTime);
                 gameSettings.setPlayerNumber(playerNumber);
                 gameSettings.setRoundLimit(roundNumber);
+                gameSettings.setAiNumber(Math.min(aiNumber, playerNumber));
+                gameSettings.setAiDifficulty(aiDifficulty);
             }
         } else if (menuOption == MenuEnum.PLAYER_NUMBER_OPTION) {
             playerNumber = changeNumber(input, playerNumber, playerLimit, 1);
-            stringPlayerNumber = "            < " + playerNumber + " >";
+            stringPlayerNumber = optionValue(playerNumber);
             choosenOption = MenuEnum.PLAYER_NUMBER_OPTION;
         } else if (menuOption == MenuEnum.ROUND_TIME_OPTION) {
             roundTime = changeNumber(input, roundTime, roundTimeLimit, 5);
-            stringRoundTime = "           < " + roundTime + " >";
+            stringRoundTime = optionValue(roundTime);
             choosenOption = MenuEnum.ROUND_TIME_OPTION;
         } else if (menuOption == MenuEnum.ROUND_NUMBER_OPTION) {
             roundNumber = changeNumber(input, roundNumber, roundNumberLimit, 4);
-            stringRoundNumber = "            < " + roundNumber + " >";
+            stringRoundNumber = optionValue(roundNumber);
             choosenOption = MenuEnum.ROUND_NUMBER_OPTION;
+        } else if (menuOption == MenuEnum.AI_NUMBER_OPTION) {
+            aiNumber = changeAiNumber(input, aiNumber);
+            stringAiNumber = optionValue(aiNumber);
+            choosenOption = MenuEnum.AI_NUMBER_OPTION;
+        } else if (menuOption == MenuEnum.AI_DIFFICULTY_OPTION) {
+            aiDifficulty = changeAiDifficulty(input, aiDifficulty);
+            stringAiDifficulty = difficultyValue(aiDifficulty.getDisplayName());
+            choosenOption = MenuEnum.AI_DIFFICULTY_OPTION;
         } else if (menuOption == MenuEnum.CONTROLS) {
             if (input.isJustPressed(GameAction.CONFIRM)) {
                 showingControls = true;
@@ -348,6 +380,28 @@ public class GameMenu {
     /** Current round time (seconds) selected in the menu. */
     public int getRoundTime() { return roundTime; }
 
+    /** Current AI-player count selected in the menu. */
+    public int getAiNumber() { return aiNumber; }
+
+    /** Current AI difficulty selected in the menu. */
+    public AiDifficulty getAiDifficulty() { return aiDifficulty; }
+
+    /** Width (chars) the DIFFICULTY name is centred within so its chevrons stay symmetric as it changes. */
+    private static final int DIFFICULTY_VALUE_WIDTH = 9;
+
+    /** Tight {@code < value >} for numeric options (chevrons close to the number). */
+    private String optionValue(int value) {
+        return "< " + value + " >";
+    }
+
+    /** Difficulty name centred between chevrons so {@code <} / {@code >} stay symmetric across names. */
+    private String difficultyValue(String value) {
+        int total = Math.max(0, DIFFICULTY_VALUE_WIDTH - value.length());
+        int left = total / 2;
+        int right = total - left;
+        return "< " + " ".repeat(left) + value + " ".repeat(right) + " >";
+    }
+
     /** Adjusts a numeric menu option left/right and wraps at the limits. */
     public int changeNumber(InputBridge input, int defaultValue, int limit, int multiply) {
         if (input.isJustPressed(GameAction.NAVIGATE_LEFT)) {
@@ -364,6 +418,28 @@ public class GameMenu {
         return defaultValue;
     }
 
+    /** Adjusts the AI-player count in [0, playerNumber], wrapping at the ends. */
+    public int changeAiNumber(InputBridge input, int value) {
+        if (input.isJustPressed(GameAction.NAVIGATE_LEFT)) {
+            value = value <= 0 ? playerNumber : value - 1;
+        } else if (input.isJustPressed(GameAction.NAVIGATE_RIGHT)) {
+            value = value >= playerNumber ? 0 : value + 1;
+        }
+        return Math.min(value, playerNumber);
+    }
+
+    /** Cycles the AI difficulty left/right through {@link AiDifficulty} values. */
+    public AiDifficulty changeAiDifficulty(InputBridge input, AiDifficulty value) {
+        AiDifficulty[] all = AiDifficulty.values();
+        int idx = value.ordinal();
+        if (input.isJustPressed(GameAction.NAVIGATE_LEFT)) {
+            idx = (idx - 1 + all.length) % all.length;
+        } else if (input.isJustPressed(GameAction.NAVIGATE_RIGHT)) {
+            idx = (idx + 1) % all.length;
+        }
+        return all[idx];
+    }
+
     /** Moves the menu selection to the next option. */
     public void changeMenuOptionDown() {
 
@@ -376,6 +452,10 @@ public class GameMenu {
         } else if (menuOption == MenuEnum.ROUND_NUMBER_OPTION) {
             menuOption = MenuEnum.ROUND_TIME_OPTION;
         } else if (menuOption == MenuEnum.ROUND_TIME_OPTION) {
+            menuOption = MenuEnum.AI_NUMBER_OPTION;
+        } else if (menuOption == MenuEnum.AI_NUMBER_OPTION) {
+            menuOption = MenuEnum.AI_DIFFICULTY_OPTION;
+        } else if (menuOption == MenuEnum.AI_DIFFICULTY_OPTION) {
             menuOption = MenuEnum.CONTROLS;
         } else if (menuOption == MenuEnum.CONTROLS) {
             menuOption = MenuEnum.QUIT;
@@ -406,8 +486,12 @@ public class GameMenu {
             menuOption = MenuEnum.PLAYER_NUMBER_OPTION;
         } else if (menuOption == MenuEnum.ROUND_TIME_OPTION) {
             menuOption = MenuEnum.ROUND_NUMBER_OPTION;
-        } else if (menuOption == MenuEnum.CONTROLS) {
+        } else if (menuOption == MenuEnum.AI_NUMBER_OPTION) {
             menuOption = MenuEnum.ROUND_TIME_OPTION;
+        } else if (menuOption == MenuEnum.AI_DIFFICULTY_OPTION) {
+            menuOption = MenuEnum.AI_NUMBER_OPTION;
+        } else if (menuOption == MenuEnum.CONTROLS) {
+            menuOption = MenuEnum.AI_DIFFICULTY_OPTION;
         } else if (menuOption == MenuEnum.QUIT) {
             menuOption = MenuEnum.CONTROLS;
         }
@@ -422,19 +506,23 @@ public class GameMenu {
     public void drawChoosenMenuOption(Graphics2D g2d) {
         // Keep the same green/yellow selection colours; only add the shared drop shadow for legibility.
         if (menuOption == MenuEnum.CONTINUE) {
-            shadowString(g2d, stringContinue, textPosition, menuHeight, Color.green);
+            shadowStringCentered(g2d, stringContinue, menuHeight, Color.green);
         } else if (menuOption == MenuEnum.START_NEW_GAME) {
-            shadowString(g2d, stringNewGame, textPosition, menuHeight + 3 * nextLine, Color.green);
+            shadowStringCentered(g2d, stringNewGame, menuHeight + 2 * nextLine, Color.green);
         } else if (menuOption == MenuEnum.PLAYER_NUMBER_OPTION) {
-            shadowString(g2d, stringPlayerNumber, textPosition, menuHeight + 5 * nextLine, Color.yellow);
+            shadowStringCentered(g2d, stringPlayerNumber, menuHeight + 4 * nextLine, Color.yellow);
         } else if (menuOption == MenuEnum.ROUND_NUMBER_OPTION) {
-            shadowString(g2d, stringRoundNumber, textPosition, menuHeight + 7 * nextLine, Color.yellow);
+            shadowStringCentered(g2d, stringRoundNumber, menuHeight + 6 * nextLine, Color.yellow);
         } else if (menuOption == MenuEnum.ROUND_TIME_OPTION) {
-            shadowString(g2d, stringRoundTime, textPosition, menuHeight + 9 * nextLine, Color.yellow);
+            shadowStringCentered(g2d, stringRoundTime, menuHeight + 8 * nextLine, Color.yellow);
+        } else if (menuOption == MenuEnum.AI_NUMBER_OPTION) {
+            shadowStringCentered(g2d, stringAiNumber, menuHeight + 10 * nextLine, Color.yellow);
+        } else if (menuOption == MenuEnum.AI_DIFFICULTY_OPTION) {
+            shadowStringCentered(g2d, stringAiDifficulty, menuHeight + 12 * nextLine, Color.yellow);
         } else if (menuOption == MenuEnum.CONTROLS) {
-            shadowString(g2d, stringControls, textPosition, menuHeight + 11 * nextLine, Color.green);
+            shadowStringCentered(g2d, stringControls, menuHeight + 14 * nextLine, Color.green);
         } else if (menuOption == MenuEnum.QUIT) {
-            shadowString(g2d, stringQuit, textPosition, menuHeight + 12 * nextLine, Color.green);
+            shadowStringCentered(g2d, stringQuit, menuHeight + 15 * nextLine, Color.green);
         }
     }
     /** The four players' rotate-left / rotate-right / shoot actions, in player order. */

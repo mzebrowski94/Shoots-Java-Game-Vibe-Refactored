@@ -21,6 +21,9 @@
 - `...ui` (c14) — AWT shell: `GameFrame`, `GameCanvas`, `GameCounter`, `GamePointer`, `GameScreen`, `GameMenu`,
   + UI enums/palette `MenuEnum`/`RoundEnum`/`PSConst`/`ColorScheme`.
 - `...app` (c14) — lifecycle/loop/state: `GameLoop`, `GameSettings`, `Round`.
+- `...ai` (C1-C2) — `AiDifficulty`, `TargetMode`, `AiSkills` + `AiSkillsFactory` (seed-derived skills);
+  `AiTargeting` (bounce-path reach walk) + `PlayerAiController` (utility targeting, drives applyInput/fire)
+  + `AiPlayers` (owns controllers, fills high slots, staggered). Config: `config.AiConfig` + `disc.maxPerShot`.
 
 ## Kept AWT Shell (c13 standards pass; c14 repackaged)
 - Live shell in `...ui`/`...app` draws `PlayWorld`/`MatchFlow`. `GameSettings` = window/fonts/round-timing
@@ -47,7 +50,31 @@
 
 ## Established Contracts
 - **Config = immutable records, AWT-decoupled.** `GameConfig` aggregates `GridConfig`, `DiscConfig`,
-  `CollisionConfig`, `RoundConfig`, `ColorPalette` (+ `RgbColor`). `GameConfigLoader.load()` falls back per-key.
+  `CollisionConfig`, `RoundConfig`, `ColorPalette` (+ `RgbColor`) + `AiConfig` + a resolved `long seed` (master run
+  seed for map + AI; `GameConfigLoader.resolveSeed` reads optional `game.seed`, blank=fresh time seed).
+  `GameConfig` has `withSeed`/`withPlayerNumber`/`withRound` copy helpers. `GameConfigLoader.load()`
+  falls back per-key. `PlayWorld(GameConfig)` builds from `config.seed()`; `PlayWorld(GameConfig,long)`
+  seeds map+AI and exposes `seed()`; `PlayWorld(GameConfig,Random)` is the test ctor (records seed 0).
+- **AI skills = seed-derived knob bundle (C1).** `AiSkillsFactory.create(AiDifficulty,seed,playerId)`
+  -> immutable `AiSkills` (normalised knobs in [0,1] + concrete disc counts / tick intervals +
+  `TargetMode`). EASY..VERY_HARD interpolate weak->strong endpoints by `ladderFraction()`, nudged by a
+  per-AI deviation; `RANDOM` draws a wide band. RNG seeded on `mix(seed,playerId)` so skills are
+  reproducible per (seed,player) yet independent across players. C2 reads these; C5 will let
+  `game.properties` override the endpoints/deviation.
+- **AI control = `PlayerAiController` (C2).** Reads `PlayWorld` (baseOf/aimOf/scoring/collider/config) and
+  drives ONLY `applyInput`/`fire` -- AI is just another input source. `think(world)` per tick: on a
+  `decisionIntervalTicks` cadence it scans `scanAngles` candidate angles via `AiTargeting.reach`, filters
+  own-flank-first-hit angles (never shoot flank blocks), scores reachable `CapturePoint`s by knobs/
+  `TargetMode`, caches the best angle (+ Gaussian aim error scaled by 1-accuracy = real misses); other
+  ticks nudge aim (cursorSpeedFactor) and fire when aligned, honouring volley pacing + disc caps. Seeded
+  RNG -> reproducible. `PlayWorld.collider()` added for the reach walk.
+- **AI wiring (C3-C5).** `AiPlayers.build(world,aiCount,difficulty,scanAngles)` fills the HIGHEST
+  slots (humans low), clamps count to player count, clamps each AI's disc caps to `disc.maxPerPlayer`/
+  `disc.maxPerShot`, staggers first decisions. `PlayingState.updateContinues` calls `aiPlayers.think(world)`
+  after human `PlayInput.apply` (so AIs are inert during BEGIN/ENDS/pause via `isPlayerKeyboardAvailable`).
+  Menu: `AI_NUMBER_OPTION` (0..playerNumber) + `AI_DIFFICULTY_OPTION` in `GameMenu`, applied to
+  `GameSettings.aiNumber/aiDifficulty` on START_NEW_GAME. Tunables: `disc.maxPerShot`, `ai.scanAngles`,
+  `ai.scanBudgetPerFrame`, `ai.skillsEnabled` in `game.properties` (per-key fallback).
 - **`GameAction` + `InputBridge`**: all input as `GameAction`; EDT writes, loop reads via `poll()`.
 - **`GameState` + `GameStateMachine`**: `update(InputBridge) → GameState`. `PlayingState` owns the round cycle.
 - **`FixedTimestep` + `Renderer`**: loop on its own thread; `Renderer.render(RoundEnum, alpha)` is the only entry.
@@ -91,6 +118,38 @@
   `game.properties`). Fix: `PlayingState.rebuildWorldForSelectedPlayers` overlays the selected
   round limit + round time onto `RoundConfig` (`applySelectedRoundSettings`) before building
   `PlayWorld`. Tests: `PlayingStateRoundLimitTest`.
+- **C-fixes (post-AI playtest):** aim arc was halved (±90) — restored to legacy ±110 via
+  `PlayWorld.AIM_ROTATION_LIMIT_DEG`. Player aim **cursor** drawable (legacy `PlayerCursor`) restored as
+  `GameScreen.drawCursors` (arrowhead along `aimOf(p).currentAngle()`, dir=(-sinθ,cosθ) matches disc
+  travel; `CursorDirectionTest`). Menu value rows centred via `optionValue(...)` (no manual padding,
+  symmetric chevrons); rows recompacted (`menuHeight=120`/`nextLine=46`, contiguous 0..13) so
+  CONTROLS/QUIT fit the 900px window. `AiDifficulty.getDisplayName()` added for the menu label.
+- **Base placement (post-AI):** `MapGenerator.BASE_CENTRES` kept at 1 tile from each border
+  (`{12,23}`,`{12,1}`,`{1,12}`,`{23,12}`) so each base box + its `FLANK_OFFSET=2` flank walls TOUCH the
+  border (matches `preview/PLAYER_CURSOR_EXAMPLE.png`). Even so, no aim angle across the ±110° arc
+  first-reflects on an own flank (disc clears the spawn box first), so the AI flank filter is a
+  harmless safeguard — proven by `FlankFilterHarmlessTest`. Menu value rows are centred under their
+  labels via `shadowStringCentered` (tight `< n >` for numbers, symmetric chevrons for the difficulty
+  name); rows gapped so CONTINUE and CONTROLS/QUIT sit apart from the option block, all inside the
+  backdrop (bottom extended past QUIT).
+- **Spawn side / aim now fixed per player id (bug):** `PlayWorld.locateBases` used to assign bases by
+  MAP SCAN ORDER, so player count changed which side each player spawned on and which way they aimed
+  (2-player cursors/lasers pointed at the border). Now it maps `playerId -> MapGenerator.baseCentre(p)`
+  + `SHOOT_DIRECTIONS[p]`: P0 bottom, P1 top, P2 left, P3 right, ALWAYS, with neutral aim pointing at
+  the map centre regardless of player count. `MapGenerator.baseCentre(int)` exposes the canonical
+  tiles. Tests in `PlayWorldTest` (spawn-side-independent-of-count, aim-to-centre, aim-independent-of-count).
+- **Per-player aim key handedness (bug):** human LEFT/RIGHT keys are mirrored for the side-facing
+  bases so each player's key turns toward THEIR own left/right (legacy `Player.moveUnit`: P1/P3=-1
+  mirrored, P2/P4=+1). `PlayWorld.aimKeysMirrored(playerId)` drives the swap in `PlayInput.aimFor`;
+  the world API (`applyInput`) stays raw so the AI is unaffected. Menu: all option titles + action
+  rows now drawn via `shadowStringCentered` (centred on the panel).
+- **Per-round map regeneration (bug):** the map was built once and reused every round. `PlayWorld`
+  now regenerates the map each `resetRound()` from `mapSeedFor(roundIndex) = mix(baseMapSeed, round)`
+  via `buildMap` (rebuilds tiles/collider/laser/bases + re-registers capture points; rebinds
+  `DiscSystem` collider via new `setCollider`). `baseMapSeed` = master seed (or a value drawn from the
+  test Random when seed==0); `resetMatch` resets `roundIndex=0` so a new game restarts the sequence —
+  fully reproducible per master seed. `PlayingState.rebuildAiForCurrentMap()` rebuilds `AiPlayers`
+  after each `resetRound()` so AI targeting binds to the fresh collider. Tests in `PlayWorldTest`.
 - **USER ACTION (Windows, leftover stubs):** delete the inert Windows-locked stub files I could not
   remove from the sandbox: the whole `src/main/java/pl/mzebrows/shoots/game/logic/` folder and
   `ui/PSConst.java`. Build is green with them present (they hold only a package line).

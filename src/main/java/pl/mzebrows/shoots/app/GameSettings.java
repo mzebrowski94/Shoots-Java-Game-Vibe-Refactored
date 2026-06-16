@@ -6,6 +6,7 @@ import pl.mzebrows.shoots.ui.GameScreen;
 import pl.mzebrows.shoots.ui.GameDimensions;
 
 import pl.mzebrows.shoots.input.InputBridge;
+import pl.mzebrows.shoots.ai.AiDifficulty;
 
 import java.awt.Font;
 import java.awt.FontFormatException;
@@ -31,6 +32,10 @@ import lombok.extern.slf4j.Slf4j;
 public class GameSettings {
 
     private int playerNumber;
+    /** Number of computer-controlled players (0..playerNumber); they occupy the highest slots. */
+    private int aiNumber;
+    /** Difficulty applied to all AI players for the match. */
+    private AiDifficulty aiDifficulty = AiDifficulty.NORMAL;
     private InputBridge inputBridge;
     private Font gameFont;
     private Font menuFont;

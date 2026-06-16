@@ -12,7 +12,7 @@ import pl.mzebrows.shoots.pool.ObjectPool;
 /** Verifies disc spawning from the pool, config-driven stats, exhaustion, and retirement. */
 class CombatSystemTest {
 
-    private static final DiscConfig DISC = new DiscConfig(18, 10, 2.0, 7, 3, 4);
+    private static final DiscConfig DISC = new DiscConfig(18, 10, 2.0, 7, 3, 3, 4);
 
     private ObjectPool<Entity> pool(int capacity) {
         return new ObjectPool<>(capacity, Entity::new, Entity::reset);

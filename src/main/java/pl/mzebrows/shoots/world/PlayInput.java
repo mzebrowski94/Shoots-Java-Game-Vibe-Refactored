@@ -24,14 +24,19 @@ public final class PlayInput {
 
     private PlayInput() { }
 
-    /** Aim intent for {@code playerId} from current input (left wins ties, matching legacy order). */
+    /**
+     * Aim intent for {@code playerId} from current input (left wins ties, matching legacy order). For
+     * players whose base faces so that screen-handedness is reversed ({@link PlayWorld#aimKeysMirrored}),
+     * the LEFT/RIGHT keys are swapped so each player's key turns the cursor toward THEIR own left/right.
+     */
     public static PlayWorld.AimInput aimFor(InputBridge input, int playerId) {
         GameAction[] a = PLAYER_ACTIONS[playerId];
+        boolean mirrored = PlayWorld.aimKeysMirrored(playerId);
         if (input.isHeld(a[0])) {
-            return PlayWorld.AimInput.LEFT;
+            return mirrored ? PlayWorld.AimInput.RIGHT : PlayWorld.AimInput.LEFT;
         }
         if (input.isHeld(a[1])) {
-            return PlayWorld.AimInput.RIGHT;
+            return mirrored ? PlayWorld.AimInput.LEFT : PlayWorld.AimInput.RIGHT;
         }
         return PlayWorld.AimInput.NONE;
     }

@@ -21,7 +21,7 @@ class DiscSystemTest {
 
     private static final int UNIT = 36;
     private static final int SIZE = 25;
-    private static final DiscConfig DISC = new DiscConfig(18, 10, 2.0, 7, 3, 4);
+    private static final DiscConfig DISC = new DiscConfig(18, 10, 2.0, 7, 3, 3, 4);
 
     private final GridConfig grid = new GridConfig(UNIT, SIZE);
     private final CollisionConfig collision = new CollisionConfig(4);

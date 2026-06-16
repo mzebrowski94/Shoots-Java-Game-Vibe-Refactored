@@ -26,8 +26,10 @@ class GameConfigLoaderTest {
     @Test
     void loadingMissingResourceFallsBackToDefaults() {
         var config = GameConfigLoader.load("does-not-exist.properties");
+        var defaults = GameConfigLoader.defaults();
 
-        assertThat(config).isEqualTo(GameConfigLoader.defaults());
+        // Seed is resolved fresh each call, so normalise it before comparing the rest.
+        assertThat(config.withSeed(0L)).isEqualTo(defaults.withSeed(0L));
     }
 
     @Test
@@ -69,5 +71,83 @@ class GameConfigLoaderTest {
 
         assertThat(config.grid().unit()).isEqualTo(36);
         assertThat(config.palette().background()).isEqualTo(new RgbColor(95, 99, 104));
+    }
+
+    @Test
+    void blankSeedResolvesToAFreshValueEachLoad() {
+        var props = new Properties(); // no game.seed
+
+        long first = GameConfigLoader.fromProperties(props).seed();
+        long second = GameConfigLoader.fromProperties(props).seed();
+
+        // Time-based; extremely unlikely to collide across two consecutive resolutions.
+        assertThat(first).isNotEqualTo(second);
+    }
+
+    @Test
+    void explicitSeedIsUsedVerbatimAndIsReproducible() {
+        var props = new Properties();
+        props.setProperty("game.seed", "123456789");
+
+        assertThat(GameConfigLoader.fromProperties(props).seed()).isEqualTo(123456789L);
+        assertThat(GameConfigLoader.fromProperties(props).seed()).isEqualTo(123456789L);
+    }
+
+    @Test
+    void invalidSeedFallsBackToAFreshValue() {
+        var props = new Properties();
+        props.setProperty("game.seed", "not-a-long");
+
+        // Falls back to a time seed rather than throwing.
+        assertThat(GameConfigLoader.fromProperties(props).seed()).isNotEqualTo(0L);
+    }
+
+    @Test
+    void defaultsIncludeDiscPerShotAndAiBlock() {
+        var d = GameConfigLoader.defaults();
+
+        assertThat(d.disc().maxPerShot()).isEqualTo(3);
+        assertThat(d.ai().scanAngles()).isEqualTo(24);
+        assertThat(d.ai().scanBudgetPerFrame()).isEqualTo(4);
+        assertThat(d.ai().skillsEnabled()).isTrue();
+    }
+
+    @Test
+    void bundledPropertiesProvideDiscPerShotAndAiBlock() {
+        var config = GameConfigLoader.load();
+
+        assertThat(config.disc().maxPerShot()).isEqualTo(3);
+        assertThat(config.ai().scanAngles()).isEqualTo(24);
+        assertThat(config.ai().scanBudgetPerFrame()).isEqualTo(4);
+        assertThat(config.ai().skillsEnabled()).isTrue();
+    }
+
+    @Test
+    void aiAndDiscPerShotKeysOverrideDefaults() {
+        var props = new Properties();
+        props.setProperty("disc.maxPerShot", "2");
+        props.setProperty("ai.scanAngles", "40");
+        props.setProperty("ai.scanBudgetPerFrame", "2");
+        props.setProperty("ai.skillsEnabled", "false");
+
+        var config = GameConfigLoader.fromProperties(props);
+
+        assertThat(config.disc().maxPerShot()).isEqualTo(2);
+        assertThat(config.ai().scanAngles()).isEqualTo(40);
+        assertThat(config.ai().scanBudgetPerFrame()).isEqualTo(2);
+        assertThat(config.ai().skillsEnabled()).isFalse();
+    }
+
+    @Test
+    void absentAiKeysFallBackPerKey() {
+        var props = new Properties();
+        props.setProperty("ai.scanAngles", "30"); // only one key set
+
+        var config = GameConfigLoader.fromProperties(props);
+
+        assertThat(config.ai().scanAngles()).isEqualTo(30);
+        // the others keep defaults
+        assertThat(config.ai().scanBudgetPerFrame()).isEqualTo(4);
+        assertThat(config.ai().skillsEnabled()).isTrue();
     }
 }
