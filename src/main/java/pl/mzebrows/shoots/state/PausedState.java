@@ -23,7 +23,13 @@ public final class PausedState implements GameState {
     }
 
     @Override
-    public void enter() { /* nothing */ }
+    public void enter() {
+        // When pausing an in-progress game, default the highlighted option to CONTINUE (not START NEW GAME).
+        // Before the first round / after the match ends, CONTINUE is unavailable, so leave the default.
+        if (settings.getActualRoundNumber() != 0 && !settings.isGameEnd()) {
+            screen.getMenuLayout().selectContinue();
+        }
+    }
 
     @Override
     public GameState update(InputBridge input) {

@@ -9,7 +9,7 @@ The goal is to practice vibe coding and give the game a new life.
 
 Game rules and mechanics are described in [Game rules](GameRules.md) file.
 
-#### PREVIEW - gifs from first version of game: 
+#### PREVIEW - gifs from LEGACY version of game: 
 1. One player game: 
 
 <img src="preview/Project_Shooots_v1_one_player.gif?raw=true" width="50%" height="50%">

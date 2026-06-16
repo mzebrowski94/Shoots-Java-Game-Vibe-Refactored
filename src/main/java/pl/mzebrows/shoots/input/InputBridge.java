@@ -101,4 +101,18 @@ public final class InputBridge implements KeyListener {
 
     @Override
     public void keyTyped(KeyEvent e) { /* unused */ }
+
+    /**
+     * Human-readable name of the first key bound to {@code action} (e.g. {@code "Left"}, {@code "W"},
+     * {@code "Num 4"}), or {@code "-"} if nothing is bound. Used by the menu's controls screen so the
+     * displayed bindings stay truthful to the actual key map.
+     */
+    public String keyNameFor(GameAction action) {
+        return keyMap.entrySet().stream()
+                .filter(e -> e.getValue().contains(action))
+                .map(Map.Entry::getKey)
+                .min(Integer::compareTo)
+                .map(KeyEvent::getKeyText)
+                .orElse("-");
+    }
 }

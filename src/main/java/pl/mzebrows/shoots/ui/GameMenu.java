@@ -44,6 +44,10 @@ public class GameMenu {
     String stringRoundLimitText = "      - Round Limit: - ";
     String stringRoundTimeText = "      - Round Time: - ";
     String stringQuit = "      [     QUIT     ]";
+    String stringControls = "    [    CONTROLS    ]";
+
+    /** When true, the menu shows the all-players controls panel instead of the option list. */
+    boolean showingControls = false;
     String stringPlayerNumber = "            < " + playerNumber + " >";
     String stringRoundNumber = "            < " + roundNumber + " >";
     String stringRoundTime = "           < " + roundTime + " >";
@@ -70,6 +74,11 @@ public class GameMenu {
     public void drawMenu(Graphics2D g2d, PlayWorld world) {
         g2d.setFont(menuFont);
 
+        if (showingControls) {
+            drawControls(g2d);
+            return;
+        }
+
         // UX: anchor the menu on a dark rounded backdrop so the purple/green text keeps consistent
         // contrast regardless of the (now more opaque) game frame behind it.
         drawMenuBackdrop(g2d);
@@ -85,6 +94,7 @@ public class GameMenu {
         shadowString(g2d, stringRoundNumber, textPosition, menuHeight + 7 * nextLine, purple);
         shadowString(g2d, stringRoundTimeText, textPosition, menuHeight + 8 * nextLine, purple);
         shadowString(g2d, stringRoundTime, textPosition, menuHeight + 9 * nextLine, purple);
+        shadowString(g2d, stringControls, textPosition, menuHeight + 11 * nextLine, purple);
         shadowString(g2d, stringQuit, textPosition, menuHeight + 12 * nextLine, purple);
 
         if (gameSettings.getActualRoundNumber() == 0) {
@@ -191,6 +201,7 @@ public class GameMenu {
             case PLAYER_NUMBER_OPTION -> 5;
             case ROUND_NUMBER_OPTION -> 7;
             case ROUND_TIME_OPTION -> 9;
+            case CONTROLS -> 11;
             case QUIT -> 12;
             default -> -1;
         };
@@ -265,6 +276,14 @@ public class GameMenu {
     public MenuEnum checkMenuInput(InputBridge input) {
         var choosenOption = MenuEnum.NO_OPTION;
 
+        // While the controls panel is open it captures all input: CONFIRM or PAUSE/ESC returns to the menu.
+        if (showingControls) {
+            if (input.isJustPressed(GameAction.CONFIRM) || input.isJustPressed(GameAction.PAUSE)) {
+                showingControls = false;
+            }
+            return MenuEnum.NO_OPTION;
+        }
+
         if (input.isJustPressed(GameAction.NAVIGATE_DOWN)) {
             changeMenuOptionDown();
         } else if (input.isJustPressed(GameAction.NAVIGATE_UP)) {
@@ -294,6 +313,11 @@ public class GameMenu {
             roundNumber = changeNumber(input, roundNumber, roundNumberLimit, 4);
             stringRoundNumber = "            < " + roundNumber + " >";
             choosenOption = MenuEnum.ROUND_NUMBER_OPTION;
+        } else if (menuOption == MenuEnum.CONTROLS) {
+            if (input.isJustPressed(GameAction.CONFIRM)) {
+                showingControls = true;
+                choosenOption = MenuEnum.CONTROLS;
+            }
         } else if (menuOption == MenuEnum.QUIT) {
             if (input.isJustPressed(GameAction.CONFIRM)) {
                 choosenOption = MenuEnum.QUIT;
@@ -302,6 +326,18 @@ public class GameMenu {
 
         return choosenOption;
     }
+
+    /** Whether the controls overlay panel is currently shown instead of the option list. */
+    public boolean isShowingControls() { return showingControls; }
+
+    /** Pre-selects CONTINUE and closes any controls panel; used when pausing an in-progress game. */
+    public void selectContinue() {
+        menuOption = MenuEnum.CONTINUE;
+        showingControls = false;
+    }
+
+    /** The currently highlighted menu option (exposed for state wiring/tests). */
+    public MenuEnum getMenuOption() { return menuOption; }
 
     /** Current player count selected in the menu. */
     public int getPlayerNumber() { return playerNumber; }
@@ -340,6 +376,8 @@ public class GameMenu {
         } else if (menuOption == MenuEnum.ROUND_NUMBER_OPTION) {
             menuOption = MenuEnum.ROUND_TIME_OPTION;
         } else if (menuOption == MenuEnum.ROUND_TIME_OPTION) {
+            menuOption = MenuEnum.CONTROLS;
+        } else if (menuOption == MenuEnum.CONTROLS) {
             menuOption = MenuEnum.QUIT;
         } else if (menuOption == MenuEnum.QUIT) {
             if (gameSettings.getActualRoundNumber() != 0 && !gameSettings.isGameEnd()) {
@@ -368,8 +406,10 @@ public class GameMenu {
             menuOption = MenuEnum.PLAYER_NUMBER_OPTION;
         } else if (menuOption == MenuEnum.ROUND_TIME_OPTION) {
             menuOption = MenuEnum.ROUND_NUMBER_OPTION;
-        } else if (menuOption == MenuEnum.QUIT) {
+        } else if (menuOption == MenuEnum.CONTROLS) {
             menuOption = MenuEnum.ROUND_TIME_OPTION;
+        } else if (menuOption == MenuEnum.QUIT) {
+            menuOption = MenuEnum.CONTROLS;
         }
 
     }
@@ -391,8 +431,46 @@ public class GameMenu {
             shadowString(g2d, stringRoundNumber, textPosition, menuHeight + 7 * nextLine, Color.yellow);
         } else if (menuOption == MenuEnum.ROUND_TIME_OPTION) {
             shadowString(g2d, stringRoundTime, textPosition, menuHeight + 9 * nextLine, Color.yellow);
+        } else if (menuOption == MenuEnum.CONTROLS) {
+            shadowString(g2d, stringControls, textPosition, menuHeight + 11 * nextLine, Color.green);
         } else if (menuOption == MenuEnum.QUIT) {
             shadowString(g2d, stringQuit, textPosition, menuHeight + 12 * nextLine, Color.green);
         }
+    }
+    /** The four players' rotate-left / rotate-right / shoot actions, in player order. */
+    private static final GameAction[][] CONTROL_ACTIONS = {
+            {GameAction.P1_ROTATE_LEFT, GameAction.P1_ROTATE_RIGHT, GameAction.P1_SHOOT},
+            {GameAction.P2_ROTATE_LEFT, GameAction.P2_ROTATE_RIGHT, GameAction.P2_SHOOT},
+            {GameAction.P3_ROTATE_LEFT, GameAction.P3_ROTATE_RIGHT, GameAction.P3_SHOOT},
+            {GameAction.P4_ROTATE_LEFT, GameAction.P4_ROTATE_RIGHT, GameAction.P4_SHOOT},
+    };
+
+    /**
+     * Draws the controls panel: a title, one row per player showing the rotate-left / rotate-right /
+     * shoot keys (read live from the {@link InputBridge} so they match the real bindings), and a hint to
+     * return. Reuses the menu backdrop style for a consistent look.
+     */
+    private void drawControls(Graphics2D g2d) {
+        g2d.setFont(menuFont);
+        drawMenuBackdrop(g2d);
+
+        Color purple = gameSettings.getColorScheme().getDeadLineColor();
+        Color label = gameSettings.getColorScheme().getBackgroundFontColor();
+        InputBridge input = gameSettings.getInputBridge();
+
+        int x = textPosition - 20;
+        int y = menuHeight - nextLine;
+        shadowString(g2d, "        CONTROLS", x, y, label);
+
+        shadowString(g2d, " Player   Left   Right   Shoot", x, y + 2 * nextLine, label);
+        for (int p = 0; p < CONTROL_ACTIONS.length; p++) {
+            String left = input.keyNameFor(CONTROL_ACTIONS[p][0]);
+            String right = input.keyNameFor(CONTROL_ACTIONS[p][1]);
+            String shoot = input.keyNameFor(CONTROL_ACTIONS[p][2]);
+            String row = String.format("  P%d     %-6s %-6s %-6s", p + 1, left, right, shoot);
+            shadowString(g2d, row, x, y + (3 + p) * nextLine, purple);
+        }
+
+        shadowString(g2d, "   [ ENTER / ESC to return ]", x, y + 8 * nextLine, label);
     }
 }

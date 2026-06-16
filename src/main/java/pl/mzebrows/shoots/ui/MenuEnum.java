@@ -22,6 +22,9 @@ public enum MenuEnum {
     /** Choose the round duration. */
     ROUND_TIME_OPTION,
 
+    /** Show the key bindings for all players. */
+    CONTROLS,
+
     /** No option selected. */
     NO_OPTION;
 }
