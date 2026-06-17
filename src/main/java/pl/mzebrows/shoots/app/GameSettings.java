@@ -1,24 +1,20 @@
 // pl/mzebrows/shoots/app/GameSettings.java
 package pl.mzebrows.shoots.app;
 
-import pl.mzebrows.shoots.ui.ColorScheme;
-import pl.mzebrows.shoots.ui.GameScreen;
-import pl.mzebrows.shoots.ui.GameDimensions;
-
-import pl.mzebrows.shoots.input.InputBridge;
-import pl.mzebrows.shoots.ai.AiDifficulty;
-
-import java.awt.Font;
-import java.awt.FontFormatException;
-import java.awt.GraphicsEnvironment;
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import pl.mzebrows.shoots.ai.AiDifficulty;
+import pl.mzebrows.shoots.input.InputBridge;
+import pl.mzebrows.shoots.ui.ColorScheme;
+import pl.mzebrows.shoots.ui.GameDimensions;
+import pl.mzebrows.shoots.ui.GameScreen;
+
+import java.awt.*;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
 
 /**
  * Game window/config + round-pacing state shared by the AWT panels. The live simulation, scoring, and
@@ -32,9 +28,13 @@ import lombok.extern.slf4j.Slf4j;
 public class GameSettings {
 
     private int playerNumber;
-    /** Number of computer-controlled players (0..playerNumber); they occupy the highest slots. */
+    /**
+     * Number of computer-controlled players (0..playerNumber); they occupy the highest slots.
+     */
     private int aiNumber;
-    /** Difficulty applied to all AI players for the match. */
+    /**
+     * Difficulty applied to all AI players for the match.
+     */
     private AiDifficulty aiDifficulty = AiDifficulty.NORMAL;
     private InputBridge inputBridge;
     private Font gameFont;
@@ -68,7 +68,9 @@ public class GameSettings {
 
     private boolean gameEnd;
 
-    /** Constructs default settings and loads fonts; the live model is created separately by PlayingState. */
+    /**
+     * Constructs default settings and loads fonts; the live model is created separately by PlayingState.
+     */
     public GameSettings() {
         this.playerNumber = 2;
         this.roundLimit = 2;
@@ -83,13 +85,15 @@ public class GameSettings {
         initializeFont();
     }
 
-    /** Loads the bundled game/menu fonts, registering them with the graphics environment. */
+    /**
+     * Loads the bundled game/menu fonts, registering them with the graphics environment.
+     */
     public void initializeFont() {
         try {
             GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
-            var loadedGameFont = new File("src/main/resources/fonts/13_Misa.TTF");
+            File loadedGameFont = loadFont("13_Misa.TTF");
             gameFont = Font.createFont(Font.TRUETYPE_FONT, loadedGameFont).deriveFont(12f);
-            var loadedMenuFont = new File("src/main/resources/fonts/GeosansLight.ttf");
+            File loadedMenuFont = loadFont("GeosansLight.ttf");
             menuFont = Font.createFont(Font.TRUETYPE_FONT, loadedMenuFont).deriveFont(25f);
             ge.registerFont(Font.createFont(Font.TRUETYPE_FONT, loadedGameFont));
             ge.registerFont(Font.createFont(Font.TRUETYPE_FONT, loadedMenuFont));
@@ -112,10 +116,24 @@ public class GameSettings {
         actualRound = newRound;
     }
 
-    /** Resets match bookkeeping for a new game; the live model is reset by PlayingState. */
+    /**
+     * Resets match bookkeeping for a new game; the live model is reset by PlayingState.
+     */
     public void restartGame() {
         actualRoundNumber = 0;
         roundList.clear();
         previousRound = null;
+    }
+
+    private static File loadFont(String fileName) throws IOException {
+        File font = new File("app/classes/fonts/%s".formatted(fileName));
+        if (!font.exists()) {
+            log.debug("Font not found, using resources path");
+            font = new File("src/main/resources/fonts/%s".formatted(fileName));
+        }
+        if (!font.exists()) {
+            throw new IOException("Font file not found: %s".formatted(fileName));
+        }
+        return font;
     }
 }
