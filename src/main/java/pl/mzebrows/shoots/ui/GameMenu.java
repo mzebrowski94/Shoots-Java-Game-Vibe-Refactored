@@ -34,12 +34,12 @@ public class GameMenu {
     int roundTimeLimit = 60;
 
     int playerLimit = 4;
-    int playerNumber = 2;
+    int playerNumber = 4;
 
     int roundNumber = 4;
     int roundNumberLimit = 20;
 
-    int aiNumber = 0;
+    int aiNumber = 3;
     AiDifficulty aiDifficulty = AiDifficulty.NORMAL;
 
     String stringContinue = "[ CONTINUE ]";

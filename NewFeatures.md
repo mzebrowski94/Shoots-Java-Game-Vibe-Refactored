@@ -36,7 +36,7 @@
 > `PausedState.enter()`, guarded so it only applies mid-game (`actualRoundNumber != 0 && !gameEnd`); before
 > the first round and on the game-over screen the default is left unchanged (CONTINUE is unavailable there).
 
-## [ ] C. AI players (computer-controlled opponents)
+## [X] C. AI players (computer-controlled opponents)
 > Adds 0-4 computer-controlled players, selectable from the menu, in a new `...ai` package. An AI is
 > **just another input source**: it drives the same `PlayWorld.applyInput(playerId, AimInput, shoot)` /
 > `fire(playerId)` API a human uses, so there is no special-case physics and nothing in the hot disc/

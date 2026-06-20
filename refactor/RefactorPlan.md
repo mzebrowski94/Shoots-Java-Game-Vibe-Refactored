@@ -1,3 +1,6 @@
+# IMPORTANT: Refactor phase finished
+File left for chronicle purposes.
+
 # Refactor Plan (Iterative — Ralph Loop)
 
 > **How this file is used**: each top-level item is a *cluster* of 1-2 tightly-coupled
@@ -212,7 +215,7 @@
       now `getDefaultWidth()` etc.); `gS` -> `gameSettings` (100 refs); `gd2` -> `g2d`; `var` applied
       to obvious-type locals. 153 tests green.]**
 
-## [ ] 13. Playtest Bug Fixing - Secound round
+## [X] 13. Playtest Bug Fixing - Secound round
 > The migrated model now drives the live game, but manual playtesting surfaced gameplay bugs.
 - [x] **Every match ended after 2 rounds regardless of the menu.** The menu wrote the selected round
       count to `GameSettings.roundLimit` (`setRoundLimit(roundNumber)`), but the match-end decision runs
@@ -222,4 +225,3 @@
       menu-selected round limit (and round time) onto the loaded `RoundConfig` via
       `PlayingState.applySelectedRoundSettings` before constructing the `PlayWorld`. Regression tests in
       `PlayingStateRoundLimitTest`.
-- [ ] (Placeholder for bugs reported by user while playtesting.)

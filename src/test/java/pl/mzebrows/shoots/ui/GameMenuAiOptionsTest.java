@@ -65,11 +65,9 @@ class GameMenuAiOptionsTest {
     @Test
     void aiNumberIncrementsAndIsClampedToPlayerCount() {
         gotoAiNumber();
-        // Default playerNumber is 2, so AI count maxes at 2.
+        // Default playerNumber is 3, so AI count maxes at 4.
         press(KeyEvent.VK_RIGHT);
-        assertThat(menu.getAiNumber()).isEqualTo(1);
-        press(KeyEvent.VK_RIGHT);
-        assertThat(menu.getAiNumber()).isEqualTo(2);
+        assertThat(menu.getAiNumber()).isEqualTo(4);
         // Wraps back to 0 at the top.
         press(KeyEvent.VK_RIGHT);
         assertThat(menu.getAiNumber()).isEqualTo(0);
@@ -105,7 +103,7 @@ class GameMenuAiOptionsTest {
         assertThat(menu.getMenuOption()).isEqualTo(MenuEnum.START_NEW_GAME);
         press(KeyEvent.VK_ENTER);
 
-        assertThat(settings.getAiNumber()).isEqualTo(1);
+        assertThat(settings.getAiNumber()).isEqualTo(4);
         assertThat(settings.getAiDifficulty()).isEqualTo(AiDifficulty.HARD);
     }
 
