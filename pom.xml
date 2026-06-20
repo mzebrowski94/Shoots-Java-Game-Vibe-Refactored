@@ -4,7 +4,7 @@
 
   <groupId>pl.mzebrows.shoots</groupId>
   <artifactId>Shoots-Vibe-Refactor</artifactId>
-  <version>1.0</version>
+  <version>1.1-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <name>Shoots-Vibe-Refactor</name>
@@ -19,6 +19,12 @@
     <junit.version>5.13.4</junit.version>
     <assertj.version>3.27.6</assertj.version>
     <mockito.version>5.20.0</mockito.version>
+
+    <!-- OpenRewrite: dormant codemod tool, NOT part of normal builds. See tools/OpenRewritePlan.md.
+         Pin these to versions seeded into tools/.m2 (or run on a networked host). -->
+    <rewrite.maven.plugin.version>5.46.0</rewrite.maven.plugin.version>
+    <rewrite.static-analysis.version>1.21.0</rewrite.static-analysis.version>
+    <rewrite.migrate-java.version>2.30.0</rewrite.migrate-java.version>
 
     <!-- Build output directory. Override with -Dbuild.dir=/some/local/path to keep
          target/ off a network/9p mount (avoids stale-class + file-lock issues). The
@@ -77,7 +83,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-resources-plugin</artifactId>
-        <version>3.5.0</version>
+        <version>3.4.0</version>
         <configuration>
           <nonFilteredFileExtensions>
             <nonFilteredFileExtension>ttf</nonFilteredFileExtension>
@@ -112,6 +118,41 @@
         <configuration>
           <workingDirectory>${project.build.directory}</workingDirectory>
         </configuration>
+      </plugin>
+
+      <!-- OpenRewrite (DORMANT): does nothing during a normal `mvn`/`./mvnw` build. It only
+           acts when invoked explicitly: `./mvnw rewrite:dryRun` / `rewrite:run`. Only Cluster 1
+           (imports + dead code) is active below; enable later clusters per tools/OpenRewritePlan.md.
+           NOTE: recipe JARs are not in the offline tools/.m2 yet — seed them or run on a host
+           with network access first (see the plan). -->
+      <plugin>
+        <groupId>org.openrewrite.maven</groupId>
+        <artifactId>rewrite-maven-plugin</artifactId>
+        <version>${rewrite.maven.plugin.version}</version>
+        <configuration>
+          <activeRecipes>
+            <!-- Cluster 1 — imports & dead code (lowest risk). Review every dry-run on
+                 Lombok @Getter/@Setter classes before running (see plan caveats). -->
+            <recipe>org.openrewrite.java.RemoveUnusedImports</recipe>
+            <recipe>org.openrewrite.java.OrderImports</recipe>
+            <recipe>org.openrewrite.staticanalysis.RemoveUnusedLocalVariables</recipe>
+            <recipe>org.openrewrite.staticanalysis.RemoveUnusedPrivateMethods</recipe>
+            <recipe>org.openrewrite.staticanalysis.UnnecessaryThrows</recipe>
+            <recipe>org.openrewrite.staticanalysis.RemoveExtraSemicolons</recipe>
+          </activeRecipes>
+        </configuration>
+        <dependencies>
+          <dependency>
+            <groupId>org.openrewrite.recipe</groupId>
+            <artifactId>rewrite-static-analysis</artifactId>
+            <version>${rewrite.static-analysis.version}</version>
+          </dependency>
+          <dependency>
+            <groupId>org.openrewrite.recipe</groupId>
+            <artifactId>rewrite-migrate-java</artifactId>
+            <version>${rewrite.migrate-java.version}</version>
+          </dependency>
+        </dependencies>
       </plugin>
     </plugins>
   </build>

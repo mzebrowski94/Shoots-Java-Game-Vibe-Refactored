@@ -5,7 +5,7 @@
 > ones. Target: whole file under ~120 lines.
 
 ## Package Map
-- Root: `pl.mzebrows.shoots`. Entry point in `...game.main` (`ProjectShoots`).
+- Root: `pl.mzebrows.shoots`. Entry point `pl.mzebrows.shoots.ProjectShoots` (package root).
 - `...config` — immutable config records + loader (c1). Resources: `game.properties`, `fonts/`, `images/`.
 - `...input` — `GameAction` enum + `InputBridge` (c2).
 - `...state` — `GameState`, `GameStateMachine`, `PlayingState`, `PausedState`, `GameOverState` (c2);
@@ -19,7 +19,7 @@
 - `...score` — `CapturePoint`, `CaptureScoring`, `PlayerScore`, `MatchScorer` (c7).
 - `...world` — `PlayWorld` facade + `PlayInput` adapter (c8); `MatchFlow` round/match scorer (c9); `BlockHitEffect` (c12).
 - `...ui` (c14) — AWT shell: `GameFrame`, `GameCanvas`, `GameCounter`, `GamePointer`, `GameScreen`, `GameMenu`,
-  + UI enums/palette `MenuEnum`/`RoundEnum`/`PSConst`/`ColorScheme`.
+  + UI enums/palette `MenuEnum`/`RoundEnum`/`GameDimensions`/`ColorScheme`.
 - `...app` (c14) — lifecycle/loop/state: `GameLoop`, `GameSettings`, `Round`.
 - `...ai` (C1-C2) — `AiDifficulty`, `TargetMode`, `AiSkills` + `AiSkillsFactory` (seed-derived skills);
   `AiTargeting` (bounce-path reach walk) + `PlayerAiController` (utility targeting, drives applyInput/fire)
@@ -30,8 +30,8 @@
   only; `Round` = timing only (`@Getter`/`@Setter`). c13: removed `@author`, fixed misspellings, Lombok-ified
   getters, dropped dead `Round.playerPointsList` + `GameCounter.getRoundTimeInSeconds`. All legacy
   `game.logic`/`Drawables` classes DELETED (c13).
-- **c14 leftover:** the 13 moved files left inert Windows-locked stubs in `game/logic/` (package line only).
-  **ACTION FOR USER (Windows):** delete the whole `src/main/java/pl/mzebrows/shoots/game/logic/` folder.
+- **c14:** the moved-file stubs in `game/logic/` and the old `ui/PSConst` have since been deleted
+  (`PSConst` → `GameDimensions`); the legacy `game/` package no longer exists.
 
 ## Design-Pattern Audit (c16)
 - **Strategy**: `MovementStrategy`/`AttackStrategy`/`AiStrategy` (+ impls `BounceMovementStrategy`,
@@ -150,13 +150,9 @@
   test Random when seed==0); `resetMatch` resets `roundIndex=0` so a new game restarts the sequence —
   fully reproducible per master seed. `PlayingState.rebuildAiForCurrentMap()` rebuilds `AiPlayers`
   after each `resetRound()` so AI targeting binds to the fresh collider. Tests in `PlayWorldTest`.
-- **USER ACTION (Windows, leftover stubs):** delete the inert Windows-locked stub files I could not
-  remove from the sandbox: the whole `src/main/java/pl/mzebrows/shoots/game/logic/` folder and
-  `ui/PSConst.java`. Build is green with them present (they hold only a package line).
-- **BUILD ENV**: `./mvnw` auto-detects the vendored offline toolchain in `tools/` (JDK 26 + Maven 3.9 +
-  pre-seeded `.m2`); builds fully offline in the sandbox. Verify with `./mvnw test` from project root.
-  **Mount gotcha:** editor/`rm` on existing files is Windows-locked; writes can append NUL bytes — write
-  via bash heredoc/python, verify, and hand file deletions to the user on Windows.
+- **BUILD ENV & mount gotcha:** see `tools/AgentWorkflow.md` (single source of truth). TL;DR:
+  verify with `./mvnw test`; writes can inject NUL bytes — write via bash heredoc/python and verify.
+- **Codemods:** OpenRewrite AI-readiness plan in `tools/OpenRewritePlan.md` (dormant plugin in `pom.xml`).
 
 ## Legacy Logic Coverage Map
 - All legacy `game.logic` responsibilities migrated to `world`/`score`/`entity`/`spatial` (c4-c11); legacy retained for c12 ref, deleted c13.

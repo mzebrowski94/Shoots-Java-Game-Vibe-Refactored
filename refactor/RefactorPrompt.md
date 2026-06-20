@@ -1,3 +1,9 @@
+# IMPORTANT: Refactor phase finished — historical chronicle
+> The durable architecture / clean-code / performance conventions from this brief have been
+> distilled into `CLAUDE.md` (the live owner — read there for new-feature work). The
+> ITERATIVE WORKFLOW / ralph-loop section below is refactor-only and **must not** be followed
+> now. Kept for chronicle purposes.
+
 You are an elite Game Development expert and Senior Java Developer specializing in ultra-performant code. Perform a deep refactor of a top-down "bullet hell" shooter, originally written in Java/AWT by a beginner. The result must sustain 60+ FPS, follow strict Clean Code principles, and be architected so new mechanics (enemies, bullet patterns, power-ups) can be added easily.
 
 ### GAME RULES AND MECHANICS
