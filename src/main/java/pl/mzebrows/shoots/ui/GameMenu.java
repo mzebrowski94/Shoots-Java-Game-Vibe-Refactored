@@ -150,17 +150,40 @@ public class GameMenu {
 
     /** Baseline y (px) of option row {@code row}, measured in {@link #nextLine} units from {@link #menuHeight}. */
     private int rowY(int row) {
-        return menuHeight + row * nextLine;
+        return menuHeight + (row + optionRowOffset()) * nextLine;
+    }
+
+    /** Extra rows the option list is pushed down on the end screen to clear the scoreboard above it. */
+    private int optionRowOffset() {
+        return gameSettings.isGameEnd() ? END_SCREEN_OPTION_OFFSET_ROWS : 0;
+    }
+
+    /** Whole-window horizontal centre in this canvas's coords. The menu paints only on the playfield
+     *  canvas, but the right-side stats panel shifts the window's true centre right; centring on it
+     *  keeps the menu from sitting left-of-centre. */
+    private int menuCenterX() {
+        return (width + gameSettings.getDefaultPointerWidth()) / 2;
     }
 
     /** Total height (px) of the menu backdrop: headroom + all option rows + bottom padding. */
     private int panelHeight() {
-        return (PANEL_TOP_ROWS + ROW_QUIT) * nextLine + PANEL_BOTTOM_PAD;
+        return (PANEL_TOP_ROWS + ROW_QUIT + optionRowOffset()) * nextLine + PANEL_BOTTOM_PAD;
     }
 
-    /** Top baseline (px) of the option block so the whole backdrop is vertically centred in the window. */
+    /** Top baseline (px) of the option block. Centres the backdrop on the whole window vertically when
+     *  there is room (the top counter panel biases the centre up); otherwise centres it in the playfield. */
     private int centeredMenuTop() {
-        int panelTop = (height - panelHeight()) / 2;
+        int panelH = panelHeight();
+        int fit = height - panelH;
+        int panelTop;
+        if (fit <= 2 * panelScreenMargin()) {
+            panelTop = fit / 2;                       // panel nearly fills the playfield: just centre it
+        } else {
+            int counter = gameSettings.getDefaultCounterHeight();
+            int windowCentred = (height + counter - panelH) / 2 - counter;
+            int maxTop = height - panelScreenMargin() - panelH;
+            panelTop = Math.max(panelScreenMargin(), Math.min(windowCentred, maxTop));
+        }
         return panelTop + PANEL_TOP_ROWS * nextLine;
     }
 
@@ -179,18 +202,12 @@ public class GameMenu {
         return menuConfig.maxPlayers();
     }
 
-    /** Width reserved for the "Rounds:/Points:" row labels at the left of the scoreboard. */
-    private static final int SCORE_LABEL_WIDTH = 150;
-
     // --- Win-text pulse animation (end-of-game "WINNER(s)!" colour ramps between these bounds). ---
     private static final int WIN_PULSE_MIN = 50;
     private static final int WIN_PULSE_MAX = 100;
 
-    // --- Scoreboard row layout. ---
-    /** Vertical gap (px) between the "WINNER(s)!" header and the player-id row. */
-    private static final int SCORE_HEADER_GAP = 50;
-    /** Vertical gap (px) between successive scoreboard rows (ids -> rounds -> points). */
-    private static final int SCORE_ROW_GAP = 50;
+    /** Rows the option list is pushed down on the end screen so the scoreboard above it never overlaps. */
+    private static final int END_SCREEN_OPTION_OFFSET_ROWS = 1;
 
     // --- Option-block row layout, in nextLine units measured from menuHeight (row 0 = CONTINUE). ---
     private static final int ROW_CONTINUE = 0;
@@ -240,19 +257,41 @@ public class GameMenu {
      */
     private int panelWidth(Graphics2D g2d) {
         int w = menuRowsWidth(g2d);
+        if (showingControls) {
+            w = Math.max(w, controlsWidth(g2d));
+        }
         if (gameSettings.isGameEnd()) {
-            FontMetrics fm = g2d.getFontMetrics(menuFont);
-            int scoreboard = SCORE_LABEL_WIDTH + maxPlayers() * (fm.stringWidth("00") + SCORE_COL_PAD)
-                    + 2 * panelPadX();
-            w = Math.max(w, scoreboard);
+            w = Math.max(w, scoreboardWidth(g2d));
         }
         return Math.min(w, width - 2 * panelScreenMargin());
+    }
+
+    /** Width (px) reserved at the scoreboard's left for the "Rounds:/Points:" labels (measured + a gap). */
+    private int scoreLabelSpan(Graphics2D g2d) {
+        FontMetrics fm = g2d.getFontMetrics(menuFont);
+        return Math.max(fm.stringWidth("Rounds: "), fm.stringWidth("Points: ")) + SCORE_COL_PAD;
+    }
+
+    /** Backdrop width needed to hold the end-game scoreboard: label column + one column per player. */
+    private int scoreboardWidth(Graphics2D g2d) {
+        FontMetrics fm = g2d.getFontMetrics(menuFont);
+        return scoreLabelSpan(g2d) + maxPlayers() * (fm.stringWidth("00") + SCORE_COL_PAD) + 2 * panelPadX();
+    }
+
+    /** Backdrop width needed to hold the controls table (its header or widest key row) plus padding. */
+    private int controlsWidth(Graphics2D g2d) {
+        FontMetrics fm = g2d.getFontMetrics(menuFont);
+        int widest = fm.stringWidth(CONTROLS_HEADER);
+        for (String row : buildControlRows()) {
+            widest = Math.max(widest, fm.stringWidth(row));
+        }
+        return widest + 2 * panelPadX();
     }
 
     /** Left edge of the menu panel: centred on the screen horizontally, clamped on-screen. */
     private int panelLeft(Graphics2D g2d) {
         int w = panelWidth(g2d);
-        int x = width / 2 - w / 2;
+        int x = menuCenterX() - w / 2;
         int maxX = width - panelScreenMargin() - w;
         return Math.max(panelScreenMargin(), Math.min(x, maxX));
     }
@@ -290,7 +329,7 @@ public class GameMenu {
     /** Draws {@code text} horizontally centred on the screen. */
     private void shadowStringCentered(Graphics2D g2d, String text, int y, Color color) {
         FontMetrics fm = g2d.getFontMetrics(menuFont);
-        int x = width / 2 - fm.stringWidth(text) / 2;
+        int x = menuCenterX() - fm.stringWidth(text) / 2;
         shadowString(g2d, text, x, y, color);
     }
 
@@ -344,14 +383,15 @@ public class GameMenu {
         int panelX = panelLeft(g2d);
         int panelW = panelWidth(g2d);
         int labelX = panelX + panelPadX();
-        int colsLeft = labelX + SCORE_LABEL_WIDTH;
+        int colsLeft = labelX + scoreLabelSpan(g2d);
         int colsRight = panelX + panelW - panelPadX();
 
-        // The header sits one row below the panel top; the id/rounds/points rows follow beneath it.
-        int headerY = panelTop() + PANEL_TOP_ROWS * nextLine;
-        int idsY = headerY + SCORE_HEADER_GAP;
-        int roundsY = idsY + SCORE_ROW_GAP;
-        int pointsY = roundsY + SCORE_ROW_GAP;
+        // Scoreboard occupies the panel's top rows (measured in the menu row unit so it lines up with the
+        // rest of the panel); the option list is pushed below it by optionRowOffset() so they never overlap.
+        int headerY = panelTop() + nextLine;
+        int idsY = headerY + nextLine;
+        int roundsY = headerY + 2 * nextLine;
+        int pointsY = headerY + 3 * nextLine;
 
         Color labelColor = gameSettings.getColorScheme().getBackgroundFontColor();
         shadowString(g2d, "Rounds: ", labelX, roundsY, labelColor);
@@ -652,6 +692,19 @@ public class GameMenu {
     /** Fixed-width row format so the key columns line up under {@link #CONTROLS_HEADER}. */
     private static final String CONTROLS_ROW_FORMAT = "  P%d     %-6s %-6s %-6s";
 
+    /** Builds the per-player controls rows from the live key bindings, formatted to align under the header. */
+    private String[] buildControlRows() {
+        InputBridge input = gameSettings.getInputBridge();
+        String[] rows = new String[CONTROL_ACTIONS.length];
+        for (int p = 0; p < CONTROL_ACTIONS.length; p++) {
+            rows[p] = String.format(CONTROLS_ROW_FORMAT, p + 1,
+                    input.keyNameFor(CONTROL_ACTIONS[p][0]),
+                    input.keyNameFor(CONTROL_ACTIONS[p][1]),
+                    input.keyNameFor(CONTROL_ACTIONS[p][2]));
+        }
+        return rows;
+    }
+
     /**
      * Draws the controls panel: a title, one row per player showing the rotate-left / rotate-right /
      * shoot keys (read live from the {@link InputBridge} so they match the real bindings), and a hint to
@@ -664,24 +717,16 @@ public class GameMenu {
 
         Color purple = gameSettings.getColorScheme().getDeadLineColor();
         Color label = gameSettings.getColorScheme().getBackgroundFontColor();
-        InputBridge input = gameSettings.getInputBridge();
 
-        // Build the player rows first so the whole block can be centred on its widest line.
-        String[] rows = new String[CONTROL_ACTIONS.length];
-        for (int p = 0; p < CONTROL_ACTIONS.length; p++) {
-            rows[p] = String.format(CONTROLS_ROW_FORMAT, p + 1,
-                    input.keyNameFor(CONTROL_ACTIONS[p][0]),
-                    input.keyNameFor(CONTROL_ACTIONS[p][1]),
-                    input.keyNameFor(CONTROL_ACTIONS[p][2]));
-        }
+        String[] rows = buildControlRows();
 
-        // Left edge that centres the table block (its widest row) on the screen.
+        // Left edge that centres the table block (its widest row) on the menu's centre.
         FontMetrics fm = g2d.getFontMetrics(menuFont);
         int widest = fm.stringWidth(CONTROLS_HEADER);
         for (String row : rows) {
             widest = Math.max(widest, fm.stringWidth(row));
         }
-        int blockX = width / 2 - widest / 2;
+        int blockX = menuCenterX() - widest / 2;
 
         // First row sits just below the panel's top headroom; the rest follow row by row.
         int y = panelTop() + PANEL_TOP_ROWS * nextLine;
