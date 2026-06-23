@@ -20,7 +20,7 @@ class ObjectPoolTest {
         var pool = new ObjectPool<>(4, () -> {
             created.incrementAndGet();
             return new Box();
-        }, b -> {});
+        }, _ -> {});
 
         assertThat(created).hasValue(4);
         assertThat(pool.capacity()).isEqualTo(4);
@@ -34,7 +34,7 @@ class ObjectPoolTest {
         var pool = new ObjectPool<>(2, () -> {
             created.incrementAndGet();
             return new Box();
-        }, b -> {});
+        }, _ -> {});
 
         pool.acquire();
         pool.acquire();
@@ -45,7 +45,7 @@ class ObjectPoolTest {
 
     @Test
     void returnsNullWhenExhausted() {
-        var pool = new ObjectPool<>(1, Box::new, b -> {});
+        var pool = new ObjectPool<>(1, Box::new, _ -> {});
 
         assertThat(pool.acquire()).isNotNull();
         assertThat(pool.acquire()).isNull();
@@ -67,7 +67,7 @@ class ObjectPoolTest {
 
     @Test
     void releaseIgnoresNullAndOverflow() {
-        var pool = new ObjectPool<>(1, Box::new, b -> {});
+        var pool = new ObjectPool<>(1, Box::new, _ -> {});
         var box = pool.acquire();
 
         pool.release(null);
@@ -79,7 +79,7 @@ class ObjectPoolTest {
 
     @Test
     void rejectsNonPositiveCapacity() {
-        assertThatThrownBy(() -> new ObjectPool<>(0, Box::new, b -> {}))
+        assertThatThrownBy(() -> new ObjectPool<>(0, Box::new, _ -> {}))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

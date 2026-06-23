@@ -14,5 +14,5 @@ public enum RoundEnum {
     ROUND_ENDS,
 
     /** The round is paused. */
-    ROUND_PAUSED;
+    ROUND_PAUSED
 }

@@ -11,7 +11,9 @@ import pl.mzebrows.shoots.ui.ColorScheme;
 import pl.mzebrows.shoots.ui.GameDimensions;
 import pl.mzebrows.shoots.ui.GameScreen;
 
-import java.awt.*;
+import java.awt.Font;
+import java.awt.FontFormatException;
+import java.awt.GraphicsEnvironment;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -110,7 +112,7 @@ public class GameSettings {
         actualRoundNumber++;
         var newRound = new Round(this, actualRoundNumber);
         if (roundList != null && !roundList.isEmpty()) {
-            previousRound = roundList.get(roundList.size() - 1);
+            previousRound = roundList.getLast();
         }
         roundList.add(newRound);
         actualRound = newRound;

@@ -115,6 +115,8 @@ public class GamePointer extends GameCanvas {
 
     /** Resets the bars that visualise each player's captured points. */
     public void restartGamePointer() {
+        playerPointBarsList.clear();
+        playerPointBarElapsed.clear();
         for (int i = 0; i < gameSettings.getPlayerNumber(); i++) {
             playerPointBarsList.add(0);
             playerPointBarElapsed.add(0);
@@ -203,8 +205,20 @@ public class GamePointer extends GameCanvas {
      * @param roundState the current round phase
      */
     public void drawPlayerStats(Graphics2D g2d, RoundEnum roundState) {
+        // Guard: if the world's player count differs from the pre-allocated list size (e.g. the very
+        // first round after launch uses a default-config world with a different count than GameSettings),
+        // resize the lists in-place rather than crashing.
+        int count = playerCount();
+        while (playerPointBarsList.size() < count) {
+            playerPointBarsList.add(0);
+            playerPointBarElapsed.add(0);
+        }
+        while (playerPointBarsList.size() > count) {
+            playerPointBarsList.removeLast();
+            playerPointBarElapsed.removeLast();
+        }
 
-        for (int i = 0; i < playerCount(); i++) {
+        for (int i = 0; i < count; i++) {
             actualPlayerIndex = i;
             actualLeftWidth = statsStartPosiotionWidth + borderSize;
             int actualRightWidth = width - (4 * borderSize);

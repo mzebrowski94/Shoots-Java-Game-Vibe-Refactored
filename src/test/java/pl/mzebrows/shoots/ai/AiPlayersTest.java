@@ -82,7 +82,7 @@ class AiPlayersTest {
         }
         // The single AI is slot 1; its disc cap is respected.
         assertThat(world.activeDiscs(1))
-                .isLessThanOrEqualTo(ai.controllers().get(0).skills().maxDiscsInFlight());
+                .isLessThanOrEqualTo(ai.controllers().getFirst().skills().maxDiscsInFlight());
     }
 
     @Test

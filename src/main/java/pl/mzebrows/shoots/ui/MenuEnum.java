@@ -32,5 +32,5 @@ public enum MenuEnum {
     CONTROLS,
 
     /** No option selected. */
-    NO_OPTION;
+    NO_OPTION
 }

@@ -128,7 +128,7 @@ public final class GameConfigLoader {
         }
         try {
             return Integer.parseInt(raw.trim());
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             log.warn("Invalid int for '{}'='{}'; using {}", key, raw, fallback);
             return fallback;
         }
@@ -145,7 +145,7 @@ public final class GameConfigLoader {
         }
         try {
             return Long.parseLong(raw.trim());
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             log.warn("Invalid long for 'game.seed'='{}'; using a fresh time seed", raw);
             return System.nanoTime();
         }
@@ -166,7 +166,7 @@ public final class GameConfigLoader {
         }
         try {
             return Double.parseDouble(raw.trim());
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             log.warn("Invalid double for '{}'='{}'; using {}", key, raw, fallback);
             return fallback;
         }
@@ -185,7 +185,7 @@ public final class GameConfigLoader {
             int b = Integer.parseInt(parts[2].trim());
             int a = parts.length > 3 ? Integer.parseInt(parts[3].trim()) : 255;
             return new RgbColor(r, g, b, a);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException _) {
             log.warn("Invalid colour for '{}'='{}'; using {}", key, raw, fallback);
             return fallback;
         }

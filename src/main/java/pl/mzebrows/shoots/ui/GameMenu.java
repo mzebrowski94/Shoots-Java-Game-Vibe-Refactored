@@ -2,7 +2,6 @@
 package pl.mzebrows.shoots.ui;
 
 import pl.mzebrows.shoots.app.GameSettings;
-import pl.mzebrows.shoots.app.Round;
 
 import pl.mzebrows.shoots.ai.AiDifficulty;
 import pl.mzebrows.shoots.input.GameAction;
@@ -87,34 +86,49 @@ public class GameMenu {
             return;
         }
 
-        // UX: anchor the menu on a dark rounded backdrop so the purple/green text keeps consistent
-        // contrast regardless of the (now more opaque) game frame behind it.
+        // Vertically centre the menu panel in the window each frame.
+        // Panel spans rows -2 to +16 relative to menuHeight, plus bottom pad.
+        // Total panel height = (2 + 16) * nextLine + 24 pad. Solving for the top:
+        //   panelTop = (height - panelH) / 2  →  menuHeight = panelTop + 2 * nextLine
+        int panelH = 18 * nextLine + 24;
+        menuHeight = (height - panelH) / 2 + 2 * nextLine;
+
+        // UX: anchor the menu on a dark rounded backdrop so text keeps consistent
+        // contrast regardless of the game frame behind it.
         drawMenuBackdrop(g2d);
 
         // Subtle highlight bar behind the currently selected row, for clear focus.
         drawSelectionHighlight(g2d);
 
-        Color purple = gameSettings.getColorScheme().getDeadLineColor();
-        shadowStringCentered(g2d, stringNewGame, menuHeight + 2 * nextLine, purple);
-        shadowStringCentered(g2d, stringPlayerNumberText, menuHeight + 3 * nextLine, purple);
-        shadowStringCentered(g2d, stringPlayerNumber, menuHeight + 4 * nextLine, purple);
-        shadowStringCentered(g2d, stringRoundLimitText, menuHeight + 5 * nextLine, purple);
-        shadowStringCentered(g2d, stringRoundNumber, menuHeight + 6 * nextLine, purple);
-        shadowStringCentered(g2d, stringRoundTimeText, menuHeight + 7 * nextLine, purple);
-        shadowStringCentered(g2d, stringRoundTime, menuHeight + 8 * nextLine, purple);
-        shadowStringCentered(g2d, stringAiNumberText, menuHeight + 9 * nextLine, purple);
-        shadowStringCentered(g2d, stringAiNumber, menuHeight + 10 * nextLine, purple);
-        shadowStringCentered(g2d, stringAiDifficultyText, menuHeight + 11 * nextLine, purple);
-        shadowStringCentered(g2d, stringAiDifficulty, menuHeight + 12 * nextLine, purple);
-        shadowStringCentered(g2d, stringControls, menuHeight + 14 * nextLine, purple);
-        shadowStringCentered(g2d, stringQuit, menuHeight + 15 * nextLine, purple);
+        // Bright lavender for action labels — much more readable on the dark backdrop.
+        Color label = new Color(200, 160, 255);
+        // Softer teal-white for section sub-labels.
+        Color sublabel = new Color(160, 200, 220);
+        // Muted lavender for non-interactive value rows (overdrawn green/yellow when selected).
+        Color valueIdle = new Color(170, 130, 220);
+
+        shadowStringCentered(g2d, stringNewGame, menuHeight + 2 * nextLine, label);
+        shadowStringCentered(g2d, stringPlayerNumberText, menuHeight + 3 * nextLine, sublabel);
+        shadowStringCentered(g2d, stringPlayerNumber, menuHeight + 4 * nextLine, valueIdle);
+        shadowStringCentered(g2d, stringRoundLimitText, menuHeight + 5 * nextLine, sublabel);
+        shadowStringCentered(g2d, stringRoundNumber, menuHeight + 6 * nextLine, valueIdle);
+        shadowStringCentered(g2d, stringRoundTimeText, menuHeight + 7 * nextLine, sublabel);
+        shadowStringCentered(g2d, stringRoundTime, menuHeight + 8 * nextLine, valueIdle);
+        // AI section separator — draws attention so players don't miss these options.
+        shadowStringCentered(g2d, "--- AI Settings ---", menuHeight + 9 * nextLine, new Color(255, 200, 80, 200));
+        shadowStringCentered(g2d, stringAiNumberText, menuHeight + 10 * nextLine, sublabel);
+        shadowStringCentered(g2d, stringAiNumber, menuHeight + 11 * nextLine, valueIdle);
+        shadowStringCentered(g2d, stringAiDifficultyText, menuHeight + 12 * nextLine, sublabel);
+        shadowStringCentered(g2d, stringAiDifficulty, menuHeight + 13 * nextLine, valueIdle);
+        shadowStringCentered(g2d, stringControls, menuHeight + 15 * nextLine, label);
+        shadowStringCentered(g2d, stringQuit, menuHeight + 16 * nextLine, label);
 
         if (gameSettings.getActualRoundNumber() == 0) {
             shadowStringCentered(g2d, stringContinue, menuHeight, gameSettings.getColorScheme().getBackgroundFontColor());
         } else if (gameSettings.isGameEnd()) {
             drawGameEnd(g2d, world);
         } else {
-            shadowStringCentered(g2d, stringContinue, menuHeight, purple);
+            shadowStringCentered(g2d, stringContinue, menuHeight, label);
         }
 
         drawChoosenMenuOption(g2d);
@@ -135,7 +149,8 @@ public class GameMenu {
         FontMetrics fm = g2d.getFontMetrics(menuFont);
         int widest = 0;
         for (String row : new String[]{stringContinue, stringNewGame, stringPlayerNumberText,
-                stringRoundLimitText, stringRoundTimeText, stringQuit, "       WINNER(s) !     "}) {
+                stringRoundLimitText, stringRoundTimeText, stringAiNumberText, stringAiDifficultyText,
+                "--- AI Settings ---", stringQuit, "       WINNER(s) !     "}) {
             widest = Math.max(widest, fm.stringWidth(row));
         }
         return widest + 2 * PANEL_PAD_X;
@@ -157,28 +172,31 @@ public class GameMenu {
         return Math.min(w, width - 2 * PANEL_SCREEN_MARGIN);
     }
 
-    /** Left edge of the menu panel: centred on the (left-aligned) menu text block, clamped on-screen. */
+    /** Left edge of the menu panel: centred on the screen horizontally, clamped on-screen. */
     private int panelLeft(Graphics2D g2d) {
-        FontMetrics fm = g2d.getFontMetrics(menuFont);
-        int menuCentre = textPosition + fm.stringWidth(stringNewGame) / 2;
         int w = panelWidth(g2d);
-        int x = menuCentre - w / 2;
+        int x = width / 2 - w / 2;
         int maxX = width - PANEL_SCREEN_MARGIN - w;
         return Math.max(PANEL_SCREEN_MARGIN, Math.min(x, maxX));
     }
 
-    /** Dark, slightly transparent rounded panel behind the menu items to lift text contrast. */
+    /** Dark navy rounded panel behind the menu items to lift text contrast. */
     private void drawMenuBackdrop(Graphics2D g2d) {
         int pad = 24;
-        int top = menuHeight - 2 * nextLine;            // a little headroom above CONTINUE
-        int bottom = menuHeight + 15 * nextLine + pad;  // below QUIT (row 15)
+        int top = menuHeight - 2 * nextLine;             // a little headroom above CONTINUE
+        int bottom = menuHeight + 16 * nextLine + pad;   // below QUIT (row 16)
         int x = panelLeft(g2d);
         int w = panelWidth(g2d);
         int h = bottom - top;
-        g2d.setColor(new Color(15, 15, 20, 150));
+        // Dark navy tint — lighter than pure black so text colours pop against it.
+        g2d.setColor(new Color(20, 15, 40, 185));
         g2d.fillRoundRect(x, top, w, h, 28, 28);
-        g2d.setColor(new Color(0, 0, 0, 90));
+        // Subtle violet border to tie into the game's purple palette.
+        g2d.setColor(new Color(130, 60, 180, 120));
         g2d.drawRoundRect(x, top, w, h, 28, 28);
+        // Inner border glow for depth.
+        g2d.setColor(new Color(160, 80, 220, 45));
+        g2d.drawRoundRect(x + 2, top + 2, w - 4, h - 4, 26, 26);
     }
 
     /** Draws a soft drop shadow then the coloured text; never changes the requested text colour. */
@@ -189,11 +207,10 @@ public class GameMenu {
         g2d.drawString(text, x, y);
     }
 
-    /** Draws {@code text} horizontally centred on the menu block (so value rows sit under their labels). */
+    /** Draws {@code text} horizontally centred on the screen. */
     private void shadowStringCentered(Graphics2D g2d, String text, int y, Color color) {
         FontMetrics fm = g2d.getFontMetrics(menuFont);
-        int blockCentre = textPosition + fm.stringWidth(stringNewGame) / 2;
-        int x = blockCentre - fm.stringWidth(text) / 2;
+        int x = width / 2 - fm.stringWidth(text) / 2;
         shadowString(g2d, text, x, y, color);
     }
 
@@ -205,26 +222,32 @@ public class GameMenu {
         }
         FontMetrics fm = g2d.getFontMetrics(menuFont);
         int y = menuHeight + row * nextLine;
-        int barX = panelLeft(g2d) + 10;
-        int barW = panelWidth(g2d) - 20;
-        int barY = y - fm.getAscent();
-        int barH = fm.getHeight() + 6;
-        g2d.setColor(new Color(255, 255, 255, 28));
-        g2d.fillRoundRect(barX, barY, barW, barH, 14, 14);
+        int barX = panelLeft(g2d) + 8;
+        int barW = panelWidth(g2d) - 16;
+        int barY = y - fm.getAscent() - 2;
+        int barH = fm.getHeight() + 8;
+        // Brighter highlight so the selected row is unmistakably visible.
+        g2d.setColor(new Color(200, 160, 255, 55));
+        g2d.fillRoundRect(barX, barY, barW, barH, 12, 12);
+        // Thin violet rim around the highlight.
+        g2d.setColor(new Color(200, 140, 255, 90));
+        g2d.drawRoundRect(barX, barY, barW, barH, 12, 12);
     }
 
     /** Row index (in nextLine units from menuHeight) of the selected option, or -1 if none. */
     private int selectedRow() {
+        // Row 9 is the "--- AI Settings ---" separator (not selectable).
+        // AI options sit at rows 10/11 and 12/13; Controls/Quit shift to 15/16.
         return switch (menuOption) {
             case CONTINUE -> 0;
             case START_NEW_GAME -> 2;
             case PLAYER_NUMBER_OPTION -> 4;
             case ROUND_NUMBER_OPTION -> 6;
             case ROUND_TIME_OPTION -> 8;
-            case AI_NUMBER_OPTION -> 10;
-            case AI_DIFFICULTY_OPTION -> 12;
-            case CONTROLS -> 14;
-            case QUIT -> 15;
+            case AI_NUMBER_OPTION -> 11;
+            case AI_DIFFICULTY_OPTION -> 13;
+            case CONTROLS -> 15;
+            case QUIT -> 16;
             default -> -1;
         };
     }
@@ -235,7 +258,7 @@ public class GameMenu {
      * @param g2d the Graphics2D used to draw the elements
      */
     public void drawGameEnd(Graphics2D g2d, PlayWorld world) {
-        // Lay the scoreboard out INSIDE the centred panel: the row labels sit at the panel\'s left padding
+        // Lay the scoreboard out INSIDE the centred panel: the row labels sit at the panel's left padding
         // and the player columns are distributed evenly across the remaining width, so every column
         // (including P4) stays within the backdrop regardless of player count.
         int panelX = panelLeft(g2d);
@@ -504,7 +527,8 @@ public class GameMenu {
      * @param g2d the Graphics2D used to draw the elements
      */
     public void drawChoosenMenuOption(Graphics2D g2d) {
-        // Keep the same green/yellow selection colours; only add the shared drop shadow for legibility.
+        // Bright green for action rows (CONTINUE, START, CONTROLS, QUIT); warm yellow for value rows.
+        // Row numbers must match the drawMenu layout (separator at row 9 shifts AI+ rows down).
         if (menuOption == MenuEnum.CONTINUE) {
             shadowStringCentered(g2d, stringContinue, menuHeight, Color.green);
         } else if (menuOption == MenuEnum.START_NEW_GAME) {
@@ -516,13 +540,13 @@ public class GameMenu {
         } else if (menuOption == MenuEnum.ROUND_TIME_OPTION) {
             shadowStringCentered(g2d, stringRoundTime, menuHeight + 8 * nextLine, Color.yellow);
         } else if (menuOption == MenuEnum.AI_NUMBER_OPTION) {
-            shadowStringCentered(g2d, stringAiNumber, menuHeight + 10 * nextLine, Color.yellow);
+            shadowStringCentered(g2d, stringAiNumber, menuHeight + 11 * nextLine, Color.yellow);
         } else if (menuOption == MenuEnum.AI_DIFFICULTY_OPTION) {
-            shadowStringCentered(g2d, stringAiDifficulty, menuHeight + 12 * nextLine, Color.yellow);
+            shadowStringCentered(g2d, stringAiDifficulty, menuHeight + 13 * nextLine, Color.yellow);
         } else if (menuOption == MenuEnum.CONTROLS) {
-            shadowStringCentered(g2d, stringControls, menuHeight + 14 * nextLine, Color.green);
+            shadowStringCentered(g2d, stringControls, menuHeight + 15 * nextLine, Color.green);
         } else if (menuOption == MenuEnum.QUIT) {
-            shadowStringCentered(g2d, stringQuit, menuHeight + 15 * nextLine, Color.green);
+            shadowStringCentered(g2d, stringQuit, menuHeight + 16 * nextLine, Color.green);
         }
     }
     /** The four players' rotate-left / rotate-right / shoot actions, in player order. */

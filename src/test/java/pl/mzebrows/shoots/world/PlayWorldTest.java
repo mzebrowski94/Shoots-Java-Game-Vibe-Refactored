@@ -126,7 +126,7 @@ class PlayWorldTest {
 
         // Force the only disc to its bounce budget, then step: DiscSystem should retire it,
         // the sink frees the player's slot, and the tracked list drops it.
-        var disc = world.discs().get(0);
+        var disc = world.discs().getFirst();
         disc.setBounces(config(1).disc().maxBounces());
 
         world.step();
@@ -158,7 +158,7 @@ class PlayWorldTest {
         // disc near the left edge, one step pushes its tile index to 0 (the border), which the
         // collider treats as a wall bounce -> onWallHit -> a block-hit flash is registered.
         world.fire(0);
-        var disc = world.discs().get(0);
+        var disc = world.discs().getFirst();
         int unit = world.unit();
         disc.setX(1.2 * unit);          // inside tile column 1, near the left border (column 0)
         disc.setY(12 * unit + unit / 2.0);
@@ -170,7 +170,7 @@ class PlayWorldTest {
         world.step();
 
         assertThat(world.blockHits()).isNotEmpty();
-        assertThat(world.blockHits().get(0).ownerId()).isEqualTo(0);
+        assertThat(world.blockHits().getFirst().ownerId()).isEqualTo(0);
     }
 
     @Test
@@ -192,7 +192,7 @@ class PlayWorldTest {
         assertThat(cpX).isGreaterThanOrEqualTo(0);
 
         world.fire(0);
-        var disc = world.discs().get(0);
+        var disc = world.discs().getFirst();
         int unit = 36;
         // Place the disc squarely inside the capture-point tile and aim so it stays there one step.
         disc.setX(cpX * unit + unit / 2.0);
@@ -218,7 +218,7 @@ class PlayWorldTest {
             }
         }
         world.fire(0);
-        var disc = world.discs().get(0);
+        var disc = world.discs().getFirst();
         disc.setX(cpX * 36 + 18.0);
         disc.setY(cpY * 36 + 18.0);
         disc.setAngle(0);

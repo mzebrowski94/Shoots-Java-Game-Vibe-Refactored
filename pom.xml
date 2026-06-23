@@ -11,10 +11,11 @@
   <url>http://maven.apache.org</url>
 
   <properties>
+    <argLine></argLine>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>25</maven.compiler.release>
 
-    <lombok.version>1.18.42</lombok.version>
+    <lombok.version>1.18.46</lombok.version>
     <slf4j.version>2.0.17</slf4j.version>
     <junit.version>5.13.4</junit.version>
     <assertj.version>3.27.6</assertj.version>
@@ -22,9 +23,9 @@
 
     <!-- OpenRewrite: dormant codemod tool, NOT part of normal builds. See tools/OpenRewritePlan.md.
          Pin these to versions seeded into tools/.m2 (or run on a networked host). -->
-    <rewrite.maven.plugin.version>5.46.0</rewrite.maven.plugin.version>
-    <rewrite.static-analysis.version>1.21.0</rewrite.static-analysis.version>
-    <rewrite.migrate-java.version>2.30.0</rewrite.migrate-java.version>
+    <rewrite.maven.plugin.version>6.42.0</rewrite.maven.plugin.version>
+    <rewrite.static-analysis.version>2.37.0</rewrite.static-analysis.version>
+    <rewrite.migrate-java.version>3.37.0</rewrite.migrate-java.version>
 
     <!-- Build output directory. Override with -Dbuild.dir=/some/local/path to keep
          target/ off a network/9p mount (avoids stale-class + file-lock issues). The
@@ -98,7 +99,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.14.0</version>
+        <version>3.15.0</version>
         <configuration>
           <release>25</release>
           <annotationProcessorPaths>
@@ -114,9 +115,11 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>3.5.4</version>
+        <version>3.5.6</version>
         <configuration>
           <workingDirectory>${project.build.directory}</workingDirectory>
+          <!--suppress MavenModelInspection -->
+          <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar}</argLine>
         </configuration>
       </plugin>
 
@@ -134,12 +137,18 @@
             <!-- Cluster 1 — imports & dead code (lowest risk). Review every dry-run on
                  Lombok @Getter/@Setter classes before running (see plan caveats). -->
             <recipe>org.openrewrite.java.RemoveUnusedImports</recipe>
-            <recipe>org.openrewrite.java.OrderImports</recipe>
             <recipe>org.openrewrite.staticanalysis.RemoveUnusedLocalVariables</recipe>
             <recipe>org.openrewrite.staticanalysis.RemoveUnusedPrivateMethods</recipe>
             <recipe>org.openrewrite.staticanalysis.UnnecessaryThrows</recipe>
             <recipe>org.openrewrite.staticanalysis.RemoveExtraSemicolons</recipe>
+            <recipe>org.openrewrite.staticanalysis.EqualsAvoidsNull</recipe>
+            <recipe>org.openrewrite.staticanalysis.LambdaBlockToExpression</recipe>
+            <recipe>org.openrewrite.staticanalysis.MissingOverrideAnnotation</recipe>
+            <recipe>org.openrewrite.java.migrate.UpgradeToJava25</recipe>
           </activeRecipes>
+          <exclusions>
+            <exclusion>tools/**</exclusion>
+          </exclusions>
         </configuration>
         <dependencies>
           <dependency>
@@ -153,6 +162,17 @@
             <version>${rewrite.migrate-java.version}</version>
           </dependency>
         </dependencies>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>properties</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
