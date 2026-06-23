@@ -1,20 +1,14 @@
 // pl/mzebrows/shoots/ui/GameDimensions.java
 package pl.mzebrows.shoots.ui;
 
-import lombok.Getter;
-
 /**
- * Podstawowe stałe jednostek używane w całej grze: rozmiar jednego kafelka w pikselach i rozmiar pola gry w kafelkach.
+ * @deprecated Superseded by {@code GridConfig} (tile unit / table size) and {@code WindowConfig}
+ * (window-tile multipliers), both sourced from {@code game.properties}. This type no longer holds any
+ * values and can be deleted; it remains only so a stale import elsewhere fails loudly rather than
+ * silently reintroducing hard-coded dimensions. Safe to remove from the repo on Windows.
  */
-@Getter
-public enum GameDimensions {
-    UNIT(36),
-    TABLE_SIZE(25),
-    WINDOW_TILES(25);
-
-    private final int value;
-
-    GameDimensions(int value) {
-        this.value = value;
+@Deprecated(forRemoval = true)
+public final class GameDimensions {
+    private GameDimensions() {
     }
 }

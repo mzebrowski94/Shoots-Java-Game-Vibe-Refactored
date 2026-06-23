@@ -73,10 +73,30 @@ public final class GameConfigLoader {
                 intValue(props, "ai.scanBudgetPerFrame", defaults.ai().scanBudgetPerFrame()),
                 boolValue(props, "ai.skillsEnabled", defaults.ai().skillsEnabled()));
 
+        var menu = new MenuConfig(
+                intValue(props, "menu.initialPlayers", defaults.menu().initialPlayers()),
+                intValue(props, "menu.maxPlayers", defaults.menu().maxPlayers()),
+                intValue(props, "menu.initialRoundLimit", defaults.menu().initialRoundLimit()),
+                intValue(props, "menu.maxRoundLimit", defaults.menu().maxRoundLimit()),
+                intValue(props, "menu.roundLimitStep", defaults.menu().roundLimitStep()),
+                intValue(props, "menu.initialRoundTime", defaults.menu().initialRoundTime()),
+                intValue(props, "menu.maxRoundTime", defaults.menu().maxRoundTime()),
+                intValue(props, "menu.roundTimeStep", defaults.menu().roundTimeStep()),
+                intValue(props, "menu.initialAiPlayers", defaults.menu().initialAiPlayers()),
+                floatValue(props, "menu.fontSize", defaults.menu().fontSize()),
+                intValue(props, "menu.rowSpacing", defaults.menu().rowSpacing()),
+                intValue(props, "menu.panelPadX", defaults.menu().panelPadX()),
+                intValue(props, "menu.panelMargin", defaults.menu().panelMargin()));
+
+        var window = new WindowConfig(
+                intValue(props, "window.windowTiles", defaults.window().windowTiles()),
+                intValue(props, "window.counterHeightTiles", defaults.window().counterHeightTiles()),
+                intValue(props, "window.pointerWidthTiles", defaults.window().pointerWidthTiles()));
+
         return new GameConfig(
                 intValue(props, "playerNumber", defaults.playerNumber()),
                 resolveSeed(props),
-                grid, disc, collision, round, palette, ai);
+                grid, disc, collision, round, palette, ai, menu, window);
     }
 
     /** Built-in defaults mirroring the legacy hard-coded values. */
@@ -100,7 +120,9 @@ public final class GameConfigLoader {
                         new RgbColor(252, 3, 0),
                         new RgbColor(237, 26, 116)));
         var ai = new AiConfig(24, 4, true);
-        return new GameConfig(2, System.nanoTime(), grid, disc, collision, round, palette, ai);
+        var menu = new MenuConfig(2, 4, 2, 20, 4, 15, 60, 5, 0, 30f, 46, 28, 16);
+        var window = new WindowConfig(25, 2, 4);
+        return new GameConfig(2, System.nanoTime(), grid, disc, collision, round, palette, ai, menu, window);
     }
 
     private static ColorPalette paletteFromProperties(Properties props, ColorPalette defaults) {
@@ -168,6 +190,19 @@ public final class GameConfigLoader {
             return Double.parseDouble(raw.trim());
         } catch (NumberFormatException _) {
             log.warn("Invalid double for '{}'='{}'; using {}", key, raw, fallback);
+            return fallback;
+        }
+    }
+
+    private static float floatValue(Properties props, String key, float fallback) {
+        var raw = props.getProperty(key);
+        if (raw == null || raw.isBlank()) {
+            return fallback;
+        }
+        try {
+            return Float.parseFloat(raw.trim());
+        } catch (NumberFormatException _) {
+            log.warn("Invalid float for '{}'='{}'; using {}", key, raw, fallback);
             return fallback;
         }
     }

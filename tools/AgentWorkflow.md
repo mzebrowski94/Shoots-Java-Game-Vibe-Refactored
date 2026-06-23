@@ -25,6 +25,18 @@ tools/.m2/repository/        # pre-seeded local repo (all deps + plugins)
 - Correct verification, always: `cd <project root> && ./mvnw test` (or `clean test`).
 - Past false alarm to avoid: seeing JDK 11 and reporting that release-25 can't be built. Wrong —
   that ignores `tools/`.
+- **Toolchain drift is real — check `tools/.m2` BEFORE assuming your code broke the build.**
+  The pinned plugin/dependency versions in `pom.xml` can drift *ahead* of what's seeded in
+  `tools/.m2/repository/` (seen 2026-06-23: pom pinned compiler `3.15.0`, surefire `3.5.6`,
+  Lombok `1.18.46`; the offline repo only had `3.14.0`/`3.5.4`/`1.18.42`). Symptom: a
+  `PluginResolutionException`/`DependencyResolutionException` saying an artifact "has not been
+  downloaded" in offline mode — this fires *before* compilation, so it is NOT your code.
+  Diagnose: `ls tools/.m2/repository/org/apache/maven/plugins/<plugin>/` and compare to the
+  `<version>` in `pom.xml`. Fix options: (a) reseed `tools/.m2` to the pinned versions on a
+  networked host (preferred — keeps the committed pom authoritative); or (b) to verify code
+  locally, temporarily edit the pom to the cached versions, run `./mvnw test`, then **revert the
+  pom to its committed state** (`git diff -- pom.xml` must be empty). Never commit a downgrade
+  done only to satisfy this sandbox.
 
 ## 2. The deletion constraint (the reliable failure mode)
 
@@ -40,21 +52,35 @@ this even applies to files created *this* session (verified 2026-06-20). It hits
   (Legacy fallback, rarely needed: `cp -r pom.xml mvnw .mvn src /tmp/build/ && ln -s "$PWD/tools"
   /tmp/build/tools && cd /tmp/build && ./mvnw test`.)
 
-## 3. Writes: trust-but-verify (not "never use Edit")
+## 3. Writes: heredoc by default, verify the TAIL immediately
 
-The mount *can* truncate a write or inject NUL bytes, but in practice this is **rare, not
-systematic** — Write+Edit on `.md`/`.java` came back clean when last tested (2026-06-20). So:
-- **Use the native Edit tool for surgical changes** — it's the cheapest path and it works.
-  Use a `bash` heredoc for full-file (re)writes.
-- **Let the build be your verifier for code.** A truncated/NUL-corrupted `.java` fails
-  compilation loudly ("reached end of file while parsing" / "illegal character: NUL"), and
-  `./mvnw test` catches it. You do NOT need a manual check after every edit.
-- **Manually verify only when it matters** — a non-compiled file (`.md`, `.properties`) you
-  won't build, or any file where an edit looked suspicious. One command:
-  `wc -l FILE; grep -aP '\x00' FILE | wc -l` — NUL count must be 0.
-  (`grep -c $'\x00'` is a false friend — the empty pattern matches every line.)
-- **If a write DID corrupt:** restore from git (`git show HEAD:PATH > PATH`) and re-apply via
-  bash heredoc — don't hand-repair a truncated tail.
+The mount can silently **truncate** a write — the file is cut off at a clean point (mid-line or
+mid-comment) with the rest dropped. **No NUL bytes are injected when this happens**, so a NUL check
+does NOT detect it. (NUL injection is a separate, rarer corruption; truncation is the one that bit
+hard on 2026-06-23 — five source files truncated in a single edit pass, every one NUL-clean.)
+
+What proved reliable vs not, this session:
+- **`bash` heredoc full-file writes: reliable.** Every heredoc-written file came back intact.
+- **Native `Edit` round-trips: unreliable for non-trivial files.** The truncations all landed on
+  files changed via `Edit` (and re-synced through the mount). Treat `Edit` as fine ONLY for a
+  genuine one-liner; for anything larger, rewrite the whole file with a heredoc.
+
+The rules:
+- **Prefer a `bash` heredoc (`cat > FILE <<'EOF' ... EOF`) for any multi-line change or full
+  rewrite.** Use native `Edit` only for true single-line surgical fixes.
+- **Verify the TAIL in the SAME bash call, every time** — do not wait for the build:
+  `cat > FILE <<'EOF' ... EOF; echo "lines: $(wc -l < FILE)"; tail -3 FILE; echo "NUL: $(grep -aPc '\x00' FILE)"`.
+  The file must (a) end with the real last line you wrote, (b) have a plausible line count, and
+  (c) report `NUL: 0`. Truncation shows up as a wrong/short tail even when NUL is 0 — the **tail
+  check is the primary detector; NUL is secondary**.
+- **Let the build be a backstop, not the first alarm.** A truncated `.java` does fail
+  compilation, but the error arrives late and can interleave with unrelated failures (e.g. a
+  toolchain-drift `PluginResolutionException`), which wastes a cycle untangling them. Catch it at
+  write time instead.
+- **If a write DID truncate:** rewrite the whole file via heredoc (restore the lost tail from git
+  first if you no longer have the content: `git show HEAD:PATH > /tmp/orig`). Don't hand-patch the
+  truncated end with another `Edit` — that tends to truncate again.
+- `grep -c $'\x00'` is a false friend (the empty pattern matches every line); use `grep -aPc '\x00'`.
 
 ## 4. Git: the user commits, you don't
 
@@ -73,7 +99,9 @@ for this project while an agent works — most lock cases are IntelliJ compiling
 
 | Symptom | Cause | Action |
 |---|---|---|
-| reached end of file while parsing / illegal character NUL | mount corrupted a write (rare) | restore from git, rewrite via heredoc, verify NUL=0 |
+| reached end of file while parsing (tail missing, NUL=0) | mount **truncated** the write (silent; not rare) | rewrite whole file via heredoc; verify `tail -3` + `wc -l` at write time |
+| illegal character: NUL | mount injected NUL bytes (rarer) | rewrite via heredoc; `grep -aPc '\x00'` must be 0 |
+| PluginResolution/DependencyResolutionException, "has not been downloaded" (offline) | toolchain drift: pom pins versions ahead of `tools/.m2` | NOT your code; compare pom `<version>` to `ls tools/.m2/...`; reseed `.m2`, or temp-downgrade pom to verify then revert |
 | Fix doesn't change test results | stale class files | `./mvnw clean test` |
 | can't build / `java -version` shows 11 | looking at system JDK | use `./mvnw` (vendored JDK 26) |
 | copying … to target/… failed: NoSuchFileException | broken/locked target on mount | already avoided via build.dir; else delete target on Windows |

@@ -6,9 +6,10 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import pl.mzebrows.shoots.ai.AiDifficulty;
+import pl.mzebrows.shoots.config.GameConfig;
+import pl.mzebrows.shoots.config.GameConfigLoader;
 import pl.mzebrows.shoots.input.InputBridge;
 import pl.mzebrows.shoots.ui.ColorScheme;
-import pl.mzebrows.shoots.ui.GameDimensions;
 import pl.mzebrows.shoots.ui.GameScreen;
 
 import java.awt.Font;
@@ -23,11 +24,21 @@ import java.util.ArrayList;
  * win logic now live in the {@code world}/{@code score} model ({@code PlayWorld}/{@code MatchFlow});
  * this class retains only window sizing, fonts, colours, the input bridge, and lightweight round
  * bookkeeping (round number + per-round {@link Round} timing) that the panels and {@code PlayingState} read.
+ *
+ * <p>Every default is sourced from {@link GameConfig} (loaded from {@code game.properties}); the class
+ * holds no hard-coded gameplay or window dimensions of its own.
  */
 @Slf4j
 @Getter
 @Setter
 public class GameSettings {
+
+    /** Point size of the in-game HUD font (the menu font size is config-driven via {@code menu.fontSize}). */
+    private static final float GAME_FONT_SIZE = 12f;
+
+    /** The loaded game configuration backing every default below; the single source of truth. */
+    @Setter(AccessLevel.NONE)
+    private final GameConfig config;
 
     private int playerNumber;
     /**
@@ -42,16 +53,16 @@ public class GameSettings {
     private Font gameFont;
     private Font menuFont;
 
-    // Window sizing (derived from GameDimensions; immutable once constructed).
-    private final int defaultWidth = GameDimensions.UNIT.getValue() * GameDimensions.WINDOW_TILES.getValue();
-    private final int defaultHeight = GameDimensions.UNIT.getValue() * GameDimensions.WINDOW_TILES.getValue();
-    private final int defaultCounterHeight = GameDimensions.UNIT.getValue() * 2;
-    private final int defaultPointerWidth = GameDimensions.UNIT.getValue() * 4;
-    private final int defaultCounterWidth = defaultWidth + defaultPointerWidth;
-    private final int defaultPointerHeight = GameDimensions.UNIT.getValue() * GameDimensions.WINDOW_TILES.getValue();
+    // Window sizing (derived from grid + window config; immutable once constructed).
+    private final int defaultWidth;
+    private final int defaultHeight;
+    private final int defaultCounterHeight;
+    private final int defaultPointerWidth;
+    private final int defaultCounterWidth;
+    private final int defaultPointerHeight;
 
-    private final int size = GameDimensions.TABLE_SIZE.getValue();
-    private final int unit = GameDimensions.UNIT.getValue();
+    private final int size;
+    private final int unit;
 
     private int roundTime;
     private ArrayList<Round> roundList;
@@ -71,19 +82,43 @@ public class GameSettings {
     private boolean gameEnd;
 
     /**
-     * Constructs default settings and loads fonts; the live model is created separately by PlayingState.
+     * Constructs settings from the bundled {@code game.properties} (default config) and loads fonts;
+     * the live model is created separately by PlayingState.
      */
     public GameSettings() {
-        this.playerNumber = 2;
-        this.roundLimit = 2;
-        this.roundEndDelay = 2;
-        this.animationTime = 1;
+        this(GameConfigLoader.load());
+    }
+
+    /**
+     * Constructs settings whose every default is sourced from {@code config} -- no hard-coded values.
+     * Window sizing is derived from the grid unit and window-tile multipliers; round pacing and the
+     * initial player/AI selection come from the round and menu configs.
+     */
+    public GameSettings(GameConfig config) {
+        this.config = config;
+
+        var grid = config.grid();
+        var window = config.window();
+        this.unit = grid.unit();
+        this.size = grid.tableSize();
+        this.defaultWidth = unit * window.windowTiles();
+        this.defaultHeight = unit * window.windowTiles();
+        this.defaultCounterHeight = unit * window.counterHeightTiles();
+        this.defaultPointerWidth = unit * window.pointerWidthTiles();
+        this.defaultPointerHeight = unit * window.windowTiles();
+        this.defaultCounterWidth = defaultWidth + defaultPointerWidth;
+
+        this.playerNumber = config.menu().initialPlayers();
+        this.aiNumber = config.menu().initialAiPlayers();
+        this.roundTime = config.round().roundTimeSeconds();
+        this.roundLimit = config.round().roundLimit();
+        this.roundEndDelay = config.round().roundEndDelay();
+        this.animationTime = config.round().animationTime();
         this.colorScheme = new ColorScheme();
         this.playerKeyboardAvailable = true;
         this.actualRoundNumber = 0;
-        this.roundTime = 15;
         this.roundList = new ArrayList<>();
-        inputBridge = InputBridge.withDefaultKeyMap();
+        this.inputBridge = InputBridge.withDefaultKeyMap();
         initializeFont();
     }
 
@@ -94,9 +129,9 @@ public class GameSettings {
         try {
             GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
             File loadedGameFont = loadFont("13_Misa.TTF");
-            gameFont = Font.createFont(Font.TRUETYPE_FONT, loadedGameFont).deriveFont(12f);
+            gameFont = Font.createFont(Font.TRUETYPE_FONT, loadedGameFont).deriveFont(GAME_FONT_SIZE);
             File loadedMenuFont = loadFont("GeosansLight.ttf");
-            menuFont = Font.createFont(Font.TRUETYPE_FONT, loadedMenuFont).deriveFont(25f);
+            menuFont = Font.createFont(Font.TRUETYPE_FONT, loadedMenuFont).deriveFont(config.menu().fontSize());
             ge.registerFont(Font.createFont(Font.TRUETYPE_FONT, loadedGameFont));
             ge.registerFont(Font.createFont(Font.TRUETYPE_FONT, loadedMenuFont));
         } catch (IOException | FontFormatException e) {
