@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import lombok.extern.slf4j.Slf4j;
 import pl.mzebrows.shoots.config.GameConfig;
 import pl.mzebrows.shoots.entity.AimController;
 import pl.mzebrows.shoots.entity.DiscAttackStrategy;
@@ -32,6 +33,7 @@ import pl.mzebrows.shoots.system.DiscSystem;
  * {@link CaptureScoring}. The renderer reads state through the queryable getters; nothing here
  * references {@code Graphics2D}, so the whole simulation is unit-testable without a graphics context.
  */
+@Slf4j
 public final class PlayWorld {
 
     /** Per-player aim intent for a single step, decoupled from raw key codes. */
@@ -160,6 +162,7 @@ public final class PlayWorld {
     }
 
     private PlayWorld(GameConfig config, long seed, Random random) {
+        log.info("Initialising world. Seed: {}", seed);
         this.config = config;
         this.seed = seed;
         this.playerCount = config.playerNumber();

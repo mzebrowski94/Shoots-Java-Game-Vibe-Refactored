@@ -191,7 +191,11 @@ public class GameScreen extends GameCanvas {
         }
     }
 
-    /** Draws each player's predicted aiming laser as a dashed polyline in the player colour. */
+    /**
+     * Draws each player's predicted aiming laser as a dashed line in the player colour, fading each
+     * successive bounce segment by {@code laser.bounceAlphaFalloff} so the path grows more transparent
+     * the further it reaches.
+     */
     private void drawLasers(PlayWorld world) {
         // Origin point + one point per predicted reflection (laser.maxBounces).
         int laserPoints = 1 + world.config().disc().laserMaxBounces();
@@ -199,14 +203,23 @@ public class GameScreen extends GameCanvas {
             laserX = new int[laserPoints];
             laserY = new int[laserPoints];
         }
+        double falloff = world.config().disc().laserBounceAlphaFalloff();
         var dashed = new BasicStroke(2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND,
                 5.0f, new float[]{6f}, dashPhase);
         g2d.setStroke(dashed);
         for (int p = 0; p < world.playerCount(); p++) {
             int n = world.predictLaser(p, laserX, laserY);
-            if (n >= 2) {
-                g2d.setColor(world.playerColor(p));
-                g2d.drawPolyline(laserX, laserY, n);
+            if (n < 2) {
+                continue;
+            }
+            Color base = world.playerColor(p);
+            // Each segment i runs from vertex i to i+1; segment opacity falls off per bounce.
+            double segAlpha = 255.0;
+            for (int i = 0; i + 1 < n; i++) {
+                int a = Math.max(0, Math.min(255, (int) Math.round(segAlpha)));
+                g2d.setColor(new Color(base.getRed(), base.getGreen(), base.getBlue(), a));
+                g2d.drawLine(laserX[i], laserY[i], laserX[i + 1], laserY[i + 1]);
+                segAlpha *= falloff;
             }
         }
     }

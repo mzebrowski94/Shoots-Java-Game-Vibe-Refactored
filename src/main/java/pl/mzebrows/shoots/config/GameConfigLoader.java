@@ -57,7 +57,8 @@ public final class GameConfigLoader {
                 intValue(props, "disc.maxPerShot", defaults.disc().maxPerShot()),
                 intValue(props, "laser.maxBounces", defaults.disc().laserMaxBounces()),
                 doubleValue(props, "disc.bounceSpeedGain", defaults.disc().bounceSpeedGain()),
-                doubleValue(props, "disc.maxSpeedFactor", defaults.disc().maxSpeedFactor()));
+                doubleValue(props, "disc.maxSpeedFactor", defaults.disc().maxSpeedFactor()),
+                doubleValue(props, "laser.bounceAlphaFalloff", defaults.disc().laserBounceAlphaFalloff()));
 
         var collision = new CollisionConfig(
                 intValue(props, "collision.ballCollisionSize", defaults.collision().ballCollisionSize()));
@@ -114,7 +115,7 @@ public final class GameConfigLoader {
     public static GameConfig defaults() {
         var grid = new GridConfig(36, 25);
         // Acceleration on by default: a subtle per-bounce speed gain, capped at a safe multiple.
-        var disc = new DiscConfig(18, 10, 2.0, 7, 3, 3, 4, 1.06, 1.7);
+        var disc = new DiscConfig(18, 10, 2.0, 7, 3, 3, 4, 1.06, 1.7, 0.6);
         var collision = new CollisionConfig(4);
         var round = new RoundConfig(15, 2, 2, 1);
         var power = new PowerShotConfig(true, 0.6, 1.9, 16, 2);
