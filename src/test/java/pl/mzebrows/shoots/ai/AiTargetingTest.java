@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
 import pl.mzebrows.shoots.config.CollisionConfig;
 import pl.mzebrows.shoots.config.GridConfig;
+import pl.mzebrows.shoots.spatial.GridPathTracer;
 import pl.mzebrows.shoots.spatial.TileType;
 import pl.mzebrows.shoots.spatial.UniformGridCollider;
 
@@ -28,7 +29,7 @@ class AiTargetingTest {
 
     private static AiTargeting targeting(TileType[][] tiles, int maxBounces) {
         var collider = new UniformGridCollider(tiles, new GridConfig(UNIT, SIZE), new CollisionConfig(4));
-        return new AiTargeting(collider, UNIT, maxBounces);
+        return new AiTargeting(new GridPathTracer(collider, UNIT), maxBounces);
     }
 
     private static double centreOf(int tile) {
@@ -41,9 +42,6 @@ class AiTargetingTest {
         tiles[6][4] = TileType.CAPTURE_POINT; // to the right of a base at column 2, same row
         var targeting = targeting(tiles, 5);
 
-        // Fire straight right (angle 0 per the disc convention uses sin/cos; angle 0 moves +Y, so use the
-        // direction that walks +X). The base disc convention: shootDirection 0 fires +X for player 2.
-        // We verify by scanning both axes-aligned angles and asserting the point is reached from one.
         var rightHit = targeting.reach(centreOf(2), centreOf(4), 90, 2.0);
         var leftHit = targeting.reach(centreOf(2), centreOf(4), -90, 2.0);
 
@@ -65,8 +63,6 @@ class AiTargetingTest {
 
     @Test
     void recordsBounceCountForAnIndirectPath() {
-        // A capture point that can only be reached after at least one wall bounce: place it behind the
-        // shooter's straight line so a reflection is required.
         TileType[][] tiles = emptyWalledMap();
         tiles[2][2] = TileType.CAPTURE_POINT;
         var targeting = targeting(tiles, 6);
@@ -87,7 +83,6 @@ class AiTargetingTest {
         var targeting = targeting(emptyWalledMap(), 4);
 
         long packed = targeting.firstWallTile(centreOf(4), centreOf(4), 0, 2.0);
-        // Decode and check the tile is within the map bounds (it must hit a border wall).
         int tx = (int) (packed >> 32);
         int ty = (int) (packed & 0xFFFFFFFFL);
         assertThat(tx).isBetween(0, SIZE - 1);

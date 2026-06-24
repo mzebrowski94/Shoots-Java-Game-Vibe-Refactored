@@ -55,7 +55,9 @@ public final class GameConfigLoader {
                 intValue(props, "disc.maxBounces", defaults.disc().maxBounces()),
                 intValue(props, "disc.maxPerPlayer", defaults.disc().maxPerPlayer()),
                 intValue(props, "disc.maxPerShot", defaults.disc().maxPerShot()),
-                intValue(props, "laser.maxBounces", defaults.disc().laserMaxBounces()));
+                intValue(props, "laser.maxBounces", defaults.disc().laserMaxBounces()),
+                doubleValue(props, "disc.bounceSpeedGain", defaults.disc().bounceSpeedGain()),
+                doubleValue(props, "disc.maxSpeedFactor", defaults.disc().maxSpeedFactor()));
 
         var collision = new CollisionConfig(
                 intValue(props, "collision.ballCollisionSize", defaults.collision().ballCollisionSize()));
@@ -71,7 +73,16 @@ public final class GameConfigLoader {
         var ai = new AiConfig(
                 intValue(props, "ai.scanAngles", defaults.ai().scanAngles()),
                 intValue(props, "ai.scanBudgetPerFrame", defaults.ai().scanBudgetPerFrame()),
-                boolValue(props, "ai.skillsEnabled", defaults.ai().skillsEnabled()));
+                boolValue(props, "ai.skillsEnabled", defaults.ai().skillsEnabled()),
+                boolValue(props, "ai.powerShotEnabled", defaults.ai().powerShotEnabled()),
+                intValue(props, "ai.powerShotMinBounces", defaults.ai().powerShotMinBounces()));
+
+        var power = new PowerShotConfig(
+                boolValue(props, "power.enabled", defaults.power().enabled()),
+                doubleValue(props, "power.chargeSeconds", defaults.power().chargeSeconds()),
+                doubleValue(props, "power.speedFactor", defaults.power().speedFactor()),
+                intValue(props, "power.maxBounces", defaults.power().maxBounces()),
+                intValue(props, "power.captureStrength", defaults.power().captureStrength()));
 
         var menu = new MenuConfig(
                 intValue(props, "menu.initialPlayers", defaults.menu().initialPlayers()),
@@ -96,15 +107,17 @@ public final class GameConfigLoader {
         return new GameConfig(
                 intValue(props, "playerNumber", defaults.playerNumber()),
                 resolveSeed(props),
-                grid, disc, collision, round, palette, ai, menu, window);
+                grid, disc, collision, round, palette, ai, menu, window, power);
     }
 
     /** Built-in defaults mirroring the legacy hard-coded values. */
     public static GameConfig defaults() {
         var grid = new GridConfig(36, 25);
-        var disc = new DiscConfig(18, 10, 2.0, 7, 3, 3, 4);
+        // Acceleration on by default: a subtle per-bounce speed gain, capped at a safe multiple.
+        var disc = new DiscConfig(18, 10, 2.0, 7, 3, 3, 4, 1.06, 1.7);
         var collision = new CollisionConfig(4);
         var round = new RoundConfig(15, 2, 2, 1);
+        var power = new PowerShotConfig(true, 0.6, 1.9, 16, 2);
         var palette = new ColorPalette(
                 new RgbColor(95, 99, 104),
                 new RgbColor(25, 25, 25),
@@ -119,10 +132,10 @@ public final class GameConfigLoader {
                         new RgbColor(48, 213, 200),
                         new RgbColor(252, 3, 0),
                         new RgbColor(237, 26, 116)));
-        var ai = new AiConfig(24, 4, true);
+        var ai = new AiConfig(24, 4, true, true, 2);
         var menu = new MenuConfig(2, 4, 2, 20, 4, 15, 60, 5, 0, 30f, 46, 28, 16);
         var window = new WindowConfig(25, 2, 4);
-        return new GameConfig(2, System.nanoTime(), grid, disc, collision, round, palette, ai, menu, window);
+        return new GameConfig(2, System.nanoTime(), grid, disc, collision, round, palette, ai, menu, window, power);
     }
 
     private static ColorPalette paletteFromProperties(Properties props, ColorPalette defaults) {

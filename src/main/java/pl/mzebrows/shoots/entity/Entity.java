@@ -31,10 +31,20 @@ public final class Entity {
     private int directionY;
     private double moveSpeed;
 
+    /** Multiplicative speed gain applied on each wall bounce (1.0 = no acceleration). */
+    private double speedGainPerBounce;
+    /** Upper bound the realised {@link #moveSpeed} may reach via acceleration (0 = no cap). */
+    private double maxMoveSpeed;
+
     private int radius;
 
     /** Owning player id (-1 = none); used by combat/scoring without a separate component array. */
     private int ownerId;
+
+    /** Capture levels this entity applies per control-point hit (1 = normal, &gt;1 = power shot). */
+    private int captureStrength;
+    /** Whether this is a charged power disc (drives the lighting/glow effect in the renderer). */
+    private boolean powered;
 
     private int bounces;
     private int maxBounces;
@@ -68,8 +78,12 @@ public final class Entity {
         directionX = 1;
         directionY = 1;
         moveSpeed = 0.0;
+        speedGainPerBounce = 1.0;
+        maxMoveSpeed = 0.0;
         radius = 0;
         ownerId = -1;
+        captureStrength = 1;
+        powered = false;
         bounces = 0;
         maxBounces = 0;
         movementStrategy = null;

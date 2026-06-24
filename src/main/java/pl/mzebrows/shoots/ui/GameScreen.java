@@ -255,7 +255,39 @@ public class GameScreen extends GameCanvas {
             g2d.setColor(world.playerColor(p));
             drawRotatedRing(cx, cy, rBig, baseRotation);
             drawRotatedRing(cx, cy, rSmall, -baseRotation);
+            drawChargeRing(cx, cy, rBig + 6, world.chargeProgress(p), world.playerColor(p));
         }
+    }
+
+    /**
+     * Draws the power-shot charge indicator as a ring on the base that fills clockwise from the top in
+     * the player colour and brightens as it charges, with a soft white glow as it nears full. No-op
+     * when {@code progress <= 0} (not charging), so a normal shot shows nothing.
+     */
+    private void drawChargeRing(int cx, int cy, int radius, double progress, Color color) {
+        if (progress <= 0.0) {
+            return;
+        }
+        var old = g2d.getStroke();
+        int d = 2 * radius;
+        g2d.setStroke(new BasicStroke(4.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        // Faint full-circle track behind the fill.
+        g2d.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), 55));
+        g2d.drawOval(cx - radius, cy - radius, d, d);
+        // Filling sweep, brightening with progress.
+        int sweep = (int) Math.round(360.0 * Math.min(1.0, progress));
+        int alpha = Math.min(255, (int) (110 + 145 * Math.min(1.0, progress)));
+        g2d.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), alpha));
+        g2d.drawArc(cx - radius, cy - radius, d, d, 90, -sweep);
+        // Soft glow as it approaches the auto-fire threshold.
+        if (progress >= 0.8) {
+            int gr = radius + 5;
+            int glowAlpha = (int) (90 * ((progress - 0.8) / 0.2));
+            g2d.setStroke(new BasicStroke(3.0f));
+            g2d.setColor(new Color(255, 255, 255, Math.max(0, Math.min(120, glowAlpha))));
+            g2d.drawOval(cx - gr, cy - gr, 2 * gr, 2 * gr);
+        }
+        g2d.setStroke(old);
     }
 
     /**
@@ -324,11 +356,34 @@ public class GameScreen extends GameCanvas {
             }
             double dx = disc.interpolatedX(alpha);
             double dy = disc.interpolatedY(alpha);
+            Color ownerColor = world.playerColor(disc.getOwnerId());
+            if (disc.isPowered()) {
+                drawPowerGlow(dx, dy, big, ownerColor);
+            }
             var outer = new Area(new Ellipse2D.Double(dx - halfBig, dy - halfBig, big, big));
             outer.subtract(new Area(new Ellipse2D.Double(dx - halfSmall, dy - halfSmall, small, small)));
-            g2d.setColor(world.playerColor(disc.getOwnerId()));
+            g2d.setColor(disc.isPowered() ? ownerColor.brighter() : ownerColor);
             g2d.fill(outer);
+            if (disc.isPowered()) {
+                // Bright core to read as a charged, energised disc.
+                g2d.setColor(new Color(255, 255, 255, 210));
+                g2d.fill(new Ellipse2D.Double(dx - 3, dy - 3, 6, 6));
+            }
         }
+    }
+
+    /** Lighting effect for a power disc: a couple of translucent halo rings in the owner colour. */
+    private void drawPowerGlow(double dx, double dy, int big, Color owner) {
+        var old = g2d.getStroke();
+        Color bright = owner.brighter();
+        for (int ring = 1; ring <= 2; ring++) {
+            int pad = ring * 4;
+            int alpha = 130 / ring;
+            g2d.setStroke(new BasicStroke(2.0f));
+            g2d.setColor(new Color(bright.getRed(), bright.getGreen(), bright.getBlue(), alpha));
+            g2d.draw(new Ellipse2D.Double(dx - big / 2.0 - pad, dy - big / 2.0 - pad, big + 2.0 * pad, big + 2.0 * pad));
+        }
+        g2d.setStroke(old);
     }
 
     @Override

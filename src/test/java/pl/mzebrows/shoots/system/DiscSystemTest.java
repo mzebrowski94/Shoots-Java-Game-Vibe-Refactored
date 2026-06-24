@@ -13,6 +13,7 @@ import pl.mzebrows.shoots.config.DiscConfig;
 import pl.mzebrows.shoots.config.GridConfig;
 import pl.mzebrows.shoots.entity.Entity;
 import pl.mzebrows.shoots.pool.ObjectPool;
+import pl.mzebrows.shoots.spatial.GridPathTracer;
 import pl.mzebrows.shoots.spatial.TileType;
 import pl.mzebrows.shoots.spatial.UniformGridCollider;
 
@@ -37,6 +38,10 @@ class DiscSystemTest {
         return tiles;
     }
 
+    private GridPathTracer tracer(TileType[][] tiles) {
+        return new GridPathTracer(new UniformGridCollider(tiles, grid, collision), UNIT);
+    }
+
     private ObjectPool<Entity> pool() {
         return new ObjectPool<>(4, Entity::new, Entity::reset);
     }
@@ -44,7 +49,7 @@ class DiscSystemTest {
     @Test
     void movesActiveDiscByOneStep() {
         var combat = new CombatSystem(pool(), DISC);
-        var system = new DiscSystem(new UniformGridCollider(emptyField(), grid, collision), combat);
+        var system = new DiscSystem(tracer(emptyField()), combat);
         Entity disc = combat.spawnDisc(12 * UNIT + UNIT / 2.0, 12 * UNIT, 0, 1); // +Y travel
 
         double y0 = disc.getY();
@@ -57,8 +62,7 @@ class DiscSystemTest {
     @Test
     void skipsInactiveDiscs() {
         var combat = new CombatSystem(pool(), DISC);
-        var collider = new UniformGridCollider(emptyField(), grid, collision);
-        var system = new DiscSystem(collider, combat);
+        var system = new DiscSystem(tracer(emptyField()), combat);
         var sink = mock(DiscSystem.DiscEventSink.class);
         var inactive = new Entity(); // active == false
 
@@ -74,9 +78,9 @@ class DiscSystemTest {
         var tiles = emptyField();
         tiles[12][13] = TileType.CAPTURE_POINT;
         var combat = new CombatSystem(pool(), DISC);
-        var system = new DiscSystem(new UniformGridCollider(tiles, grid, collision), combat);
+        var system = new DiscSystem(tracer(tiles), combat);
         var sink = mock(DiscSystem.DiscEventSink.class);
-        // Place disc so that after one +Y step it lands inside tile (12,13).
+        // Disc spawned inside the capture tile (12,13): a +Y step keeps it there, hit is reported.
         Entity disc = combat.spawnDisc(12 * UNIT + UNIT / 2.0, 13 * UNIT + UNIT / 2.0, 0, 1);
 
         system.update(List.of(disc), sink);
@@ -86,18 +90,14 @@ class DiscSystemTest {
 
     @Test
     void retiringDiscsMidUpdateDoesNotCorruptIteration() {
-        // Regression: the retirement sink removes the spent disc from the live list (as PlayWorld
-        // does). The old forward loop cached size() and threw IndexOutOfBoundsException once a disc
-        // was removed mid-iteration (e.g. right after a block bounce exhausted its bounce budget).
         var combat = new CombatSystem(pool(), DISC);
-        var system = new DiscSystem(new UniformGridCollider(emptyField(), grid, collision), combat);
+        var system = new DiscSystem(tracer(emptyField()), combat);
         var discs = new java.util.ArrayList<Entity>();
         for (int k = 0; k < 4; k++) {
-            Entity d = combat.spawnDisc(12 * UNIT, 12 * UNIT, 0, 1);
+            Entity d = combat.spawnDisc(12 * UNIT + UNIT / 2.0, 12 * UNIT + UNIT / 2.0, 0, 1);
             d.setBounces(DISC.maxBounces()); // every disc is already spent -> all retire this step
             discs.add(d);
         }
-        // Sink mirrors PlayWorld: remove the retired disc from the list mid-update.
         DiscSystem.DiscEventSink removingSink = new DiscSystem.DiscEventSink() {
             @Override public boolean onCapturePointHit(Entity disc, int tileX, int tileY) { return false; }
             @Override public void onDiscRetired(Entity disc) { discs.remove(disc); }
@@ -110,13 +110,10 @@ class DiscSystemTest {
 
     @Test
     void discRetiresWhenCaptureHitIsConsumed() {
-        // A capture hit that changes the point (sink returns true) consumes the disc: it is retired
-        // and reported, and does NOT keep flying. Mirrors PlayWorld returning resolveHit(...).
         var tiles = emptyField();
         tiles[12][13] = TileType.CAPTURE_POINT;
         var combat = new CombatSystem(pool(), DISC);
-        var system = new DiscSystem(new UniformGridCollider(tiles, grid, collision), combat);
-        // Land inside the capture tile after one +Y step.
+        var system = new DiscSystem(tracer(tiles), combat);
         Entity disc = combat.spawnDisc(12 * UNIT + UNIT / 2.0, 13 * UNIT + UNIT / 2.0, 0, 1);
         var discs = new java.util.ArrayList<Entity>();
         discs.add(disc);
@@ -133,11 +130,10 @@ class DiscSystemTest {
 
     @Test
     void discPassesThroughWhenCaptureHitChangesNothing() {
-        // An ineffective capture hit (sink returns false) leaves the disc active and flying.
         var tiles = emptyField();
         tiles[12][13] = TileType.CAPTURE_POINT;
         var combat = new CombatSystem(pool(), DISC);
-        var system = new DiscSystem(new UniformGridCollider(tiles, grid, collision), combat);
+        var system = new DiscSystem(tracer(tiles), combat);
         Entity disc = combat.spawnDisc(12 * UNIT + UNIT / 2.0, 13 * UNIT + UNIT / 2.0, 0, 1);
         var discs = new java.util.ArrayList<Entity>();
         discs.add(disc);
@@ -155,9 +151,9 @@ class DiscSystemTest {
     @Test
     void retiresSpentDiscAndReportsIt() {
         var combat = new CombatSystem(pool(), DISC);
-        var system = new DiscSystem(new UniformGridCollider(emptyField(), grid, collision), combat);
+        var system = new DiscSystem(tracer(emptyField()), combat);
         var sink = mock(DiscSystem.DiscEventSink.class);
-        Entity disc = combat.spawnDisc(12 * UNIT, 12 * UNIT, 0, 1);
+        Entity disc = combat.spawnDisc(12 * UNIT + UNIT / 2.0, 12 * UNIT + UNIT / 2.0, 0, 1);
         disc.setBounces(DISC.maxBounces()); // already spent
 
         system.update(List.of(disc), sink);

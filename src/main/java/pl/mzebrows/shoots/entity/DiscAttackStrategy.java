@@ -26,7 +26,8 @@ public final class DiscAttackStrategy implements AttackStrategy {
         if (activeDiscs >= maxConcurrentDiscs) {
             return false;
         }
-        Entity disc = spawner.spawnDisc(source.getX(), source.getY(), source.getAngle(), source.getOwnerId());
+        Entity disc = spawner.spawnDisc(source.getX(), source.getY(), source.getAngle(),
+                source.getOwnerId(), source.isPowered());
         if (disc == null) {
             return false;
         }

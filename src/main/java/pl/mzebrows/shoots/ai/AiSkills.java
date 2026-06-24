@@ -19,6 +19,8 @@ package pl.mzebrows.shoots.ai;
  * @param decisionIntervalTicks ticks between target re-evaluations (>=1; smaller = faster reactions)
  * @param volleyCooldownTicks ticks between successive shots (>=0; paces firing so caps aren't dumped at once)
  * @param targetMode          how candidate capture points are ranked
+ * @param powerShotTendency   likelihood in [0,1] of using a charged power shot on a long-range target
+ *                            (0 = never; scales up the difficulty ladder so strong AIs use it more)
  */
 public record AiSkills(
         double accuracy,
@@ -30,7 +32,8 @@ public record AiSkills(
         double bouncePathPreference,
         int decisionIntervalTicks,
         int volleyCooldownTicks,
-        TargetMode targetMode) {
+        TargetMode targetMode,
+        double powerShotTendency) {
 
     public AiSkills {
         requireUnit("accuracy", accuracy);
@@ -38,6 +41,7 @@ public record AiSkills(
         requireUnit("retakeStubbornness", retakeStubbornness);
         requireUnit("defendTendency", defendTendency);
         requireUnit("bouncePathPreference", bouncePathPreference);
+        requireUnit("powerShotTendency", powerShotTendency);
         if (maxDiscsInFlight < 1) {
             throw new IllegalArgumentException("maxDiscsInFlight must be >= 1: " + maxDiscsInFlight);
         }

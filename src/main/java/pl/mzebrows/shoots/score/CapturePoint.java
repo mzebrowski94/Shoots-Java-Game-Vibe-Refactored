@@ -65,6 +65,25 @@ public final class CapturePoint {
         return true;
     }
 
+    /**
+     * Applies a hit worth {@code strength} capture steps (a power shot lands several levels at once).
+     * Each step uses the single-hit tug-of-war rule above; stepping stops early once a step no longer
+     * changes anything (e.g. the owner has maxed the point).
+     *
+     * @return {@code true} if any step changed ownership or level
+     */
+    public boolean tryCapture(int playerId, int strength) {
+        boolean changed = false;
+        for (int s = 0; s < Math.max(1, strength); s++) {
+            if (tryCapture(playerId)) {
+                changed = true;
+            } else {
+                break;
+            }
+        }
+        return changed;
+    }
+
     /** Points this capture point currently awards its owner (0 when neutral). */
     public int awardedPoints() {
         return captured ? level : 0;

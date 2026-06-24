@@ -9,13 +9,13 @@ import java.util.Random;
 
 import pl.mzebrows.shoots.config.GameConfig;
 import pl.mzebrows.shoots.entity.AimController;
-import pl.mzebrows.shoots.entity.BounceMovementStrategy;
 import pl.mzebrows.shoots.entity.DiscAttackStrategy;
 import pl.mzebrows.shoots.entity.Entity;
 import pl.mzebrows.shoots.entity.EntitySpawner;
 import pl.mzebrows.shoots.entity.LaserPredictor;
 import pl.mzebrows.shoots.pool.ObjectPool;
 import pl.mzebrows.shoots.score.CaptureScoring;
+import pl.mzebrows.shoots.spatial.GridPathTracer;
 import pl.mzebrows.shoots.spatial.MapGenerator;
 import pl.mzebrows.shoots.spatial.SpatialCollider;
 import pl.mzebrows.shoots.spatial.TileType;
@@ -58,11 +58,15 @@ public final class PlayWorld {
     /** Max cursor rotation each way from the base firing direction, in degrees (legacy ±110 = 220° arc). */
     private static final double AIM_ROTATION_LIMIT_DEG = 110.0;
 
+    /** Simulation steps per second; mirrors {@code GameLoop.UPDATES_PER_SECOND} (charge is timed in steps). */
+    private static final int SIMULATION_STEPS_PER_SECOND = 120;
+
     private final GameConfig config;
     private final int playerCount;
     private final long seed;
 
     private SpatialCollider collider;
+    private GridPathTracer tracer;
     private TileType[][] tiles;
 
     private final CombatSystem combatSystem;
@@ -89,6 +93,14 @@ public final class PlayWorld {
     private final DiscAttackStrategy[] attack;
     private BasePlacement[] bases;
 
+    /** Per-player power-shot charge state (human input only; AI fires power shots directly). */
+    private final int[] chargeTicks;
+    private final boolean[] chargeConsumed;
+    private final boolean[] charging;
+    private final boolean[] shootHeldPrev;
+    private final int chargeThresholdTicks;
+    private final boolean powerEnabled;
+
     /** Base seed for map generation; each round's map uses mix(baseMapSeed, roundIndex). */
     private final long baseMapSeed;
     /** 0-based index of the current round, advanced each resetRound() so each round gets a new map. */
@@ -99,7 +111,8 @@ public final class PlayWorld {
 
     private final DiscSystem.DiscEventSink sink = new DiscSystem.DiscEventSink() {
         @Override public boolean onCapturePointHit(Entity disc, int tileX, int tileY) {
-            return scoring.resolveHit(tileX, tileY, disc.getOwnerId());
+            // A power disc applies several capture levels per hit (captureStrength); a normal disc 1.
+            return scoring.resolveHit(tileX, tileY, disc.getOwnerId(), disc.getCaptureStrength());
         }
         @Override public void onWallHit(Entity disc, int tileX, int tileY) {
             spawnBlockHit(tileX, tileY, disc.getOwnerId());
@@ -118,8 +131,8 @@ public final class PlayWorld {
      * tracked list is always the authoritative set of live discs.
      */
     private final EntitySpawner trackingSpawner = new EntitySpawner() {
-        @Override public Entity spawnDisc(double x, double y, double angle, int ownerId) {
-            Entity disc = combatSystem.spawnDisc(x, y, angle, ownerId);
+        @Override public Entity spawnDisc(double x, double y, double angle, int ownerId, boolean powered) {
+            Entity disc = combatSystem.spawnDisc(x, y, angle, ownerId, powered);
             if (disc != null) {
                 discs.add(disc);
                 discOwners.put(disc, ownerId);
@@ -159,7 +172,7 @@ public final class PlayWorld {
         int maxDiscsPerPlayer = config.disc().maxPerPlayer();
         this.discPool = new ObjectPool<>(maxDiscsPerPlayer * playerCount, Entity::new, Entity::reset);
         this.discs = new ArrayList<>(discPool.capacity());
-        this.combatSystem = new CombatSystem(discPool, config.disc());
+        this.combatSystem = new CombatSystem(discPool, config.disc(), config.power());
         this.matchFlow = new MatchFlow(playerCount, config.round());
 
         this.aim = new AimController[playerCount];
@@ -168,10 +181,19 @@ public final class PlayWorld {
             attack[p] = new DiscAttackStrategy(maxDiscsPerPlayer);
         }
 
-        // Build the round-0 map and everything that depends on it (collider, laser, bases, aim, points).
+        // Power-shot charge state (human input drives this; AI fires power shots directly).
+        this.chargeTicks = new int[playerCount];
+        this.chargeConsumed = new boolean[playerCount];
+        this.charging = new boolean[playerCount];
+        this.shootHeldPrev = new boolean[playerCount];
+        this.powerEnabled = config.power().enabled();
+        this.chargeThresholdTicks =
+                Math.max(1, (int) Math.round(config.power().chargeSeconds() * SIMULATION_STEPS_PER_SECOND));
+
+        // Build the round-0 map and everything that depends on it (collider, tracer, laser, bases, points).
         buildMap(mapSeedFor(0));
-        // DiscSystem references the collider; it is rebound on each map regeneration in buildMap.
-        this.discSystem = new DiscSystem(collider, combatSystem);
+        // DiscSystem advances discs along the analytic tracer; it is rebound on each map regeneration.
+        this.discSystem = new DiscSystem(tracer, combatSystem);
     }
 
     /** Per-round map seed derived from the base seed, so each round gets a fresh yet reproducible layout. */
@@ -193,7 +215,8 @@ public final class PlayWorld {
         int unit = config.grid().unit();
         this.tiles = new MapGenerator(config.grid(), new Random(mapSeed)).generate(playerCount);
         this.collider = new UniformGridCollider(tiles, config.grid(), config.collision());
-        this.laserPredictor = new LaserPredictor(collider, new BounceMovementStrategy());
+        this.tracer = new GridPathTracer(collider, unit);
+        this.laserPredictor = new LaserPredictor(tracer);
         this.bases = locateBases(unit);
         if (aim != null) {
             for (int p = 0; p < playerCount; p++) {
@@ -201,7 +224,7 @@ public final class PlayWorld {
             }
         }
         if (discSystem != null) {
-            discSystem.setCollider(collider);
+            discSystem.setTracer(tracer);
         }
         scoring.clear();
         registerCapturePoints();
@@ -252,15 +275,71 @@ public final class PlayWorld {
         resetRound();
     }
 
-    /** Fires one disc for {@code playerId} if under the per-player cap and the pool has room. */
+    /** Fires one normal disc for {@code playerId} if under the per-player cap and the pool has room. */
     public boolean fire(int playerId) {
+        return fireDisc(playerId, false);
+    }
+
+    /**
+     * Fires one charged power disc for {@code playerId} (faster, more bounces, stronger capture). Falls
+     * back to a normal disc when the power shot is disabled in config. Used by the human charge release
+     * and directly by the AI; subject to the same per-player disc cap as a normal shot.
+     */
+    public boolean firePower(int playerId) {
+        return fireDisc(playerId, powerEnabled);
+    }
+
+    private boolean fireDisc(int playerId, boolean powered) {
         BasePlacement base = bases[playerId];
         fireSource.reset();
         fireSource.setX(base.pixelX());
         fireSource.setY(base.pixelY());
         fireSource.setAngle(aim[playerId].currentAngle());
         fireSource.setOwnerId(playerId);
+        fireSource.setPowered(powered);
         return attack[playerId].attack(fireSource, trackingSpawner);
+    }
+
+    /**
+     * Drives a human player's shoot key for this step (hold-to-charge, auto-fire when full):
+     * <ul>
+     *   <li>press (rising edge): fires a normal disc immediately (classic feel) and starts charging;</li>
+     *   <li>hold: fills the charge ring and auto-releases ONE power disc the moment it fills;</li>
+     *   <li>release: clears the charge.</li>
+     * </ul>
+     * The AI does not use this path -- it fires via {@link #fire}/{@link #firePower} directly.
+     */
+    public void applyShoot(int playerId, boolean shootHeld) {
+        boolean prev = shootHeldPrev[playerId];
+        if (shootHeld && !prev) {
+            fire(playerId);
+            chargeTicks[playerId] = 0;
+            chargeConsumed[playerId] = false;
+            charging[playerId] = powerEnabled;
+        } else if (shootHeld) {
+            if (charging[playerId] && !chargeConsumed[playerId]) {
+                chargeTicks[playerId]++;
+                if (chargeTicks[playerId] >= chargeThresholdTicks) {
+                    firePower(playerId);
+                    chargeConsumed[playerId] = true;
+                    charging[playerId] = false;
+                }
+            }
+        } else {
+            chargeTicks[playerId] = 0;
+            chargeConsumed[playerId] = false;
+            charging[playerId] = false;
+        }
+        shootHeldPrev[playerId] = shootHeld;
+    }
+
+    /** Power-shot charge fill for {@code playerId} in {@code [0,1]} (0 when not charging), for the renderer. */
+    public double chargeProgress(int playerId) {
+        if (!charging[playerId] || chargeThresholdTicks <= 0) {
+            return 0.0;
+        }
+        double p = (double) chargeTicks[playerId] / chargeThresholdTicks;
+        return p < 0.0 ? 0.0 : Math.min(p, 1.0);
     }
 
     /** Predicts the laser polyline for {@code playerId} into caller-supplied arrays (no allocation). */
@@ -287,6 +366,10 @@ public final class PlayWorld {
             while (attack[p].activeDiscs() > 0) {
                 attack[p].onDiscRetired();
             }
+            chargeTicks[p] = 0;
+            chargeConsumed[p] = false;
+            charging[p] = false;
+            shootHeldPrev[p] = false;
         }
         // New map for this round (also rebuilds collider/laser/bases and re-registers capture points,
         // and resets each player's aim to the neutral firing direction).
@@ -325,8 +408,11 @@ public final class PlayWorld {
 
     public CaptureScoring scoring() { return scoring; }
 
-    /** The collision grid (read by the AI's reachability walk so it uses the live reflection math). */
+    /** The collision grid (tile-content queries). */
     public SpatialCollider collider() { return collider; }
+
+    /** The analytic path tracer (read by the AI's reachability walk so it uses the live reflection math). */
+    public GridPathTracer tracer() { return tracer; }
 
     public AimController aimOf(int playerId) { return aim[playerId]; }
 

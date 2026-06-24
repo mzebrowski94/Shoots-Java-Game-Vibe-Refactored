@@ -25,20 +25,20 @@ class DiscAttackStrategyTest {
     @Test
     void firesDiscFromSourcePositionAndAngle() {
         var spawner = mock(EntitySpawner.class);
-        when(spawner.spawnDisc(50, 60, 135, 2)).thenReturn(new Entity());
+        when(spawner.spawnDisc(50, 60, 135, 2, false)).thenReturn(new Entity());
         var strategy = new DiscAttackStrategy(3);
 
         boolean fired = strategy.attack(source(), spawner);
 
         assertThat(fired).isTrue();
         assertThat(strategy.activeDiscs()).isEqualTo(1);
-        verify(spawner).spawnDisc(50, 60, 135, 2);
+        verify(spawner).spawnDisc(50, 60, 135, 2, false);
     }
 
     @Test
     void respectsConcurrentDiscCap() {
         var spawner = mock(EntitySpawner.class);
-        when(spawner.spawnDisc(50, 60, 135, 2)).thenReturn(new Entity());
+        when(spawner.spawnDisc(50, 60, 135, 2, false)).thenReturn(new Entity());
         var strategy = new DiscAttackStrategy(2);
 
         assertThat(strategy.attack(source(), spawner)).isTrue();
@@ -46,13 +46,13 @@ class DiscAttackStrategyTest {
         assertThat(strategy.attack(source(), spawner)).isFalse(); // capped
 
         assertThat(strategy.activeDiscs()).isEqualTo(2);
-        verify(spawner, times(2)).spawnDisc(50, 60, 135, 2);
+        verify(spawner, times(2)).spawnDisc(50, 60, 135, 2, false);
     }
 
     @Test
     void retiringADiscFreesASlot() {
         var spawner = mock(EntitySpawner.class);
-        when(spawner.spawnDisc(50, 60, 135, 2)).thenReturn(new Entity());
+        when(spawner.spawnDisc(50, 60, 135, 2, false)).thenReturn(new Entity());
         var strategy = new DiscAttackStrategy(1);
 
         assertThat(strategy.attack(source(), spawner)).isTrue();
@@ -66,7 +66,7 @@ class DiscAttackStrategyTest {
     @Test
     void poolExhaustionDoesNotConsumeASlot() {
         var spawner = mock(EntitySpawner.class);
-        when(spawner.spawnDisc(50, 60, 135, 2)).thenReturn(null);
+        when(spawner.spawnDisc(50, 60, 135, 2, false)).thenReturn(null);
         var strategy = new DiscAttackStrategy(3);
 
         assertThat(strategy.attack(source(), spawner)).isFalse();

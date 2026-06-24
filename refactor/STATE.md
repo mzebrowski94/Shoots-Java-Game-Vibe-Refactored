@@ -156,3 +156,37 @@
 
 ## Legacy Logic Coverage Map
 - All legacy `game.logic` responsibilities migrated to `world`/`score`/`entity`/`spatial` (c4-c11); legacy retained for c12 ref, deleted c13.
+
+## New-feature gameplay contracts (NewFeatures.md cluster D)
+- **Disc acceleration (D1).** Per-disc `Entity.speedGainPerBounce`/`maxMoveSpeed` (set at spawn from
+  `DiscConfig.bounceSpeedGain`/`maxSpeedFactor`). `DiscSystem(collider,combat,safeStep)` sub-steps each
+  frame at `<= safeStep` (= `min(moveSpeed, ballCollisionSize)`), accelerating on each WALL hit and
+  capping at `maxMoveSpeed`; the 2-arg ctor keeps single-step (legacy) behaviour for tests.
+- **Corner glance (D2).** `UniformGridCollider` convex corner (diagonal-only-solid) flips ONE
+  velocity-dominant axis (deterministic `|sin| vs |cos|`, tie→X) instead of both. Concave corners still
+  reverse. Laser matches automatically (shared `resolve`). Determinism preserved (no RNG/time).
+- **Power shot (D3).** `PowerShotConfig` (`power.*`). `Entity.powered`/`captureStrength` carry the kind;
+  `CombatSystem.spawnDisc(x,y,a,owner,powered)` stamps power stats; `EntitySpawner` gained the 5-arg
+  spawn (4-arg defaults powered=false). `PlayWorld` owns per-player charge state +
+  `applyShoot(player,held)` (press=normal shot+start charge, hold=fill, full=auto `firePower`),
+  `firePower`, `chargeProgress`; `PlayInput` feeds the held key. `CapturePoint.tryCapture(player,strength)`
+  applies several levels per power hit. Renderer draws the base charge ring + power-disc glow.
+- **AI power shots (D4).** `AiSkills.powerShotTendency` (ladder-scaled in `AiSkillsFactory`).
+  `PlayerAiController` fires `firePower` for targets with bounces ≥ `AiConfig.powerShotMinBounces`,
+  gated by tendency; `AiConfig.powerShotEnabled` is the master switch. AI bypasses the human charge UX.
+
+## Analytic reflection (speed-independent) — bugfix of disc/laser physics
+- **`spatial.GridPathTracer` is now the single source of reflection geometry.** It casts a disc's ray
+  against grid cell faces (DDA traversal) and reflects at the EXACT tile face, so the bounce path is a
+  pure function of (start, direction, grid) — a slow disc, a fast disc and the laser trace the identical
+  polyline; only the rate differs. Each corner is ONE reflection event (no bounce-count inflation), which
+  fixed: corner discs vanishing (esp. power shots), fast-vs-slow trajectory divergence, and laser/disc
+  mismatch. Fully deterministic (no RNG/time; corner glance tie-breaks on `|dx|>=|dy|`) — good for replay/
+  online prediction. Convex corner = single-axis glance, concave = reversal (matches feature #2).
+- **Consumers rewired onto the tracer:** `DiscSystem(tracer, combat)` advances each disc one frame along
+  the path (acceleration only changes per-frame distance, never geometry; no more sub-stepping);
+  `LaserPredictor(tracer)` records reflection vertices; `AiTargeting(tracer, maxBounces)` walks reach +
+  first-wall. `PlayWorld` builds the tracer per map and rebinds `DiscSystem.setTracer`; exposes `tracer()`.
+- **`SpatialCollider` is now just `tileAt`** (tile-content query); `UniformGridCollider` keeps tileAt +
+  `fromLegacyMatrix`. The band-based `resolve` and `CollisionResult` are retired (CollisionResult.java is
+  now unused/dead — safe to delete). `BounceMovementStrategy`/`MovementSystem` remain for generic entities.

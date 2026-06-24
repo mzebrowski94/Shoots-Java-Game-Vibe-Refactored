@@ -6,10 +6,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
 import pl.mzebrows.shoots.config.CollisionConfig;
 import pl.mzebrows.shoots.config.GridConfig;
+import pl.mzebrows.shoots.spatial.GridPathTracer;
 import pl.mzebrows.shoots.spatial.TileType;
 import pl.mzebrows.shoots.spatial.UniformGridCollider;
 
-/** Graphics-free tests that laser prediction reuses the collider's reflection math. */
+/** Graphics-free tests that laser prediction reuses the analytic tracer's reflection geometry. */
 class LaserPredictorTest {
 
     private static final int UNIT = 36;
@@ -29,8 +30,8 @@ class LaserPredictorTest {
     }
 
     private LaserPredictor predictor(TileType[][] tiles) {
-        var collider = new UniformGridCollider(tiles, grid, collision);
-        return new LaserPredictor(collider, new BounceMovementStrategy());
+        var tracer = new GridPathTracer(new UniformGridCollider(tiles, grid, collision), UNIT);
+        return new LaserPredictor(tracer);
     }
 
     @Test
@@ -47,7 +48,6 @@ class LaserPredictorTest {
 
     @Test
     void straightDownShotReflectsOffBottomBorder() {
-        // angle 0 -> moves in +Y (cos(0)=1). Centre column, should bounce off bottom wall.
         var predictor = predictor(emptyField());
         int[] xs = new int[2];
         int[] ys = new int[2];
@@ -55,16 +55,14 @@ class LaserPredictorTest {
         int written = predictor.predict(12 * UNIT + UNIT / 2.0, 12 * UNIT, 0, 2, xs, ys);
 
         assertThat(written).isEqualTo(2);
-        // X stays in the same column; Y advances downward to near the bottom border.
         assertThat(xs[1]).isEqualTo(xs[0]);
         assertThat(ys[1]).isGreaterThan(ys[0]);
-        assertThat(ys[1]).isGreaterThanOrEqualTo((SIZE - 1) * UNIT - UNIT);
+        assertThat(ys[1]).isEqualTo((SIZE - 1) * UNIT); // exact bottom tile face
     }
 
     @Test
     void reflectionPointsAreDeterministic() {
-        var tiles = emptyField();
-        var predictor = predictor(tiles);
+        var predictor = predictor(emptyField());
         int[] xs1 = new int[4];
         int[] ys1 = new int[4];
         int[] xs2 = new int[4];
@@ -83,9 +81,8 @@ class LaserPredictorTest {
         int[] xs = new int[4];
         int[] ys = new int[4];
 
-        predictor.predict(12 * UNIT, 12 * UNIT, 45, 2, xs, ys);
+        predictor.predict(12 * UNIT + UNIT / 2.0, 12 * UNIT + UNIT / 2.0, 37, 2, xs, ys);
 
-        // Each successive bounce point should differ from the previous (path keeps reflecting).
         assertThat(xs[1] != xs[0] || ys[1] != ys[0]).isTrue();
         assertThat(xs[2] != xs[1] || ys[2] != ys[1]).isTrue();
     }

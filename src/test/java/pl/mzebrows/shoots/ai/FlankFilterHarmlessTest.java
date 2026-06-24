@@ -55,7 +55,7 @@ class FlankFilterHarmlessTest {
         // Average over several maps so the assertion is not tied to one random layout.
         for (long seed = 1; seed <= 8; seed++) {
             var world = world(4, seed);
-            var targeting = new AiTargeting(world.collider(), world.unit(),
+            var targeting = new AiTargeting(world.tracer(),
                     world.config().disc().maxBounces());
             double speed = world.config().disc().moveSpeed();
 

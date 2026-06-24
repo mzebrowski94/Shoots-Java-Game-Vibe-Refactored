@@ -42,8 +42,16 @@ public final class CaptureScoring {
      * @return {@code true} if the hit captured, levelled-up, or stole the point
      */
     public boolean resolveHit(int tileX, int tileY, int playerId) {
+        return resolveHit(tileX, tileY, playerId, 1);
+    }
+
+    /**
+     * Resolves a single disc hit worth {@code strength} capture steps (a power shot lands several
+     * levels per hit). Returns {@code false} when no point sits on the tile or the hit changes nothing.
+     */
+    public boolean resolveHit(int tileX, int tileY, int playerId, int strength) {
         CapturePoint point = pointsByTile.get(key(tileX, tileY));
-        return point != null && point.tryCapture(playerId);
+        return point != null && point.tryCapture(playerId, strength);
     }
 
     /** Total points currently controlled by {@code playerId} across all capture points. */

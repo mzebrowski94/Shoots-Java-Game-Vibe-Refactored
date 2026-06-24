@@ -150,4 +150,47 @@ class GameConfigLoaderTest {
         assertThat(config.ai().scanBudgetPerFrame()).isEqualTo(4);
         assertThat(config.ai().skillsEnabled()).isTrue();
     }
+
+    @Test
+    void discAccelerationAndPowerShotDefaultsAreLoaded() {
+        var config = GameConfigLoader.load();
+
+        // Feature #1: per-bounce acceleration is on by default and capped.
+        assertThat(config.disc().bounceSpeedGain()).isGreaterThan(1.0);
+        assertThat(config.disc().maxSpeedFactor()).isGreaterThanOrEqualTo(1.0);
+        // Feature #3/#4: power shot + AI power-shot tunables come from game.properties.
+        assertThat(config.power().enabled()).isTrue();
+        assertThat(config.power().chargeSeconds()).isGreaterThan(0.0);
+        assertThat(config.power().speedFactor()).isGreaterThanOrEqualTo(1.0);
+        assertThat(config.power().maxBounces()).isGreaterThan(config.disc().maxBounces());
+        assertThat(config.power().captureStrength()).isGreaterThanOrEqualTo(1);
+        assertThat(config.ai().powerShotEnabled()).isTrue();
+        assertThat(config.ai().powerShotMinBounces()).isGreaterThanOrEqualTo(0);
+    }
+
+    @Test
+    void powerShotKeysOverrideDefaults() {
+        var props = new Properties();
+        props.setProperty("disc.bounceSpeedGain", "1.10");
+        props.setProperty("disc.maxSpeedFactor", "2.0");
+        props.setProperty("power.enabled", "false");
+        props.setProperty("power.chargeSeconds", "1.25");
+        props.setProperty("power.speedFactor", "2.5");
+        props.setProperty("power.maxBounces", "30");
+        props.setProperty("power.captureStrength", "4");
+        props.setProperty("ai.powerShotEnabled", "false");
+        props.setProperty("ai.powerShotMinBounces", "5");
+
+        var config = GameConfigLoader.fromProperties(props);
+
+        assertThat(config.disc().bounceSpeedGain()).isEqualTo(1.10);
+        assertThat(config.disc().maxSpeedFactor()).isEqualTo(2.0);
+        assertThat(config.power().enabled()).isFalse();
+        assertThat(config.power().chargeSeconds()).isEqualTo(1.25);
+        assertThat(config.power().speedFactor()).isEqualTo(2.5);
+        assertThat(config.power().maxBounces()).isEqualTo(30);
+        assertThat(config.power().captureStrength()).isEqualTo(4);
+        assertThat(config.ai().powerShotEnabled()).isFalse();
+        assertThat(config.ai().powerShotMinBounces()).isEqualTo(5);
+    }
 }

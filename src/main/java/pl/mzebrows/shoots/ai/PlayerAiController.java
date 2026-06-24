@@ -42,6 +42,8 @@ public final class PlayerAiController {
     private boolean hasTarget;
     private int targetTileX = -1;
     private int targetTileY = -1;
+    /** Bounce-path length of the cached target; drives the "long range -> power shot" decision. */
+    private int targetBounces = 0;
 
     private int decisionCountdown;
     private int cooldownCountdown;
@@ -102,6 +104,7 @@ public final class PlayerAiController {
         double bestAngle = Double.NaN;
         int bestTileX = -1;
         int bestTileY = -1;
+        int bestBounces = 0;
         boolean found = false;
 
         for (int i = 0; i < scanAngles; i++) {
@@ -127,6 +130,7 @@ public final class PlayerAiController {
                 bestAngle = angle;
                 bestTileX = reach.tileX();
                 bestTileY = reach.tileY();
+                bestBounces = reach.bounces();
                 found = true;
             }
         }
@@ -138,6 +142,7 @@ public final class PlayerAiController {
             this.targetAngle = bestAngle + error;
             this.targetTileX = bestTileX;
             this.targetTileY = bestTileY;
+            this.targetBounces = bestBounces;
             this.hasTarget = true;
         } else if (!skipsRetainingTarget()) {
             // keep the previous target (stubbornness) if we found nothing new this scan
@@ -209,7 +214,32 @@ public final class PlayerAiController {
                 cooldownCountdown = skills.volleyCooldownTicks();
             }
         }
-        world.applyInput(playerId, move, shoot);
+
+        // Aim is applied via applyInput; firing is issued explicitly so a long-range shot can be a
+        // charged power disc (AI bypasses the human hold-to-charge UX and fires it directly).
+        world.applyInput(playerId, move, false);
+        if (shoot) {
+            if (wantsPowerShot(world)) {
+                world.firePower(playerId);
+            } else {
+                world.fire(playerId);
+            }
+        }
+    }
+
+    /**
+     * Whether the current shot should be a charged power disc: only for "long range" targets (bounce
+     * path at least {@code ai.powerShotMinBounces}) and gated by the per-AI {@code powerShotTendency},
+     * so stronger difficulties fire power shots on distant targets more often.
+     */
+    private boolean wantsPowerShot(PlayWorld world) {
+        if (!world.config().power().enabled() || !world.config().ai().powerShotEnabled()) {
+            return false;
+        }
+        if (targetBounces < world.config().ai().powerShotMinBounces()) {
+            return false;
+        }
+        return rng.nextDouble() < skills.powerShotTendency();
     }
 
     /** First-reflection-is-own-flank test used to honour the "never shoot flanking blocks" rule. */

@@ -46,10 +46,20 @@ public final class PlayInput {
         return input.isJustPressed(PLAYER_ACTIONS[playerId][2]);
     }
 
-    /** Applies every player's input for this frame to the world in one call. */
+    /** Whether {@code playerId} is currently holding shoot (drives the hold-to-charge power shot). */
+    public static boolean shootHeldFor(InputBridge input, int playerId) {
+        return input.isHeld(PLAYER_ACTIONS[playerId][2]);
+    }
+
+    /**
+     * Applies every player's input for this frame to the world in one call: aim intent, then the
+     * shoot key as a HELD signal. The world's {@link PlayWorld#applyShoot} turns that into a normal
+     * shot on the press edge, a filling charge while held, and an auto-released power shot when full.
+     */
     public static void apply(InputBridge input, PlayWorld world) {
         for (int p = 0; p < world.playerCount(); p++) {
-            world.applyInput(p, aimFor(input, p), shootFor(input, p));
+            world.applyInput(p, aimFor(input, p), false);
+            world.applyShoot(p, shootHeldFor(input, p));
         }
     }
 }

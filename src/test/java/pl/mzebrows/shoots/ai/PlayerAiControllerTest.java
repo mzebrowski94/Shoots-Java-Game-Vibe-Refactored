@@ -40,7 +40,7 @@ class PlayerAiControllerTest {
 
     private static PlayerAiController controller(PlayWorld world, int playerId, AiDifficulty difficulty) {
         AiSkills skills = AiSkillsFactory.create(difficulty, world.seed(), playerId);
-        var targeting = new AiTargeting(world.collider(), world.unit(), world.config().disc().maxBounces());
+        var targeting = new AiTargeting(world.tracer(), world.config().disc().maxBounces());
         return new PlayerAiController(playerId, skills, targeting, 24, world.seed());
     }
 
@@ -48,7 +48,7 @@ class PlayerAiControllerTest {
     void rejectsTooFewScanAngles() {
         var world = world();
         AiSkills skills = AiSkillsFactory.create(AiDifficulty.NORMAL, world.seed(), 0);
-        var targeting = new AiTargeting(world.collider(), world.unit(), 7);
+        var targeting = new AiTargeting(world.tracer(), 7);
         assertThatThrownBy(() -> new PlayerAiController(0, skills, targeting, 1, world.seed()))
                 .isInstanceOf(IllegalArgumentException.class);
     }

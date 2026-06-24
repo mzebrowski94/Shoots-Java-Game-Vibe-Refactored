@@ -99,14 +99,40 @@ class AiSkillsFactoryTest {
 
     @Test
     void aiSkillsRejectsOutOfRangeKnob() {
-        assertThatThrownBy(() -> new AiSkills(1.5, 0.5, 1, 1, 0.5, 0.5, 0.5, 10, 10, TargetMode.NEAREST))
+        assertThatThrownBy(() -> new AiSkills(1.5, 0.5, 1, 1, 0.5, 0.5, 0.5, 10, 10, TargetMode.NEAREST, 0.5))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void aiSkillsRejectsNonPositiveDecisionInterval() {
-        assertThatThrownBy(() -> new AiSkills(0.5, 0.5, 1, 1, 0.5, 0.5, 0.5, 0, 10, TargetMode.NEAREST))
+        assertThatThrownBy(() -> new AiSkills(0.5, 0.5, 1, 1, 0.5, 0.5, 0.5, 0, 10, TargetMode.NEAREST, 0.5))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void aiSkillsRejectsOutOfRangePowerShotTendency() {
+        assertThatThrownBy(() -> new AiSkills(0.5, 0.5, 1, 1, 0.5, 0.5, 0.5, 10, 10, TargetMode.NEAREST, 1.5))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void powerShotTendencyRisesAcrossTheLadder() {
+        // Averaged over seeds so the per-AI deviation can't flip the monotonic ordering.
+        double easy = avgPowerTendency(AiDifficulty.EASY);
+        double normal = avgPowerTendency(AiDifficulty.NORMAL);
+        double veryHard = avgPowerTendency(AiDifficulty.VERY_HARD);
+
+        assertThat(easy).isLessThan(normal);
+        assertThat(normal).isLessThan(veryHard);
+    }
+
+    private static double avgPowerTendency(AiDifficulty d) {
+        double sum = 0;
+        int n = 50;
+        for (int seed = 0; seed < n; seed++) {
+            sum += AiSkillsFactory.create(d, seed, 1).powerShotTendency();
+        }
+        return sum / n;
     }
 
     private static double avgAccuracy(AiDifficulty d) {

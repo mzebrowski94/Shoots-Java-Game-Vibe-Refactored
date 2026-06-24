@@ -1,20 +1,15 @@
 // src/main/java/pl/mzebrows/shoots/ai/AiTargeting.java
 package pl.mzebrows.shoots.ai;
 
-import pl.mzebrows.shoots.entity.BounceMovementStrategy;
-import pl.mzebrows.shoots.entity.Entity;
-import pl.mzebrows.shoots.entity.MovementStrategy;
-import pl.mzebrows.shoots.spatial.SpatialCollider;
-import pl.mzebrows.shoots.spatial.TileType;
+import pl.mzebrows.shoots.spatial.GridPathTracer;
 
 /**
  * AWT-free shot-reachability walker for the AI. Given a firing origin and angle, it walks the exact
- * bounce path the live discs take (reusing {@link BounceMovementStrategy} + the {@link SpatialCollider}
- * reflection math, like {@code LaserPredictor}) and reports the FIRST capture-point tile the path
- * reaches plus how many wall bounces it took to get there.
+ * analytic bounce path the live discs take ({@link GridPathTracer}) and reports the FIRST capture-point
+ * tile the path reaches plus how many wall bounces it took to get there.
  *
- * <p>Reuses one scratch {@link Entity}, so a scan performs no per-call allocation. This is the cheap
- * core of "score each candidate angle, pick the best": the controller (C2) calls {@link #reach} for a
+ * <p>Reuses one {@link GridPathTracer.Ray}, so a scan performs no per-call allocation. This is the
+ * cheap core of "score each candidate angle, pick the best": the controller calls {@link #reach} for a
  * handful of angles per decision and ranks the hits.
  */
 public final class AiTargeting {
@@ -24,86 +19,91 @@ public final class AiTargeting {
         static final Reach NONE = new Reach(false, -1, -1, -1);
     }
 
-    private final SpatialCollider collider;
-    private final MovementStrategy movement;
+    private final GridPathTracer tracer;
     private final int unit;
     private final int maxBounces;
-    private final int maxStepsPerSegment;
-    private final Entity scratch = new Entity();
+    private final GridPathTracer.Ray ray = new GridPathTracer.Ray();
+    private final ReachVisitor reachVisitor = new ReachVisitor();
+    private final FirstWallVisitor firstWallVisitor = new FirstWallVisitor();
 
-    public AiTargeting(SpatialCollider collider, int unit, int maxBounces) {
-        this(collider, new BounceMovementStrategy(), unit, maxBounces, 10_000);
-    }
-
-    public AiTargeting(SpatialCollider collider, MovementStrategy movement, int unit, int maxBounces,
-                       int maxStepsPerSegment) {
-        this.collider = collider;
-        this.movement = movement;
-        this.unit = unit;
+    public AiTargeting(GridPathTracer tracer, int maxBounces) {
+        this.tracer = tracer;
+        this.unit = tracer.unit();
         this.maxBounces = maxBounces;
-        this.maxStepsPerSegment = maxStepsPerSegment;
     }
 
     /**
      * Walks the bounce path from ({@code startX},{@code startY}) at {@code angle} and returns the first
      * capture-point tile it crosses, or {@link Reach#NONE} if none is reached within the bounce budget.
-     *
-     * @param speed step size used while walking (use the disc move speed)
+     * {@code speed} is accepted for compatibility but ignored (the path is speed-independent).
      */
     public Reach reach(double startX, double startY, double angle, double speed) {
-        scratch.reset();
-        scratch.setX(startX);
-        scratch.setY(startY);
-        scratch.setAngle(angle);
-        scratch.setMoveSpeed(speed);
-        scratch.setDirectionX(1);
-        scratch.setDirectionY(1);
-
-        int lastTileX = (int) startX / unit;
-        int lastTileY = (int) startY / unit;
-        int steps = 0;
-        int stepCap = maxStepsPerSegment * (maxBounces + 1);
-
-        while (scratch.getBounces() <= maxBounces && steps < stepCap) {
-            movement.move(scratch);
-            int tx = (int) scratch.getX() / unit;
-            int ty = (int) scratch.getY() / unit;
-            if (tx != lastTileX || ty != lastTileY) {
-                if (collider.tileAt(tx, ty) == TileType.CAPTURE_POINT) {
-                    return new Reach(true, tx, ty, scratch.getBounces());
-                }
-                lastTileX = tx;
-                lastTileY = ty;
-            }
-            collider.resolve(scratch);
-            steps++;
+        seedRay(startX, startY, angle);
+        reachVisitor.reset();
+        tracer.walk(ray, Double.MAX_VALUE, maxBounces, reachVisitor);
+        if (reachVisitor.reached) {
+            return new Reach(true, reachVisitor.tileX, reachVisitor.tileY, reachVisitor.bounces);
         }
         return Reach.NONE;
     }
 
     /** Tile the bounce path FIRST contacts as a wall (its first reflection tile), for flank-block filtering. */
     public long firstWallTile(double startX, double startY, double angle, double speed) {
-        scratch.reset();
-        scratch.setX(startX);
-        scratch.setY(startY);
-        scratch.setAngle(angle);
-        scratch.setMoveSpeed(speed);
-        scratch.setDirectionX(1);
-        scratch.setDirectionY(1);
+        seedRay(startX, startY, angle);
+        firstWallVisitor.reset();
+        tracer.walk(ray, Double.MAX_VALUE, 1, firstWallVisitor);
+        return packTile(firstWallVisitor.tileX, firstWallVisitor.tileY);
+    }
 
-        int steps = 0;
-        while (scratch.getBounces() == 0 && steps < maxStepsPerSegment) {
-            movement.move(scratch);
-            collider.resolve(scratch);
-            steps++;
-        }
-        int tx = (int) scratch.getX() / unit;
-        int ty = (int) scratch.getY() / unit;
-        return packTile(tx, ty);
+    private void seedRay(double startX, double startY, double angle) {
+        double radians = Math.toRadians(-angle);
+        ray.set(startX, startY, Math.sin(radians), Math.cos(radians));
     }
 
     /** Packs a tile (x,y) into a single long key (matches the convention used elsewhere). */
     public static long packTile(int tileX, int tileY) {
         return (((long) tileX) << 32) ^ (tileY & 0xFFFFFFFFL);
+    }
+
+    /** Stops at the first capture tile entered, recording it and the bounce count so far. */
+    private final class ReachVisitor implements GridPathTracer.PathVisitor {
+        private boolean reached;
+        private int tileX;
+        private int tileY;
+        private int bounces;
+
+        void reset() {
+            reached = false;
+            tileX = -1;
+            tileY = -1;
+            bounces = -1;
+        }
+
+        @Override
+        public boolean onCapturePoint(double x, double y, int tx, int ty) {
+            reached = true;
+            tileX = tx;
+            tileY = ty;
+            bounces = ray.reflections;
+            return true;
+        }
+    }
+
+    /** Stops at the first wall reflection, recording the struck tile. */
+    private static final class FirstWallVisitor implements GridPathTracer.PathVisitor {
+        private int tileX = -1;
+        private int tileY = -1;
+
+        void reset() {
+            tileX = -1;
+            tileY = -1;
+        }
+
+        @Override
+        public boolean onReflect(double x, double y, int tx, int ty) {
+            tileX = tx;
+            tileY = ty;
+            return true;
+        }
     }
 }

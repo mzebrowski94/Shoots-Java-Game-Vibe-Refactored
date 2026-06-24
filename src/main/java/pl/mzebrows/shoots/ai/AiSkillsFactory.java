@@ -25,6 +25,8 @@ public final class AiSkillsFactory {
     private static final double RETAKE_WEAK = 0.20, RETAKE_STRONG = 0.85;
     private static final double DEFEND_WEAK = 0.15, DEFEND_STRONG = 0.90;
     private static final double BOUNCE_WEAK = 0.10, BOUNCE_STRONG = 0.95;
+    // Power-shot usage: weak AIs rarely charge a long-range shot; strong AIs do so often.
+    private static final double POWER_WEAK = 0.05, POWER_STRONG = 0.85;
 
     // Tick intervals: weak (EASY) is slow/long, strong (VERY_HARD) is fast/short.
     private static final int DECISION_WEAK = 45, DECISION_STRONG = 10;   // ticks between target re-evals
@@ -57,7 +59,8 @@ public final class AiSkillsFactory {
                 deviate(lerp(BOUNCE_WEAK, BOUNCE_STRONG, f), rng),
                 lerpInt(DECISION_WEAK, DECISION_STRONG, f),
                 lerpInt(COOLDOWN_WEAK, COOLDOWN_STRONG, f),
-                modeForLadder(f));
+                modeForLadder(f),
+                deviate(lerp(POWER_WEAK, POWER_STRONG, f), rng));
     }
 
     private static AiSkills randomBand(Random rng) {
@@ -71,7 +74,8 @@ public final class AiSkillsFactory {
                 band(rng, 0.00, 1.00),   // bouncePathPreference
                 DECISION_STRONG + rng.nextInt(DECISION_WEAK - DECISION_STRONG + 1),
                 COOLDOWN_STRONG + rng.nextInt(COOLDOWN_WEAK - COOLDOWN_STRONG + 1),
-                TargetMode.values()[rng.nextInt(TargetMode.values().length)]);
+                TargetMode.values()[rng.nextInt(TargetMode.values().length)],
+                band(rng, 0.00, 1.00));   // powerShotTendency
     }
 
     private static TargetMode modeForLadder(double f) {

@@ -3,19 +3,22 @@ package pl.mzebrows.shoots.system;
 
 import java.util.List;
 import pl.mzebrows.shoots.entity.Entity;
-import pl.mzebrows.shoots.spatial.CollisionResult;
-import pl.mzebrows.shoots.spatial.SpatialCollider;
+import pl.mzebrows.shoots.spatial.GridPathTracer;
 
 /**
- * Per-step disc lifecycle over pooled {@link Entity} instances: integrate movement, resolve wall and
- * capture-point collisions via the {@link SpatialCollider}, and retire discs that exhaust their
- * bounce budget. Replaces the legacy {@code Disc.moveDisc()/checkCollision()/checkColisionsNumber()}
- * trio with allocation-free, AWT-decoupled logic driven by config-derived state on the entity.
+ * Per-step disc lifecycle over pooled {@link Entity} instances: advance each disc along its exact
+ * analytic reflecting path ({@link GridPathTracer}), report capture/wall events, and retire discs that
+ * exhaust their bounce budget. Replaces the legacy step-sampled move/collide trio.
  *
- * <p>Constructor-injected with the collider, the {@link MovementSystem} (movement strategies), and
- * the {@link CombatSystem} (retirement back to the pool). A caller-supplied {@link DiscEventSink}
- * receives capture-point hits and retirements so scoring/audio can react without this system knowing
- * about rendering.
+ * <p>Because the tracer reflects at exact tile faces, the bounce <em>path</em> is identical for slow
+ * and fast discs (and the laser), and each corner is a single reflection event -- so a disc can no
+ * longer rack up phantom bounces in a corner band and vanish. On every wall bounce the disc's realised
+ * speed is multiplied by its {@code speedGainPerBounce} (capped at {@code maxMoveSpeed}); acceleration
+ * only changes how far the disc travels per frame, never the geometry of its path.
+ *
+ * <p>Constructor-injected with the tracer and the {@link CombatSystem} (retirement back to the pool).
+ * A caller-supplied {@link DiscEventSink} receives capture-point hits and retirements so scoring/audio
+ * stay decoupled from disc physics. Reuses one {@link GridPathTracer.Ray} and visitor: no allocation.
  */
 public final class DiscSystem {
 
@@ -41,28 +44,25 @@ public final class DiscSystem {
         @Override public void onDiscRetired(Entity disc) { }
     };
 
-    private SpatialCollider collider;
+    private GridPathTracer tracer;
     private final CombatSystem combatSystem;
+    private final GridPathTracer.Ray ray = new GridPathTracer.Ray();
+    private final DiscVisitor visitor = new DiscVisitor();
 
-    public DiscSystem(SpatialCollider collider, CombatSystem combatSystem) {
-        this.collider = collider;
+    public DiscSystem(GridPathTracer tracer, CombatSystem combatSystem) {
+        this.tracer = tracer;
         this.combatSystem = combatSystem;
     }
 
-    /** Rebinds the collider, e.g. when the world regenerates its map between rounds. */
-    public void setCollider(SpatialCollider collider) {
-        this.collider = collider;
+    /** Rebinds the tracer, e.g. when the world regenerates its map between rounds. */
+    public void setTracer(GridPathTracer tracer) {
+        this.tracer = tracer;
     }
 
     /**
-     * Advances and collides every active disc in {@code discs}, retiring spent ones. Reuses the
-     * entity instances; the only allocation is the immutable hit result.
-     *
-     * <p>Iterates from the end so the retirement {@link DiscEventSink} can remove the spent disc from
-     * {@code discs} in place without corrupting the loop: a removal at index {@code i} shifts only the
-     * already-visited tail, leaving lower indices valid. The earlier forward loop that cached
-     * {@code size()} threw {@link IndexOutOfBoundsException} once a block bounce retired a disc and the
-     * sink shrank the list mid-iteration.
+     * Advances and collides every active disc in {@code discs}, retiring spent ones. Iterates from the
+     * end so the retirement {@link DiscEventSink} can remove the spent disc from {@code discs} in place
+     * without corrupting the loop.
      */
     public void update(List<Entity> discs, DiscEventSink sink) {
         for (int i = discs.size() - 1; i >= 0; i--) {
@@ -71,26 +71,97 @@ public final class DiscSystem {
                 continue;
             }
             disc.snapshot();
-            disc.getMovementStrategy().move(disc);
+            integrate(disc, sink);
+        }
+    }
 
-            CollisionResult result = collider.resolve(disc);
-            if (result.collided() && result.tile().isCapturePoint()) {
-                // A hit that captures/levels-up/steals the point consumes the disc; an ineffective
-                // hit (owner on an already-maxed point) returns false so the disc passes through.
-                if (sink.onCapturePointHit(disc, result.tileX(), result.tileY())) {
-                    combatSystem.retire(disc);
-                    sink.onDiscRetired(disc);
-                    continue;
-                }
-            } else if (result.collided() && result.tile() == pl.mzebrows.shoots.spatial.TileType.WALL) {
-                // A wall/block bounce: notify so the renderer can flash the block in the disc colour.
-                sink.onWallHit(disc, result.tileX(), result.tileY());
-            }
+    /** Advances one disc a whole frame along its reflecting path, then accelerates / retires as needed. */
+    private void integrate(Entity disc, DiscEventSink sink) {
+        double frameSpeed = disc.getMoveSpeed();
+        double radians = Math.toRadians(-disc.getAngle());
+        double baseVx = Math.sin(radians);
+        double baseVy = Math.cos(radians);
+        double dx = disc.getDirectionX() * baseVx;
+        double dy = disc.getDirectionY() * baseVy;
 
-            if (combatSystem.isSpent(disc)) {
-                combatSystem.retire(disc);
-                sink.onDiscRetired(disc);
+        int budget = disc.getMaxBounces() - disc.getBounces();
+        if (budget < 0) {
+            budget = 0;
+        }
+
+        ray.set(disc.getX(), disc.getY(), dx, dy);
+        visitor.begin(disc, sink);
+        tracer.walk(ray, frameSpeed, budget, visitor);
+
+        disc.setX(ray.x);
+        disc.setY(ray.y);
+        // Map the (sign-flipped) travel direction back onto the entity's direction multipliers.
+        if (Math.abs(baseVx) > 1e-12) {
+            disc.setDirectionX(sameSign(ray.dirX, baseVx) ? 1 : -1);
+        }
+        if (Math.abs(baseVy) > 1e-12) {
+            disc.setDirectionY(sameSign(ray.dirY, baseVy) ? 1 : -1);
+        }
+
+        int reflections = ray.reflections;
+        if (reflections > 0) {
+            disc.setBounces(disc.getBounces() + reflections);
+            applyAcceleration(disc, frameSpeed, reflections);
+        }
+
+        if (visitor.consumed || combatSystem.isSpent(disc)) {
+            combatSystem.retire(disc);
+            sink.onDiscRetired(disc);
+        }
+    }
+
+    /** Realised speed for next frame after {@code reflections} bounces: speed * gain^n, capped. */
+    private static void applyAcceleration(Entity disc, double frameSpeed, int reflections) {
+        double gain = disc.getSpeedGainPerBounce();
+        if (gain <= 1.0) {
+            return;
+        }
+        double cap = disc.getMaxMoveSpeed();
+        double speed = frameSpeed;
+        for (int r = 0; r < reflections; r++) {
+            speed *= gain;
+            if (cap > 0.0 && speed > cap) {
+                speed = cap;
+                break;
             }
+        }
+        disc.setMoveSpeed(speed);
+    }
+
+    private static boolean sameSign(double a, double b) {
+        return (a >= 0) == (b >= 0);
+    }
+
+    /** Bridges tracer events to the {@link DiscEventSink}, tracking whether a capture consumed the disc. */
+    private final class DiscVisitor implements GridPathTracer.PathVisitor {
+        private Entity disc;
+        private DiscEventSink sink;
+        private boolean consumed;
+
+        void begin(Entity disc, DiscEventSink sink) {
+            this.disc = disc;
+            this.sink = sink;
+            this.consumed = false;
+        }
+
+        @Override
+        public boolean onReflect(double x, double y, int tileX, int tileY) {
+            sink.onWallHit(disc, tileX, tileY);
+            return false; // bounce budget is enforced by the tracer
+        }
+
+        @Override
+        public boolean onCapturePoint(double x, double y, int tileX, int tileY) {
+            boolean hit = sink.onCapturePointHit(disc, tileX, tileY);
+            if (hit) {
+                consumed = true;
+            }
+            return hit; // a consumed hit stops the walk; an ineffective one passes through
         }
     }
 }

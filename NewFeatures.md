@@ -116,3 +116,33 @@
       knob (skills on/off). Loaded via the existing per-key fallback in `GameConfigLoader`. Tests:
       loader reads new keys, falls back per-key when absent.
       **[DONE — `disc.maxPerShot` + `AiConfig` (`ai.scanAngles/scanBudgetPerFrame/skillsEnabled`); scanAngles drives the live build; AI disc caps clamped to config. 202 tests green.]**
+
+## [x] D. Gameplay feel: acceleration, corner glances, power shots
+> Four tightly-related gameplay additions on top of the refactored model. All physics stays
+> deterministic (no RNG/time in disc movement or reflection) so motion remains reproducible for
+> replay / online-prediction. Verified with `./mvnw test` (234 green).
+
+- [x] **D1. Disc acceleration per wall bounce.** Each wall bounce multiplies a disc's realised speed
+      by `disc.bounceSpeedGain`, capped at `moveSpeed * disc.maxSpeedFactor`. Carried on the pooled
+      `Entity` (`speedGainPerBounce`/`maxMoveSpeed`, set at spawn) so `DiscSystem` stays generic.
+      `DiscSystem` now integrates each frame in safe-sized sub-steps (`safeStep = min(moveSpeed,
+      ballCollisionSize)`) so fast/accelerated discs never tunnel through walls; a base-speed disc with
+      no gain sub-steps to exactly one step (legacy behaviour). Tests: `DiscAccelerationTest`.
+- [x] **D2. Corner glance instead of redundant reversal.** `UniformGridCollider` convex-corner case
+      (only the diagonal tile solid) now flips a SINGLE velocity-dominant axis (a ~90° glance) instead
+      of reversing both, eliminating the redundant 180° back-track. Concave/inner corners still reverse.
+      The flip axis is a pure function of the travel angle (`|sin| vs |cos|`, tie -> X), so it is fully
+      deterministic. The predictive laser uses the same `collider.resolve`, so it matches automatically.
+      Tests updated in `UniformGridColliderTest`.
+- [x] **D3. Charged power shot.** Hold the shoot key to fill a charge ring on the base; it auto-fires a
+      power disc when full (a tap still fires a normal disc immediately on press). Power disc = faster
+      (`power.speedFactor`), more bounces (`power.maxBounces`), and `power.captureStrength` capture
+      levels per hit (`CapturePoint.tryCapture(player,strength)`). Charge state + `applyShoot`/`firePower`/
+      `chargeProgress` live in the AWT-free `PlayWorld`; `PlayInput` drives it from the held key.
+      Renderer: a filling/brightening charge ring on the base + a glow on power discs. Config:
+      `PowerShotConfig` (`power.*`). Tests: `PowerShotChargeTest`, `CapturePointStrengthTest`.
+- [x] **D4. AI power shots by difficulty.** New `AiSkills.powerShotTendency` knob (rises up the
+      EASY..VERY_HARD ladder). `PlayerAiController` fires a power shot on "long-range" targets (bounce
+      path >= `ai.powerShotMinBounces`) gated by the tendency; AIs bypass the human charge UX and call
+      `PlayWorld.firePower` directly. Master toggle `ai.powerShotEnabled`. Tests: `AiPowerShotTest`,
+      `AiSkillsFactoryTest`.
