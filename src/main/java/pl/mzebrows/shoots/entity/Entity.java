@@ -46,6 +46,13 @@ public final class Entity {
     /** Whether this is a charged power disc (drives the lighting/glow effect in the renderer). */
     private boolean powered;
 
+    /**
+     * Whether this disc is "parked" on an opponent's base while disrupting them: it holds its position
+     * (no movement/collision) and is consumed only when the disruption ends. This is the attacker's
+     * cost -- the disc is out of play for the whole disruption -- so aggression is self-limiting.
+     */
+    private boolean parked;
+
     private int bounces;
     private int maxBounces;
 
@@ -84,6 +91,7 @@ public final class Entity {
         ownerId = -1;
         captureStrength = 1;
         powered = false;
+        parked = false;
         bounces = 0;
         maxBounces = 0;
         movementStrategy = null;

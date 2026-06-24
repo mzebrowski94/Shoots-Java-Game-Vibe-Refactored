@@ -98,12 +98,22 @@ public final class GameConfigLoader {
 
         var palette = paletteFromProperties(props, defaults.palette());
 
+        var aiToggles = new AiSkillToggles(
+                boolValue(props, "ai.skill.accuracy", defaults.ai().toggles().accuracy()),
+                boolValue(props, "ai.skill.cursorSpeed", defaults.ai().toggles().cursorSpeed()),
+                boolValue(props, "ai.skill.retake", defaults.ai().toggles().retake()),
+                boolValue(props, "ai.skill.defend", defaults.ai().toggles().defend()),
+                boolValue(props, "ai.skill.bouncePath", defaults.ai().toggles().bouncePath()),
+                boolValue(props, "ai.skill.powerShot", defaults.ai().toggles().powerShot()),
+                boolValue(props, "ai.skill.baseAttack", defaults.ai().toggles().baseAttack()));
         var ai = new AiConfig(
                 intValue(props, "ai.scanAngles", defaults.ai().scanAngles()),
                 intValue(props, "ai.scanBudgetPerFrame", defaults.ai().scanBudgetPerFrame()),
                 boolValue(props, "ai.skillsEnabled", defaults.ai().skillsEnabled()),
                 boolValue(props, "ai.powerShotEnabled", defaults.ai().powerShotEnabled()),
-                intValue(props, "ai.powerShotMinBounces", defaults.ai().powerShotMinBounces()));
+                intValue(props, "ai.powerShotMinBounces", defaults.ai().powerShotMinBounces()),
+                boolValue(props, "ai.baseAttackEnabled", defaults.ai().baseAttackEnabled()),
+                aiToggles);
 
         var power = new PowerShotConfig(
                 boolValue(props, "power.enabled", defaults.power().enabled()),
@@ -111,6 +121,11 @@ public final class GameConfigLoader {
                 doubleValue(props, "power.speedFactor", defaults.power().speedFactor()),
                 intValue(props, "power.maxBounces", defaults.power().maxBounces()),
                 intValue(props, "power.captureStrength", defaults.power().captureStrength()));
+
+        var disruption = new DisruptionConfig(
+                boolValue(props, "disruption.enabled", defaults.disruption().enabled()),
+                doubleValue(props, "disruption.durationSeconds", defaults.disruption().durationSeconds()),
+                doubleValue(props, "disruption.graceSeconds", defaults.disruption().graceSeconds()));
 
         var menu = new MenuConfig(
                 intValue(props, "menu.initialPlayers", defaults.menu().initialPlayers()),
@@ -135,7 +150,7 @@ public final class GameConfigLoader {
         return new GameConfig(
                 intValue(props, "playerNumber", defaults.playerNumber()),
                 resolveSeed(props),
-                grid, disc, collision, round, palette, ai, menu, window, power);
+                grid, disc, collision, round, palette, ai, menu, window, power, disruption);
     }
 
     /** Built-in defaults mirroring the legacy hard-coded values. */
@@ -160,10 +175,11 @@ public final class GameConfigLoader {
                         new RgbColor(48, 213, 200),
                         new RgbColor(252, 3, 0),
                         new RgbColor(237, 26, 116)));
-        var ai = new AiConfig(24, 4, true, true, 2);
+        var ai = new AiConfig(24, 4, true, true, 2, true, AiSkillToggles.allEnabled());
         var menu = new MenuConfig(2, 4, 2, 20, 4, 15, 60, 5, 0, 30f, 46, 28, 16);
         var window = new WindowConfig(25, 2, 4);
-        return new GameConfig(2, System.nanoTime(), grid, disc, collision, round, palette, ai, menu, window, power);
+        var disruption = new DisruptionConfig(true, 4.0, 2.0);
+        return new GameConfig(2, System.nanoTime(), grid, disc, collision, round, palette, ai, menu, window, power, disruption);
     }
 
     /** Builds rendering config from already-parsed properties, defaulting any absent key. */

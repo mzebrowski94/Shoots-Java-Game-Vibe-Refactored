@@ -10,6 +10,7 @@ import pl.mzebrows.shoots.render.object.BlockHitRenderer;
 import pl.mzebrows.shoots.render.object.CapturePointRenderer;
 import pl.mzebrows.shoots.render.object.CursorRenderer;
 import pl.mzebrows.shoots.render.object.DiscRenderer;
+import pl.mzebrows.shoots.render.object.DisruptionRenderer;
 import pl.mzebrows.shoots.render.object.LaserRenderer;
 import pl.mzebrows.shoots.render.object.MapObjectRenderer;
 import pl.mzebrows.shoots.render.object.RenderFrame;
@@ -58,6 +59,7 @@ public class GameScreen extends GameCanvas {
                 new BlockHitRenderer(),
                 new CapturePointRenderer(),
                 new BaseRenderer(style),
+                new DisruptionRenderer(),
                 new CursorRenderer(style),
                 new LaserRenderer(),
                 new DiscRenderer(style));

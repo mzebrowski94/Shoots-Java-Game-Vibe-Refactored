@@ -47,7 +47,8 @@ public final class AiPlayers {
         List<PlayerAiController> list = new ArrayList<>(clamped);
         for (int playerId = firstAiSlot; playerId < players; playerId++) {
             // Clamp the AI's disc usage to the configured caps so config remains the authority.
-            AiSkills skills = clampDiscCaps(AiSkillsFactory.create(difficulty, seed, playerId),
+            AiSkills skills = clampDiscCaps(
+                    AiSkillsFactory.create(difficulty, seed, playerId, world.config().ai().toggles()),
                     maxPerPlayer, maxPerShot);
             var targeting = new AiTargeting(world.tracer(), maxBounces);
             var controller = new PlayerAiController(playerId, skills, targeting, scanAngles, seed);
@@ -99,7 +100,8 @@ public final class AiPlayers {
         }
         return new AiSkills(s.accuracy(), s.cursorSpeedFactor(), inFlight, perShot,
                 s.retakeStubbornness(), s.defendTendency(), s.bouncePathPreference(),
-                s.decisionIntervalTicks(), s.volleyCooldownTicks(), s.targetMode(), s.powerShotTendency());
+                s.decisionIntervalTicks(), s.volleyCooldownTicks(), s.targetMode(), s.powerShotTendency(),
+                s.baseAttackTendency());
     }
 }
 

@@ -103,6 +103,19 @@ public final class PlayWorld {
     private final int chargeThresholdTicks;
     private final boolean powerEnabled;
 
+    /**
+     * Per-player base-disruption state. While {@code disruptTicks[p] > 0} the player is disrupted (cannot
+     * shoot, no laser) and a parked attacker disc holds on their base; while {@code graceTicks[p] > 0}
+     * the player is immune to a new disruption (but may shoot). {@code parkedDisc[p]} is the disc held on
+     * player {@code p}'s base for the current disruption, consumed when it ends.
+     */
+    private final int[] disruptTicks;
+    private final int[] graceTicks;
+    private final Entity[] parkedDisc;
+    private final int disruptDurationTicks;
+    private final int graceDurationTicks;
+    private final boolean disruptionEnabled;
+
     /** Base seed for map generation; each round's map uses mix(baseMapSeed, roundIndex). */
     private final long baseMapSeed;
     /** 0-based index of the current round, advanced each resetRound() so each round gets a new map. */
@@ -118,6 +131,9 @@ public final class PlayWorld {
         }
         @Override public void onWallHit(Entity disc, int tileX, int tileY) {
             spawnBlockHit(tileX, tileY, disc.getOwnerId());
+        }
+        @Override public boolean onPlayerBaseHit(Entity disc, int tileX, int tileY) {
+            return tryDisrupt(disc, tileX, tileY);
         }
         @Override public void onDiscRetired(Entity disc) {
             Integer owner = discOwners.remove(disc);
@@ -193,6 +209,16 @@ public final class PlayWorld {
         this.chargeThresholdTicks =
                 Math.max(1, (int) Math.round(config.power().chargeSeconds() * SIMULATION_STEPS_PER_SECOND));
 
+        // Base-disruption state (durations in fixed-timestep ticks, derived from the config seconds).
+        this.disruptTicks = new int[playerCount];
+        this.graceTicks = new int[playerCount];
+        this.parkedDisc = new Entity[playerCount];
+        this.disruptionEnabled = config.disruption().enabled();
+        this.disruptDurationTicks =
+                Math.max(1, (int) Math.round(config.disruption().durationSeconds() * SIMULATION_STEPS_PER_SECOND));
+        this.graceDurationTicks =
+                Math.max(0, (int) Math.round(config.disruption().graceSeconds() * SIMULATION_STEPS_PER_SECOND));
+
         // Build the round-0 map and everything that depends on it (collider, tracer, laser, bases, points).
         buildMap(mapSeedFor(0));
         // DiscSystem advances discs along the analytic tracer; it is rebound on each map regeneration.
@@ -251,6 +277,7 @@ public final class PlayWorld {
     /** Advances all active discs by one fixed step (movement + collision + retire), then refreshes scores. */
     public void step() {
         discSystem.update(discs, sink);
+        advanceDisruptions();
         advanceBlockHits();
         matchFlow.syncCurrentPoints(scoring);
     }
@@ -293,6 +320,10 @@ public final class PlayWorld {
     }
 
     private boolean fireDisc(int playerId, boolean powered) {
+        // A disrupted base cannot shoot at all (the core penalty of the disruption mechanic).
+        if (isDisrupted(playerId)) {
+            return false;
+        }
         BasePlacement base = bases[playerId];
         fireSource.reset();
         fireSource.setX(base.pixelX());
@@ -313,6 +344,14 @@ public final class PlayWorld {
      * The AI does not use this path -- it fires via {@link #fire}/{@link #firePower} directly.
      */
     public void applyShoot(int playerId, boolean shootHeld) {
+        // While disrupted the player cannot shoot or charge; swallow the input and keep the charge clear.
+        if (isDisrupted(playerId)) {
+            chargeTicks[playerId] = 0;
+            chargeConsumed[playerId] = false;
+            charging[playerId] = false;
+            shootHeldPrev[playerId] = shootHeld;
+            return;
+        }
         boolean prev = shootHeldPrev[playerId];
         if (shootHeld && !prev) {
             fire(playerId);
@@ -345,8 +384,40 @@ public final class PlayWorld {
         return p < 0.0 ? 0.0 : Math.min(p, 1.0);
     }
 
-    /** Predicts the laser polyline for {@code playerId} into caller-supplied arrays (no allocation). */
+    /** Whether {@code playerId}'s base is currently disrupted (cannot shoot, no laser). */
+    public boolean isDisrupted(int playerId) {
+        return disruptTicks[playerId] > 0;
+    }
+
+    /** Whether {@code playerId}'s base is currently immune to a new disruption (grace window). */
+    public boolean isImmune(int playerId) {
+        return graceTicks[playerId] > 0;
+    }
+
+    /** Disruption fill for {@code playerId} in {@code [0,1]} (1 = just disrupted, fading to 0), for the renderer. */
+    public double disruptionProgress(int playerId) {
+        if (disruptTicks[playerId] <= 0 || disruptDurationTicks <= 0) {
+            return 0.0;
+        }
+        return Math.min(1.0, (double) disruptTicks[playerId] / disruptDurationTicks);
+    }
+
+    /** Grace fill for {@code playerId} in {@code [0,1]} (1 = just entered grace, fading to 0), for the renderer. */
+    public double graceProgress(int playerId) {
+        if (graceTicks[playerId] <= 0 || graceDurationTicks <= 0) {
+            return 0.0;
+        }
+        return Math.min(1.0, (double) graceTicks[playerId] / graceDurationTicks);
+    }
+
+    /**
+     * Predicts the laser polyline for {@code playerId} into caller-supplied arrays (no allocation).
+     * Returns 0 (no laser) while the player is disrupted, so the aiming guide goes dark with shooting.
+     */
     public int predictLaser(int playerId, int[] xs, int[] ys) {
+        if (isDisrupted(playerId)) {
+            return 0;
+        }
         BasePlacement base = bases[playerId];
         return laserPredictor.predict(base.pixelX(), base.pixelY(),
                 aim[playerId].currentAngle(), config.disc().moveSpeed(), xs, ys);
@@ -358,6 +429,7 @@ public final class PlayWorld {
      * and the round index, then the index is advanced so the next round differs again.
      */
     public void resetRound() {
+        clearDisruptions();
         for (int i = discs.size() - 1; i >= 0; i--) {
             combatSystem.retire(discs.get(i));
         }
@@ -457,6 +529,106 @@ public final class PlayWorld {
                 long key = (((long) effect.tileX()) << 32) ^ (effect.tileY() & 0xFFFFFFFFL);
                 blockHitByTile.remove(key);
                 blockHits.remove(i);
+            }
+        }
+    }
+
+    // -- base disruption ----------------------------------------------------
+
+    /**
+     * Attempts to disrupt the base at ({@code tileX},{@code tileY}) using {@code disc}. Returns whether
+     * the disc should PARK on the base: only when disruption is enabled, the base belongs to a DIFFERENT
+     * player, and that victim is neither already disrupted nor currently immune (grace) nor already
+     * holding a parked disc. On success the victim is silenced for the configured duration and the disc
+     * is recorded as parked so it can be freed when the disruption ends.
+     */
+    private boolean tryDisrupt(Entity disc, int tileX, int tileY) {
+        if (!disruptionEnabled) {
+            return false;
+        }
+        int victim = playerAtBase(tileX, tileY);
+        int attacker = disc.getOwnerId();
+        if (victim < 0 || victim == attacker) {
+            return false; // not a base, or the attacker's own base -> pass through
+        }
+        if (disruptTicks[victim] > 0 || graceTicks[victim] > 0 || parkedDisc[victim] != null) {
+            return false; // already disrupted, immune, or holding a disc -> pass through
+        }
+        disruptTicks[victim] = disruptDurationTicks;
+        parkedDisc[victim] = disc;
+        // Snap the parked disc to the centre of the victim's base so it visibly sits inside it (the
+        // renderer then shakes it in place). prevX/Y too, so interpolation doesn't drift it.
+        BasePlacement vb = bases[victim];
+        disc.setX(vb.pixelX());
+        disc.setY(vb.pixelY());
+        disc.snapshot();
+        log.debug("Player {} disrupted player {}", attacker, victim);
+        return true;
+    }
+
+    /** Owner (attacker) id of the disc parked on {@code victimId}'s base, or -1 if none, for the renderer. */
+    public int parkedDiscOwnerAt(int victimId) {
+        Entity disc = parkedDisc[victimId];
+        if (disc == null) {
+            return -1;
+        }
+        Integer owner = discOwners.get(disc);
+        return owner == null ? -1 : owner;
+    }
+
+    /**
+     * Advances every player's disruption and grace timers one tick. When a disruption ends, its parked
+     * disc is retired (freeing the attacker's disc slot) and the victim enters the grace immunity window.
+     */
+    private void advanceDisruptions() {
+        for (int p = 0; p < playerCount; p++) {
+            if (disruptTicks[p] > 0) {
+                disruptTicks[p]--;
+                if (disruptTicks[p] == 0) {
+                    releaseParkedDisc(p);
+                    graceTicks[p] = graceDurationTicks;
+                }
+            } else if (graceTicks[p] > 0) {
+                graceTicks[p]--;
+            }
+        }
+    }
+
+    /** Retires the disc parked on player {@code p}'s base (if any), returning it to the pool. */
+    private void releaseParkedDisc(int p) {
+        Entity disc = parkedDisc[p];
+        parkedDisc[p] = null;
+        if (disc == null) {
+            return;
+        }
+        disc.setParked(false);
+        combatSystem.retire(disc);
+        Integer owner = discOwners.remove(disc);
+        if (owner != null && owner >= 0 && owner < attack.length) {
+            attack[owner].onDiscRetired();
+        }
+        discs.remove(disc);
+    }
+
+    /** Player id whose base centre is the tile ({@code tileX},{@code tileY}), or -1 if none. */
+    private int playerAtBase(int tileX, int tileY) {
+        for (int p = 0; p < playerCount; p++) {
+            if (bases[p].tileX() == tileX && bases[p].tileY() == tileY) {
+                return p;
+            }
+        }
+        return -1;
+    }
+
+    /** Clears all disruption/grace state and drops parked-disc refs (called on round/match reset). */
+    private void clearDisruptions() {
+        for (int p = 0; p < playerCount; p++) {
+            disruptTicks[p] = 0;
+            graceTicks[p] = 0;
+            // The parked disc is retired with the rest of the discs in resetRound, so just drop the ref.
+            if (parkedDisc[p] != null) {
+                parkedDisc[p].setParked(false);
+                parkedDisc[p] = null;
             }
         }
     }

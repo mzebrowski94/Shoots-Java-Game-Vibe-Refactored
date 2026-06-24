@@ -99,19 +99,19 @@ class AiSkillsFactoryTest {
 
     @Test
     void aiSkillsRejectsOutOfRangeKnob() {
-        assertThatThrownBy(() -> new AiSkills(1.5, 0.5, 1, 1, 0.5, 0.5, 0.5, 10, 10, TargetMode.NEAREST, 0.5))
+        assertThatThrownBy(() -> new AiSkills(1.5, 0.5, 1, 1, 0.5, 0.5, 0.5, 10, 10, TargetMode.NEAREST, 0.5, 0.5))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void aiSkillsRejectsNonPositiveDecisionInterval() {
-        assertThatThrownBy(() -> new AiSkills(0.5, 0.5, 1, 1, 0.5, 0.5, 0.5, 0, 10, TargetMode.NEAREST, 0.5))
+        assertThatThrownBy(() -> new AiSkills(0.5, 0.5, 1, 1, 0.5, 0.5, 0.5, 0, 10, TargetMode.NEAREST, 0.5, 0.5))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void aiSkillsRejectsOutOfRangePowerShotTendency() {
-        assertThatThrownBy(() -> new AiSkills(0.5, 0.5, 1, 1, 0.5, 0.5, 0.5, 10, 10, TargetMode.NEAREST, 1.5))
+        assertThatThrownBy(() -> new AiSkills(0.5, 0.5, 1, 1, 0.5, 0.5, 0.5, 10, 10, TargetMode.NEAREST, 0.5, 1.5))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

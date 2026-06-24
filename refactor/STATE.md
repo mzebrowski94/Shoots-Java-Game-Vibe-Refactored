@@ -187,6 +187,28 @@
   `PlayerAiController` fires `firePower` for targets with bounces ≥ `AiConfig.powerShotMinBounces`,
   gated by tendency; `AiConfig.powerShotEnabled` is the master switch. AI bypasses the human charge UX.
 
+## New-feature gameplay contracts (base disruption + AI aggressiveness)
+- **Base hit detection.** `TileType.PLAYER_BASE` is non-solid (tracer passes through). `GridPathTracer`
+  emits `PathVisitor.onPlayerBase` on base-tile entry (start-tile + mid-walk), mirroring the capture-point
+  event. `DiscSystem.DiscEventSink.onPlayerBaseHit` returns whether the disc should PARK; a parked disc
+  (`Entity.parked`) is never advanced/retired by `DiscSystem` -- its lifecycle is owned by `PlayWorld`.
+- **Disruption state machine (`DisruptionConfig`, `disruption.*`).** `PlayWorld` owns per-player
+  `disruptTicks`/`graceTicks`/`parkedDisc`. `tryDisrupt(disc,tx,ty)` parks the disc + silences the victim
+  iff enabled, victim!=attacker, and victim not already disrupted/immune/holding. While disrupted: `fire`/
+  `firePower` return false, `applyShoot` swallows input, `predictLaser` returns 0 (laser dark). `step()`
+  advances timers; on disruption end the parked disc is retired (frees the attacker's slot) and the victim
+  enters the grace immunity window (can shoot, can't be re-disrupted). `resetRound` clears it. Queries:
+  `isDisrupted`/`isImmune`/`disruptionProgress`/`graceProgress`. Overlay-only renderer `DisruptionRenderer`
+  (registered after `BaseRenderer`) draws an animated glitch on disrupted bases + a shield in grace; base
+  graphics are untouched. Ticks derive from seconds at 120 steps/s.
+- **AI aggressiveness.** `AiSkills.baseAttackTendency` (ladder-scaled). `AiTargeting.reachIncludingBases`
+  also stops at the first opponent-base tile (ignoring the firing disc's own origin base) and flags
+  `Reach.base`. `PlayerAiController` folds base targets into the SAME scan when `AiConfig.baseAttackEnabled`
+  + the knob is on: a reachable disruptable opponent base (bounces < `disc.maxBounces`, not own/immune/
+  disrupted) competes via `scoreBase`; base shots are always normal discs. Per-skill on/off `AiSkillToggles`
+  (in `AiConfig.toggles`, `ai.skill.*`) forces any disabled knob to its inert value; built once per round
+  in `AiSkillsFactory.create(...,toggles)`. Master switch `ai.baseAttackEnabled`.
+
 ## Analytic reflection (speed-independent) — bugfix of disc/laser physics
 - **`spatial.GridPathTracer` is now the single source of reflection geometry.** It casts a disc's ray
   against grid cell faces (DDA traversal) and reflects at the EXACT tile face, so the bounce path is a

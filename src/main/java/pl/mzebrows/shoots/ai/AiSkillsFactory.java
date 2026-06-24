@@ -3,6 +3,8 @@ package pl.mzebrows.shoots.ai;
 
 import java.util.Random;
 
+import pl.mzebrows.shoots.config.AiSkillToggles;
+
 /**
  * Derives a deterministic {@link AiSkills} bundle from {@code (difficulty, seed, playerId)}.
  *
@@ -27,6 +29,8 @@ public final class AiSkillsFactory {
     private static final double BOUNCE_WEAK = 0.10, BOUNCE_STRONG = 0.95;
     // Power-shot usage: weak AIs rarely charge a long-range shot; strong AIs do so often.
     private static final double POWER_WEAK = 0.05, POWER_STRONG = 0.85;
+    // Base-attack aggressiveness: weak AIs rarely bother disrupting bases; strong AIs do so often.
+    private static final double BASE_ATTACK_WEAK = 0.05, BASE_ATTACK_STRONG = 0.80;
 
     // Tick intervals: weak (EASY) is slow/long, strong (VERY_HARD) is fast/short.
     private static final int DECISION_WEAK = 45, DECISION_STRONG = 10;   // ticks between target re-evals
@@ -41,10 +45,40 @@ public final class AiSkillsFactory {
 
     private AiSkillsFactory() { }
 
-    /** Builds the skills for one AI player from the match seed and its player slot. */
+    /** Builds the skills for one AI player from the match seed and its player slot (all skills enabled). */
     public static AiSkills create(AiDifficulty difficulty, long seed, int playerId) {
+        return create(difficulty, seed, playerId, AiSkillToggles.allEnabled());
+    }
+
+    /**
+     * Builds the skills for one AI player, then forces any knob whose per-skill {@code toggles} switch is
+     * off to its inert value -- so an individual behaviour can be disabled from {@code game.properties}
+     * (checked once at round start) without turning off the whole AI.
+     */
+    public static AiSkills create(AiDifficulty difficulty, long seed, int playerId, AiSkillToggles toggles) {
         var rng = new Random(mix(seed, playerId));
-        return difficulty == AiDifficulty.RANDOM ? randomBand(rng) : ladder(difficulty, rng);
+        AiSkills base = difficulty == AiDifficulty.RANDOM ? randomBand(rng) : ladder(difficulty, rng);
+        return applyToggles(base, toggles);
+    }
+
+    /** Zeroes (or floors) the knobs whose toggle is off; an enabled toggle leaves the knob untouched. */
+    private static AiSkills applyToggles(AiSkills s, AiSkillToggles t) {
+        if (t == null) {
+            return s;
+        }
+        return new AiSkills(
+                t.accuracy() ? s.accuracy() : 0.0,
+                t.cursorSpeed() ? s.cursorSpeedFactor() : 0.0,
+                s.maxDiscsInFlight(),
+                s.maxDiscsPerShot(),
+                t.retake() ? s.retakeStubbornness() : 0.0,
+                t.defend() ? s.defendTendency() : 0.0,
+                t.bouncePath() ? s.bouncePathPreference() : 0.0,
+                s.decisionIntervalTicks(),
+                s.volleyCooldownTicks(),
+                s.targetMode(),
+                t.powerShot() ? s.powerShotTendency() : 0.0,
+                t.baseAttack() ? s.baseAttackTendency() : 0.0);
     }
 
     private static AiSkills ladder(AiDifficulty difficulty, Random rng) {
@@ -60,7 +94,8 @@ public final class AiSkillsFactory {
                 lerpInt(DECISION_WEAK, DECISION_STRONG, f),
                 lerpInt(COOLDOWN_WEAK, COOLDOWN_STRONG, f),
                 modeForLadder(f),
-                deviate(lerp(POWER_WEAK, POWER_STRONG, f), rng));
+                deviate(lerp(POWER_WEAK, POWER_STRONG, f), rng),
+                deviate(lerp(BASE_ATTACK_WEAK, BASE_ATTACK_STRONG, f), rng));
     }
 
     private static AiSkills randomBand(Random rng) {
@@ -75,7 +110,8 @@ public final class AiSkillsFactory {
                 DECISION_STRONG + rng.nextInt(DECISION_WEAK - DECISION_STRONG + 1),
                 COOLDOWN_STRONG + rng.nextInt(COOLDOWN_WEAK - COOLDOWN_STRONG + 1),
                 TargetMode.values()[rng.nextInt(TargetMode.values().length)],
-                band(rng, 0.00, 1.00));   // powerShotTendency
+                band(rng, 0.00, 1.00),   // powerShotTendency
+                band(rng, 0.00, 1.00));   // baseAttackTendency
     }
 
     private static TargetMode modeForLadder(double f) {

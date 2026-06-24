@@ -14,9 +14,12 @@ import pl.mzebrows.shoots.spatial.GridPathTracer;
  */
 public final class AiTargeting {
 
-    /** Outcome of walking one candidate angle: which capture-point tile it reaches and after how many bounces. */
-    public record Reach(boolean reached, int tileX, int tileY, int bounces) {
-        static final Reach NONE = new Reach(false, -1, -1, -1);
+    /**
+     * Outcome of walking one candidate angle: which target tile it first reaches (a capture point or a
+     * player base), whether that tile is a player base, and after how many wall bounces it got there.
+     */
+    public record Reach(boolean reached, int tileX, int tileY, int bounces, boolean base) {
+        static final Reach NONE = new Reach(false, -1, -1, -1, false);
     }
 
     private final GridPathTracer tracer;
@@ -42,7 +45,28 @@ public final class AiTargeting {
         reachVisitor.reset();
         tracer.walk(ray, Double.MAX_VALUE, maxBounces, reachVisitor);
         if (reachVisitor.reached) {
-            return new Reach(true, reachVisitor.tileX, reachVisitor.tileY, reachVisitor.bounces);
+            return new Reach(true, reachVisitor.tileX, reachVisitor.tileY, reachVisitor.bounces,
+                    reachVisitor.base);
+        }
+        return Reach.NONE;
+    }
+
+    /**
+     * Like {@link #reach} but also stops at the first PLAYER-BASE tile (used by the aggressive AI to find
+     * disruptable opponent bases). The returned {@link Reach#base()} flag distinguishes a base hit from a
+     * capture-point hit so the controller can score and filter (own base) accordingly.
+     */
+    public Reach reachIncludingBases(double startX, double startY, double angle, double speed) {
+        seedRay(startX, startY, angle);
+        reachVisitor.reset();
+        reachVisitor.includeBases = true;
+        reachVisitor.originTileX = (int) Math.floor(startX / unit);
+        reachVisitor.originTileY = (int) Math.floor(startY / unit);
+        tracer.walk(ray, Double.MAX_VALUE, maxBounces, reachVisitor);
+        reachVisitor.includeBases = false;
+        if (reachVisitor.reached) {
+            return new Reach(true, reachVisitor.tileX, reachVisitor.tileY, reachVisitor.bounces,
+                    reachVisitor.base);
         }
         return Reach.NONE;
     }
@@ -71,12 +95,19 @@ public final class AiTargeting {
         private int tileX;
         private int tileY;
         private int bounces;
+        private boolean base;
+        /** When set, the walk also stops on the first player-base tile, not only capture points. */
+        private boolean includeBases;
+        /** The disc's origin tile (its own base); a base hit there is self-targeting and ignored. */
+        private int originTileX = Integer.MIN_VALUE;
+        private int originTileY = Integer.MIN_VALUE;
 
         void reset() {
             reached = false;
             tileX = -1;
             tileY = -1;
             bounces = -1;
+            base = false;
         }
 
         @Override
@@ -85,6 +116,23 @@ public final class AiTargeting {
             tileX = tx;
             tileY = ty;
             bounces = ray.reflections;
+            base = false;
+            return true;
+        }
+
+        @Override
+        public boolean onPlayerBase(double x, double y, int tx, int ty) {
+            if (!includeBases) {
+                return false; // pass through bases unless base targeting is requested
+            }
+            if (tx == originTileX && ty == originTileY) {
+                return false; // the firing disc's own base -> not a target, keep walking
+            }
+            reached = true;
+            tileX = tx;
+            tileY = ty;
+            bounces = ray.reflections;
+            base = true;
             return true;
         }
     }

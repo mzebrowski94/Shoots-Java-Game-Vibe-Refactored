@@ -25,6 +25,9 @@ public final class GridPathTracer {
 
         /** The ray entered capture-point tile ({@code tileX},{@code tileY}) at ({@code x},{@code y}). */
         default boolean onCapturePoint(double x, double y, int tileX, int tileY) { return false; }
+
+        /** The ray entered player-base tile ({@code tileX},{@code tileY}) at ({@code x},{@code y}). */
+        default boolean onPlayerBase(double x, double y, int tileX, int tileY) { return false; }
     }
 
     /** Reusable ray state: position, unit travel direction, and a running reflection tally. */
@@ -90,6 +93,11 @@ public final class GridPathTracer {
 
         // A disc may start inside a capture tile (e.g. sitting on the point); report it before moving.
         if (grid.tileAt(cx, cy).isCapturePoint() && visitor.onCapturePoint(x, y, cx, cy)) {
+            store(ray, x, y, dx, dy);
+            return;
+        }
+        // Likewise it may start on a player-base tile (e.g. an attacker firing across a base).
+        if (grid.tileAt(cx, cy).isPlayerBase() && visitor.onPlayerBase(x, y, cx, cy)) {
             store(ray, x, y, dx, dy);
             return;
         }
@@ -198,8 +206,14 @@ public final class GridPathTracer {
                     break;
                 }
             }
-            if (entered && grid.tileAt(cx, cy).isCapturePoint() && visitor.onCapturePoint(x, y, cx, cy)) {
-                break;
+            if (entered) {
+                TileType entryTile = grid.tileAt(cx, cy);
+                if (entryTile.isCapturePoint() && visitor.onCapturePoint(x, y, cx, cy)) {
+                    break;
+                }
+                if (entryTile.isPlayerBase() && visitor.onPlayerBase(x, y, cx, cy)) {
+                    break;
+                }
             }
         }
         store(ray, x, y, dx, dy);

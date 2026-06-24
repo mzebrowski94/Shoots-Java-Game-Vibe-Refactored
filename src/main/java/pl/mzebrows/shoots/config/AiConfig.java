@@ -10,9 +10,12 @@ package pl.mzebrows.shoots.config;
  * @param powerShotEnabled    whether AIs may use the charged power shot at all (gated further per skill knob)
  * @param powerShotMinBounces minimum bounce-path length for a target to count as "long range" and be worth a
  *                            power shot (>=0); short/direct shots stay normal
+ * @param baseAttackEnabled   whether AIs may target opponents' bases to disrupt them (gated further per skill knob)
+ * @param toggles             per-skill on/off switches, applied once when the AI skill bundle is built
  */
 public record AiConfig(int scanAngles, int scanBudgetPerFrame, boolean skillsEnabled,
-                       boolean powerShotEnabled, int powerShotMinBounces) {
+                       boolean powerShotEnabled, int powerShotMinBounces,
+                       boolean baseAttackEnabled, AiSkillToggles toggles) {
 
     public AiConfig {
         if (scanAngles < 2) {
@@ -24,6 +27,16 @@ public record AiConfig(int scanAngles, int scanBudgetPerFrame, boolean skillsEna
         if (powerShotMinBounces < 0) {
             throw new IllegalArgumentException("powerShotMinBounces must be >= 0: " + powerShotMinBounces);
         }
+        if (toggles == null) {
+            throw new IllegalArgumentException("toggles must not be null");
+        }
+    }
+
+    /** Back-compatible constructor: base-attack on, all per-skill toggles enabled. */
+    public AiConfig(int scanAngles, int scanBudgetPerFrame, boolean skillsEnabled,
+                    boolean powerShotEnabled, int powerShotMinBounces) {
+        this(scanAngles, scanBudgetPerFrame, skillsEnabled, powerShotEnabled, powerShotMinBounces,
+                true, AiSkillToggles.allEnabled());
     }
 
     /** Back-compatible constructor: power shots enabled for AI, long-range threshold of 2 bounces. */

@@ -44,6 +44,8 @@ public final class PlayerAiController {
     private int targetTileY = -1;
     /** Bounce-path length of the cached target; drives the "long range -> power shot" decision. */
     private int targetBounces = 0;
+    /** Whether the cached target is an opponent base (disruption shot) rather than a capture point. */
+    private boolean targetIsBase = false;
 
     private int decisionCountdown;
     private int cooldownCountdown;
@@ -105,7 +107,13 @@ public final class PlayerAiController {
         int bestTileX = -1;
         int bestTileY = -1;
         int bestBounces = 0;
+        boolean bestIsBase = false;
         boolean found = false;
+
+        // Base targeting (the AI aggressiveness behaviour) folds into the same scan: when enabled, an
+        // angle that reaches a disruptable opponent base becomes a candidate too, scored by the
+        // baseAttackTendency knob. When disabled, bases are passed through and only capture points score.
+        boolean baseAttack = baseAttackEnabled(world);
 
         for (int i = 0; i < scanAngles; i++) {
             double frac = scanAngles == 1 ? 0.5 : (double) i / (scanAngles - 1);
@@ -116,21 +124,41 @@ public final class PlayerAiController {
                 continue;
             }
 
-            var reach = targeting.reach(base.pixelX(), base.pixelY(), angle, speed);
+            var reach = baseAttack
+                    ? targeting.reachIncludingBases(base.pixelX(), base.pixelY(), angle, speed)
+                    : targeting.reach(base.pixelX(), base.pixelY(), angle, speed);
             if (!reach.reached()) {
                 continue;
             }
-            CapturePoint point = world.scoring().at(reach.tileX(), reach.tileY());
-            if (point == null) {
-                continue;
+
+            double score;
+            if (reach.base()) {
+                // Only a DISRUPTABLE opponent base is worth a shot (not our own, not one already immune
+                // or disrupted), and only if the disc can actually COMPLETE the path: a disc is retired
+                // the instant its bounce budget is spent, so a base needing the full budget to reach is
+                // never struck live -- require strictly fewer bounces than the disc's budget.
+                if (reach.bounces() >= world.config().disc().maxBounces()) {
+                    continue;
+                }
+                if (!isDisruptableOpponentBase(world, reach.tileX(), reach.tileY())) {
+                    continue;
+                }
+                score = scoreBase(reach.bounces());
+            } else {
+                CapturePoint point = world.scoring().at(reach.tileX(), reach.tileY());
+                if (point == null) {
+                    continue;
+                }
+                score = scorePoint(point, reach.bounces());
             }
-            double score = scorePoint(point, reach.bounces());
+
             if (score > bestScore) {
                 bestScore = score;
                 bestAngle = angle;
                 bestTileX = reach.tileX();
                 bestTileY = reach.tileY();
                 bestBounces = reach.bounces();
+                bestIsBase = reach.base();
                 found = true;
             }
         }
@@ -143,6 +171,7 @@ public final class PlayerAiController {
             this.targetTileX = bestTileX;
             this.targetTileY = bestTileY;
             this.targetBounces = bestBounces;
+            this.targetIsBase = bestIsBase;
             this.hasTarget = true;
         } else if (!skipsRetainingTarget()) {
             // keep the previous target (stubbornness) if we found nothing new this scan
@@ -182,6 +211,42 @@ public final class PlayerAiController {
         double bouncePenalty = (1.0 - skills.bouncePathPreference()) * bounces;
         score -= bouncePenalty;
         return score;
+    }
+
+    /**
+     * Utility score for disrupting an opponent base. Scales with the AI's {@code baseAttackTendency} so
+     * only aggressive AIs prefer a disruption shot over a capture point; still discounts long paths.
+     */
+    private double scoreBase(int bounces) {
+        double aggression = skills.baseAttackTendency();
+        if (aggression <= 0.0) {
+            return Double.NEGATIVE_INFINITY; // toggle/knob off -> never pick a base
+        }
+        double score = aggression * 14.0; // a worthwhile disruption competes with a good capture point
+        score -= (1.0 - skills.bouncePathPreference()) * bounces;
+        return score;
+    }
+
+    /** Whether base-attack is allowed this match (config master switch + the per-AI tendency knob). */
+    private boolean baseAttackEnabled(PlayWorld world) {
+        return world.config().ai().baseAttackEnabled() && skills.baseAttackTendency() > 0.0;
+    }
+
+    /**
+     * Whether the tile ({@code tileX},{@code tileY}) is an opponent base that can be disrupted right now:
+     * it must belong to a DIFFERENT player and that player must not already be disrupted or immune.
+     */
+    private boolean isDisruptableOpponentBase(PlayWorld world, int tileX, int tileY) {
+        for (int p = 0; p < world.playerCount(); p++) {
+            if (p == playerId) {
+                continue;
+            }
+            var b = world.baseOf(p);
+            if (b.tileX() == tileX && b.tileY() == tileY) {
+                return !world.isDisrupted(p) && !world.isImmune(p);
+            }
+        }
+        return false;
     }
 
     // -- execution ----------------------------------------------------------
@@ -233,6 +298,9 @@ public final class PlayerAiController {
      * so stronger difficulties fire power shots on distant targets more often.
      */
     private boolean wantsPowerShot(PlayWorld world) {
+        if (targetIsBase) {
+            return false; // a disruption shot gains nothing from power capture strength
+        }
         if (!world.config().power().enabled() || !world.config().ai().powerShotEnabled()) {
             return false;
         }

@@ -10,11 +10,9 @@
 > `tools/`; see `tools/AgentWorkflow.md`).
 
 ## [ ] A. Audio (SFX + music)
-> Moved here from `RefactorPlan.md` (was the audio half of the old "Audio & Final Integration"
-> cluster) — sound is a new feature on top of the refactored engine, not part of the migration.
 - [ ] Implement a `SoundManager` with a small `javax.sound.sampled` clip pool so overlapping SFX
       (shots, hits/captures, explosions) don't cut each other off or stutter. Load clips once and
-      reuse; fail soft (log + continue) when a sound asset is missing. Wire SFX triggers into the
+      reuse; fail with log when a sound asset is missing. Wire SFX triggers into the
       existing decoupled event hooks (e.g. `DiscSystem.DiscEventSink` capture-hit / disc-retire) so
       audio stays decoupled from physics and rendering.
 
@@ -146,3 +144,23 @@
       path >= `ai.powerShotMinBounces`) gated by the tendency; AIs bypass the human charge UX and call
       `PlayWorld.firePower` directly. Master toggle `ai.powerShotEnabled`. Tests: `AiPowerShotTest`,
       `AiSkillsFactoryTest`.
+
+
+## [x] E. Base disruption + AI aggressiveness
+> Two coupled additions on top of cluster D: a new gameplay mechanic where hitting an opponent's base
+> silences them, and a new AI behavioural knob driving how often AIs go for it. Verified with
+> `./mvnw test` (257 green). Renderer overlays verified headlessly.
+
+- [x] **E1. Base disruption mechanic.** A disc that enters an opponent's base parks on it
+      (`Entity.parked`, owned by `PlayWorld`, not advanced/retired by `DiscSystem`) and disrupts the
+      victim for `disruption.durationSeconds`: shooting blocked (`fire`/`firePower`/`applyShoot`) and laser
+      off (`predictLaser`->0). When it ends the parked disc is freed (the attacker's slot cost) and the
+      victim gets a `disruption.graceSeconds` immunity window (may shoot, can't be re-disrupted). Detection
+      via `GridPathTracer.PathVisitor.onPlayerBase` + `DiscEventSink.onPlayerBaseHit`. Config
+      `DisruptionConfig` (`disruption.*`). Overlay-only `DisruptionRenderer` (animated glitch on disrupted
+      bases, animated shield in grace; base graphics untouched). Tests: `BaseDisruptionTest`.
+- [x] **E2. AI aggressiveness.** `AiSkills.baseAttackTendency` (ladder-scaled). `PlayerAiController` folds
+      opponent-base targets into its existing scan (`AiTargeting.reachIncludingBases`, own-origin base
+      ignored), gated by the knob + `ai.baseAttackEnabled`. Per-skill on/off `AiSkillToggles`
+      (`ai.skill.*`, checked once at round start) added for EVERY AI skill so any one behaviour can be
+      switched off without disabling the AI. Tests: `AiAggressivenessTest`, `GameConfigLoaderTest`.

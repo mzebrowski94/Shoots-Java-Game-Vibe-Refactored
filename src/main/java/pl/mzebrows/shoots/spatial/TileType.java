@@ -27,4 +27,9 @@ public enum TileType {
     public boolean isCapturePoint() {
         return this == CAPTURE_POINT;
     }
+
+    /** Whether this tile is a player base (a disc may disrupt the seated player on entry). */
+    public boolean isPlayerBase() {
+        return this == PLAYER_BASE;
+    }
 }

@@ -36,6 +36,11 @@ public final class DiscRenderer implements MapObjectRenderer {
             if (!disc.isActive()) {
                 continue;
             }
+            // Parked discs (held on a disrupted opponent base) are drawn by the DisruptionRenderer,
+            // centred in the base with a shake, so skip them here.
+            if (disc.isParked()) {
+                continue;
+            }
             double dx = disc.interpolatedX(alpha);
             double dy = disc.interpolatedY(alpha);
             Color ownerColor = world.playerColor(disc.getOwnerId());

@@ -193,4 +193,51 @@ class GameConfigLoaderTest {
         assertThat(config.ai().powerShotEnabled()).isFalse();
         assertThat(config.ai().powerShotMinBounces()).isEqualTo(5);
     }
+
+    @Test
+    void disruptionDefaultsAndBundledValuesAreLoaded() {
+        var defaults = GameConfigLoader.defaults();
+        assertThat(defaults.disruption().enabled()).isTrue();
+        assertThat(defaults.disruption().durationSeconds()).isGreaterThan(0.0);
+        assertThat(defaults.disruption().graceSeconds()).isGreaterThanOrEqualTo(0.0);
+
+        var bundled = GameConfigLoader.load();
+        assertThat(bundled.disruption().enabled()).isTrue();
+        assertThat(bundled.disruption().durationSeconds()).isGreaterThan(0.0);
+    }
+
+    @Test
+    void disruptionKeysOverrideDefaults() {
+        var props = new Properties();
+        props.setProperty("disruption.enabled", "false");
+        props.setProperty("disruption.durationSeconds", "3.5");
+        props.setProperty("disruption.graceSeconds", "1.5");
+
+        var config = GameConfigLoader.fromProperties(props);
+
+        assertThat(config.disruption().enabled()).isFalse();
+        assertThat(config.disruption().durationSeconds()).isEqualTo(3.5);
+        assertThat(config.disruption().graceSeconds()).isEqualTo(1.5);
+    }
+
+    @Test
+    void baseAttackAndPerSkillTogglesDefaultOnAndOverridePerKey() {
+        var d = GameConfigLoader.defaults();
+        assertThat(d.ai().baseAttackEnabled()).isTrue();
+        assertThat(d.ai().toggles().baseAttack()).isTrue();
+        assertThat(d.ai().toggles().accuracy()).isTrue();
+
+        var props = new Properties();
+        props.setProperty("ai.baseAttackEnabled", "false");
+        props.setProperty("ai.skill.baseAttack", "false");
+        props.setProperty("ai.skill.powerShot", "false");
+
+        var config = GameConfigLoader.fromProperties(props);
+
+        assertThat(config.ai().baseAttackEnabled()).isFalse();
+        assertThat(config.ai().toggles().baseAttack()).isFalse();
+        assertThat(config.ai().toggles().powerShot()).isFalse();
+        assertThat(config.ai().toggles().accuracy()).isTrue();
+        assertThat(config.ai().toggles().defend()).isTrue();
+    }
 }

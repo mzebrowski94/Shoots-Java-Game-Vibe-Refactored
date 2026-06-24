@@ -34,6 +34,14 @@ public final class DiscSystem {
         /** A disc bounced off a solid wall/block tile at the given indices (for the hit-flash effect). */
         default void onWallHit(Entity disc, int tileX, int tileY) { }
 
+        /**
+         * A disc entered a player-base tile at the given indices.
+         * @return {@code true} if the disc should PARK on the base (it disrupted a non-immune opponent and
+         *         holds there until the disruption ends); {@code false} to pass through (own base, an
+         *         immune base, or disruption disabled).
+         */
+        default boolean onPlayerBaseHit(Entity disc, int tileX, int tileY) { return false; }
+
         /** A disc exhausted its bounce budget and was returned to the pool. */
         void onDiscRetired(Entity disc);
     }
@@ -68,6 +76,11 @@ public final class DiscSystem {
         for (int i = discs.size() - 1; i >= 0; i--) {
             Entity disc = discs.get(i);
             if (!disc.isActive()) {
+                continue;
+            }
+            // A parked disc is held on an opponent's base disrupting them; its lifecycle (and eventual
+            // retirement when the disruption ends) is owned by the caller, so we never advance it.
+            if (disc.isParked()) {
                 continue;
             }
             disc.snapshot();
@@ -109,6 +122,13 @@ public final class DiscSystem {
             applyAcceleration(disc, frameSpeed, reflections);
         }
 
+        // A disc that just parked on an opponent's base holds there (no retirement); the caller frees it
+        // when the disruption ends. It must not also be retired as "spent" this frame.
+        if (visitor.parked) {
+            disc.setParked(true);
+            return;
+        }
+
         if (visitor.consumed || combatSystem.isSpent(disc)) {
             combatSystem.retire(disc);
             sink.onDiscRetired(disc);
@@ -142,11 +162,13 @@ public final class DiscSystem {
         private Entity disc;
         private DiscEventSink sink;
         private boolean consumed;
+        private boolean parked;
 
         void begin(Entity disc, DiscEventSink sink) {
             this.disc = disc;
             this.sink = sink;
             this.consumed = false;
+            this.parked = false;
         }
 
         @Override
@@ -162,6 +184,15 @@ public final class DiscSystem {
                 consumed = true;
             }
             return hit; // a consumed hit stops the walk; an ineffective one passes through
+        }
+
+        @Override
+        public boolean onPlayerBase(double x, double y, int tileX, int tileY) {
+            boolean park = sink.onPlayerBaseHit(disc, tileX, tileY);
+            if (park) {
+                parked = true; // the disc holds on the base; the caller owns its lifecycle from here
+            }
+            return park; // a parking hit stops the walk; otherwise the disc passes through the base tile
         }
     }
 }

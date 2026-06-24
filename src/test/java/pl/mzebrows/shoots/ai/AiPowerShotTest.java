@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import pl.mzebrows.shoots.config.AiConfig;
+import pl.mzebrows.shoots.config.AiSkillToggles;
 import pl.mzebrows.shoots.config.CollisionConfig;
 import pl.mzebrows.shoots.config.ColorPalette;
 import pl.mzebrows.shoots.config.DiscConfig;
@@ -62,7 +63,7 @@ class AiPowerShotTest {
     @Test
     void strongAiFiresPowerShotsWhenAllowed() {
         // Power enabled, no minimum range gate, so any of the strong AI's shots may roll a power disc.
-        var world = new PlayWorld(config(new AiConfig(24, 4, true, true, 0)), SEED);
+        var world = new PlayWorld(config(new AiConfig(24, 4, true, true, 0, false, AiSkillToggles.allEnabled())), SEED);
         var ai = controller(world, 0, AiDifficulty.VERY_HARD);
 
         assertThat(firesPowerDiscWithin(world, ai, 3000)).isTrue();
@@ -71,7 +72,7 @@ class AiPowerShotTest {
     @Test
     void aiNeverFiresPowerShotsWhenDisabled() {
         // Same strong AI, but the AI power shot is switched off in config -> only normal discs.
-        var world = new PlayWorld(config(new AiConfig(24, 4, true, false, 0)), SEED);
+        var world = new PlayWorld(config(new AiConfig(24, 4, true, false, 0, false, AiSkillToggles.allEnabled())), SEED);
         var ai = controller(world, 0, AiDifficulty.VERY_HARD);
 
         assertThat(firesPowerDiscWithin(world, ai, 3000)).isFalse();
