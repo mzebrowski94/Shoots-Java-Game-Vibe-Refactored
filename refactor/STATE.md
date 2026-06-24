@@ -6,12 +6,15 @@
 
 ## Package Map
 - Root: `pl.mzebrows.shoots`. Entry point `pl.mzebrows.shoots.ProjectShoots` (package root).
-- `...config` — immutable config records + loader (c1). Resources: `game.properties`, `fonts/`, `images/`.
+- `...config` — immutable config records + loader (c1). Resources: `game.properties` (logic) +
+  `graphic.properties` (rendering/UI/colours), `fonts/`, `images/`. Gameplay aggregate `GameConfig`;
+  rendering aggregate `GraphicsConfig` (`MenuTheme` + `ObjectStyle`).
 - `...input` — `GameAction` enum + `InputBridge` (c2).
 - `...state` — `GameState`, `GameStateMachine`, `PlayingState`, `PausedState`, `GameOverState` (c2);
   `PlayingState` now drives `world.PlayWorld` (c8).
 - `...loop` — `FixedTimestep` (c3). `...render` — `Renderer`/`AwtRenderer`/`ImageCache` (c3); render now reads
-  `PlayWorld` (c10): `render(RoundEnum, alpha, PlayWorld)`.
+  `PlayWorld` (c10): `render(RoundEnum, alpha, PlayWorld)`. `...render.object` — `MapObjectRenderer` +
+  `RenderFrame` + per-object renderers (objects refactor).
 - `...entity` — `Entity`, `EntityType`, `MovementStrategy`/`AttackStrategy`/`AiStrategy`, `EntitySpawner`,
   `BounceMovementStrategy` (c4); `AimController`, `DiscAttackStrategy`, `LaserPredictor` (c6).
 - `...pool` — `ObjectPool<T>` (c4). `...system` — `MovementSystem`, `CombatSystem` (c4); `DiscSystem` (c6).
@@ -19,7 +22,8 @@
 - `...score` — `CapturePoint`, `CaptureScoring`, `PlayerScore`, `MatchScorer` (c7).
 - `...world` — `PlayWorld` facade + `PlayInput` adapter (c8); `MatchFlow` round/match scorer (c9); `BlockHitEffect` (c12).
 - `...ui` (c14) — AWT shell: `GameFrame`, `GameCanvas`, `GameCounter`, `GamePointer`, `GameScreen`, `GameMenu`,
-  + UI enums/palette `MenuEnum`/`RoundEnum`/`GameDimensions`/`ColorScheme`.
+  + UI enums/palette `MenuEnum`/`RoundEnum`/`GameDimensions`/`ColorScheme`. `GameScreen` is now a thin
+  orchestrator over `render.object`; `ColorScheme` is derived from the config `ColorPalette`.
 - `...app` (c14) — lifecycle/loop/state: `GameLoop`, `GameSettings`, `Round`.
 - `...ai` (C1-C2) — `AiDifficulty`, `TargetMode`, `AiSkills` + `AiSkillsFactory` (seed-derived skills);
   `AiTargeting` (bounce-path reach walk) + `PlayerAiController` (utility targeting, drives applyInput/fire)
@@ -105,6 +109,14 @@
   capture points (`scoring().points()`), discs (`discs()`, interpolated ring), lasers (`predictLaser`,
   reused arrays). `GamePointer`/`GameMenu` read `matchFlow().scoreOf(p)` + `playerColor(p)` (no legacy
   fallback). Helpers: `config()`/`unit()`/`playerColor`. Convention: tile[i][j] -> pixel (i*unit, j*unit).
+- **Map-object rendering = `render.object` layer (objects refactor).** `GameScreen` owns an ordered
+  `List<MapObjectRenderer>` (`Wall`/`BlockHit`/`CapturePoint`/`Base`/`Cursor`/`Laser`/`DiscRenderer`) driven
+  once per frame over `PlayWorld` via a shared `RenderFrame` (alpha + dash/rotation phases). Each object's
+  look lives in ONE renderer; adding a new map object = new `MapObjectRenderer` + register it (OCP). Renderers
+  are read-only AWT views (no simulation), so the fixed-timestep/seeded-RNG determinism is unchanged. Visual
+  tunables come from `GraphicsConfig` (`graphic.properties`): `ObjectStyle` (base rings, disc core, cursor,
+  charge glow) + `MenuTheme` (menu chrome); `ColorScheme` derives from `ColorPalette` (no hard-coded UI
+  colours). `GameSettings` owns `GraphicsConfig`; `GameConfigLoader.load()` merges both property files.
 
 ## Open Decisions / Backlog
 - **DONE c1-c17.** Full migration + cleanup complete. Live game runs entirely on the

@@ -35,10 +35,11 @@ contracts instead of redesigning them.
 
 Root package `pl.mzebrows.shoots`. High-level layout:
 
-- `config` — immutable config records + `GameConfigLoader` (loads `game.properties`).
+- `config` — immutable config records + `GameConfigLoader` (loads `game.properties` + `graphic.properties`).
 - `input` — `GameAction` enum + `InputBridge` (EDT writes, loop reads via `poll()`).
 - `state` — `GameStateMachine` + `PlayingState`/`PausedState`/`GameOverState`.
-- `loop` / `render` — `FixedTimestep`; `Renderer`/`AwtRenderer`/`ImageCache`.
+- `loop` / `render` — `FixedTimestep`; `Renderer`/`AwtRenderer`/`ImageCache`. `render.object` —
+  per-map-object renderers (`MapObjectRenderer`) driven by `GameScreen`; add a renderer to add a map object.
 - `entity` — pooled `Entity` + Strategy interfaces (`MovementStrategy`/`AttackStrategy`/
   `AiStrategy`), `AimController`, `DiscAttackStrategy`, `LaserPredictor`.
 - `pool` — `ObjectPool<T>` (array-backed, `reset()` on release).
@@ -77,8 +78,8 @@ Root package `pl.mzebrows.shoots`. High-level layout:
 - Collision via spatial partition behind `SpatialCollider` (uniform grid) — no O(N²) scans.
 
 **Clean code**
-- `var` only where the type is obvious. Externalize tunables into config records /
-  `game.properties` — **no magic numbers** in game logic.
+- `var` only where the type is obvious. Externalize tunables into config records / `game.properties`
+  (logic) or `graphic.properties` (rendering) — **no magic numbers** in game logic or rendering.
 - One-line Javadoc on public classes/methods; minimal inline comments — code explains itself.
   No `@author` tags.
 - Tests: JUnit 5 + AssertJ + Mockito for key logic (targeting, scoring, determinism).

@@ -14,13 +14,40 @@ public final class GameConfigLoader {
 
     private static final Logger log = LoggerFactory.getLogger(GameConfigLoader.class);
     private static final String DEFAULT_RESOURCE = "game.properties";
+    private static final String GRAPHICS_RESOURCE = "graphic.properties";
 
     private GameConfigLoader() {
     }
 
-    /** Loads from the default classpath resource ({@code game.properties}). */
+    /** Loads gameplay config from the bundled resources ({@code game.properties} + {@code graphic.properties}). */
     public static GameConfig load() {
-        return load(DEFAULT_RESOURCE);
+        return fromProperties(bundledProperties());
+    }
+
+    /** Loads rendering config from the bundled resources, defaulting any absent key. */
+    public static GraphicsConfig loadGraphics() {
+        return graphicsFromProperties(bundledProperties());
+    }
+
+    /** Reads both bundled resources into one Properties (graphic over game); absent keys just stay absent. */
+    private static Properties bundledProperties() {
+        var props = new Properties();
+        readInto(props, DEFAULT_RESOURCE);
+        readInto(props, GRAPHICS_RESOURCE);
+        return props;
+    }
+
+    private static void readInto(Properties props, String resourceName) {
+        try (InputStream in = Thread.currentThread().getContextClassLoader().getResourceAsStream(resourceName)) {
+            if (in == null) {
+                log.warn("Config resource '{}' not found on classpath; using built-in defaults for its keys", resourceName);
+                return;
+            }
+            props.load(in);
+            log.debug("Loaded configuration from '{}'", resourceName);
+        } catch (IOException | RuntimeException e) {
+            log.error("Failed to read config resource '{}'; using built-in defaults for its keys", resourceName, e);
+        }
     }
 
     /** Loads from {@code resourceName}; returns {@link #defaults()} if missing or unreadable. */
@@ -137,6 +164,49 @@ public final class GameConfigLoader {
         var menu = new MenuConfig(2, 4, 2, 20, 4, 15, 60, 5, 0, 30f, 46, 28, 16);
         var window = new WindowConfig(25, 2, 4);
         return new GameConfig(2, System.nanoTime(), grid, disc, collision, round, palette, ai, menu, window, power);
+    }
+
+    /** Builds rendering config from already-parsed properties, defaulting any absent key. */
+    public static GraphicsConfig graphicsFromProperties(Properties props) {
+        var d = graphicsDefaults();
+        var menu = new MenuTheme(
+                colorValue(props, "menu.theme.label", d.menu().label()),
+                colorValue(props, "menu.theme.sublabel", d.menu().sublabel()),
+                colorValue(props, "menu.theme.value", d.menu().value()),
+                colorValue(props, "menu.theme.separator", d.menu().separator()),
+                colorValue(props, "menu.theme.panelFill", d.menu().panelFill()),
+                colorValue(props, "menu.theme.panelBorder", d.menu().panelBorder()),
+                colorValue(props, "menu.theme.panelGlow", d.menu().panelGlow()),
+                colorValue(props, "menu.theme.highlightFill", d.menu().highlightFill()),
+                colorValue(props, "menu.theme.highlightBorder", d.menu().highlightBorder()),
+                colorValue(props, "menu.theme.shadow", d.menu().shadow()),
+                intValue(props, "menu.theme.panelArc", d.menu().panelArc()));
+        var objects = new ObjectStyle(
+                intValue(props, "object.base.ringBig", d.objects().baseRingBig()),
+                intValue(props, "object.base.ringSmall", d.objects().baseRingSmall()),
+                intValue(props, "object.disc.coreRadius", d.objects().discCoreRadius()),
+                doubleValue(props, "object.cursor.sizeFactor", d.objects().cursorSizeFactor()),
+                doubleValue(props, "object.cursor.standoffFactor", d.objects().cursorStandoffFactor()),
+                doubleValue(props, "object.charge.glowThreshold", d.objects().chargeGlowThreshold()));
+        return new GraphicsConfig(menu, objects);
+    }
+
+    /** Built-in rendering defaults mirroring the legacy hard-coded visuals. */
+    public static GraphicsConfig graphicsDefaults() {
+        var menu = new MenuTheme(
+                new RgbColor(200, 160, 255),
+                new RgbColor(160, 200, 220),
+                new RgbColor(170, 130, 220),
+                new RgbColor(255, 200, 80, 200),
+                new RgbColor(20, 15, 40, 185),
+                new RgbColor(130, 60, 180, 120),
+                new RgbColor(160, 80, 220, 45),
+                new RgbColor(200, 160, 255, 55),
+                new RgbColor(200, 140, 255, 90),
+                new RgbColor(0, 0, 0, 160),
+                28);
+        var objects = new ObjectStyle(25, 15, 3, 0.5, 2.0, 0.8);
+        return new GraphicsConfig(menu, objects);
     }
 
     private static ColorPalette paletteFromProperties(Properties props, ColorPalette defaults) {

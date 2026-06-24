@@ -27,6 +27,19 @@ public class GameMenu {
     private final GameSettings gameSettings;
     private final MenuConfig menuConfig;
     private final Font menuFont;
+
+    // Menu chrome colours + corner radius, sourced from the rendering config (graphic.properties).
+    private final Color menuLabelColor;
+    private final Color menuSublabelColor;
+    private final Color menuValueColor;
+    private final Color menuSeparatorColor;
+    private final Color menuPanelFill;
+    private final Color menuPanelBorder;
+    private final Color menuPanelGlow;
+    private final Color menuHighlightFill;
+    private final Color menuHighlightBorder;
+    private final Color menuShadow;
+    private final int panelArc;
     int iterator = WIN_PULSE_MIN;
     boolean textBrighter = true;
     Color winTextColor;
@@ -67,6 +80,18 @@ public class GameMenu {
         this.menuOption = MenuEnum.START_NEW_GAME;
         this.gameSettings = gameSettings;
         this.menuConfig = gameSettings.getConfig().menu();
+        var theme = gameSettings.getGraphics().menu();
+        this.menuLabelColor = theme.label().toAwt();
+        this.menuSublabelColor = theme.sublabel().toAwt();
+        this.menuValueColor = theme.value().toAwt();
+        this.menuSeparatorColor = theme.separator().toAwt();
+        this.menuPanelFill = theme.panelFill().toAwt();
+        this.menuPanelBorder = theme.panelBorder().toAwt();
+        this.menuPanelGlow = theme.panelGlow().toAwt();
+        this.menuHighlightFill = theme.highlightFill().toAwt();
+        this.menuHighlightBorder = theme.highlightBorder().toAwt();
+        this.menuShadow = theme.shadow().toAwt();
+        this.panelArc = theme.panelArc();
         this.width = gameSettings.getDefaultWidth();
         this.height = gameSettings.getDefaultHeight();
         this.nextLine = menuConfig.rowSpacing();
@@ -114,12 +139,10 @@ public class GameMenu {
         // Subtle highlight bar behind the currently selected row, for clear focus.
         drawSelectionHighlight(g2d);
 
-        // Bright lavender for action labels -- much more readable on the dark backdrop.
-        Color label = new Color(200, 160, 255);
-        // Softer teal-white for section sub-labels.
-        Color sublabel = new Color(160, 200, 220);
-        // Muted lavender for non-interactive value rows (overdrawn green/yellow when selected).
-        Color valueIdle = new Color(170, 130, 220);
+        // Theme colours (from graphic.properties): action labels, section sub-labels, idle value rows.
+        Color label = menuLabelColor;
+        Color sublabel = menuSublabelColor;
+        Color valueIdle = menuValueColor;
 
         shadowStringCentered(g2d, stringNewGame, rowY(ROW_NEW_GAME), label);
         shadowStringCentered(g2d, stringPlayerNumberText, rowY(ROW_PLAYER_LABEL), sublabel);
@@ -129,7 +152,7 @@ public class GameMenu {
         shadowStringCentered(g2d, stringRoundTimeText, rowY(ROW_ROUND_TIME_LABEL), sublabel);
         shadowStringCentered(g2d, stringRoundTime, rowY(ROW_ROUND_TIME_VALUE), valueIdle);
         // AI section separator -- draws attention so players don't miss these options.
-        shadowStringCentered(g2d, "--- AI Settings ---", rowY(ROW_AI_SEPARATOR), new Color(255, 200, 80, 200));
+        shadowStringCentered(g2d, "--- AI Settings ---", rowY(ROW_AI_SEPARATOR), menuSeparatorColor);
         shadowStringCentered(g2d, stringAiNumberText, rowY(ROW_AI_NUMBER_LABEL), sublabel);
         shadowStringCentered(g2d, stringAiNumber, rowY(ROW_AI_NUMBER_VALUE), valueIdle);
         shadowStringCentered(g2d, stringAiDifficultyText, rowY(ROW_AI_DIFFICULTY_LABEL), sublabel);
@@ -233,9 +256,6 @@ public class GameMenu {
     private static final int PANEL_TOP_ROWS = 2;
     /** Extra padding (px) below the last row before the backdrop bottom edge. */
     private static final int PANEL_BOTTOM_PAD = 24;
-    /** Backdrop corner radius (px). */
-    private static final int PANEL_ARC = 28;
-
     /** Widest menu row (measured) plus padding on both sides -- the base panel width. */
     private int menuRowsWidth(Graphics2D g2d) {
         FontMetrics fm = g2d.getFontMetrics(menuFont);
@@ -308,19 +328,19 @@ public class GameMenu {
         int w = panelWidth(g2d);
         int h = panelHeight();
         // Dark navy tint -- lighter than pure black so text colours pop against it.
-        g2d.setColor(new Color(20, 15, 40, 185));
-        g2d.fillRoundRect(x, top, w, h, PANEL_ARC, PANEL_ARC);
+        g2d.setColor(menuPanelFill);
+        g2d.fillRoundRect(x, top, w, h, panelArc, panelArc);
         // Subtle violet border to tie into the game's purple palette.
-        g2d.setColor(new Color(130, 60, 180, 120));
-        g2d.drawRoundRect(x, top, w, h, PANEL_ARC, PANEL_ARC);
+        g2d.setColor(menuPanelBorder);
+        g2d.drawRoundRect(x, top, w, h, panelArc, panelArc);
         // Inner border glow for depth.
-        g2d.setColor(new Color(160, 80, 220, 45));
-        g2d.drawRoundRect(x + 2, top + 2, w - 4, h - 4, PANEL_ARC - 2, PANEL_ARC - 2);
+        g2d.setColor(menuPanelGlow);
+        g2d.drawRoundRect(x + 2, top + 2, w - 4, h - 4, panelArc - 2, panelArc - 2);
     }
 
     /** Draws a soft drop shadow then the coloured text; never changes the requested text colour. */
     private void shadowString(Graphics2D g2d, String text, int x, int y, Color color) {
-        g2d.setColor(new Color(0, 0, 0, 160));
+        g2d.setColor(menuShadow);
         g2d.drawString(text, x + 2, y + 2);
         g2d.setColor(color);
         g2d.drawString(text, x, y);
@@ -346,10 +366,10 @@ public class GameMenu {
         int barY = y - fm.getAscent() - 2;
         int barH = fm.getHeight() + 8;
         // Brighter highlight so the selected row is unmistakably visible.
-        g2d.setColor(new Color(200, 160, 255, 55));
+        g2d.setColor(menuHighlightFill);
         g2d.fillRoundRect(barX, barY, barW, barH, 12, 12);
         // Thin violet rim around the highlight.
-        g2d.setColor(new Color(200, 140, 255, 90));
+        g2d.setColor(menuHighlightBorder);
         g2d.drawRoundRect(barX, barY, barW, barH, 12, 12);
     }
 

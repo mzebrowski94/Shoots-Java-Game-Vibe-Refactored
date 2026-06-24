@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import pl.mzebrows.shoots.ai.AiDifficulty;
 import pl.mzebrows.shoots.config.GameConfig;
 import pl.mzebrows.shoots.config.GameConfigLoader;
+import pl.mzebrows.shoots.config.GraphicsConfig;
 import pl.mzebrows.shoots.input.InputBridge;
 import pl.mzebrows.shoots.ui.ColorScheme;
 import pl.mzebrows.shoots.ui.GameScreen;
@@ -39,6 +40,10 @@ public class GameSettings {
     /** The loaded game configuration backing every default below; the single source of truth. */
     @Setter(AccessLevel.NONE)
     private final GameConfig config;
+
+    /** The loaded rendering configuration (menu chrome + map-object styling) from {@code graphic.properties}. */
+    @Setter(AccessLevel.NONE)
+    private final GraphicsConfig graphics;
 
     private int playerNumber;
     /**
@@ -96,6 +101,7 @@ public class GameSettings {
      */
     public GameSettings(GameConfig config) {
         this.config = config;
+        this.graphics = GameConfigLoader.loadGraphics();
 
         var grid = config.grid();
         var window = config.window();
@@ -114,7 +120,7 @@ public class GameSettings {
         this.roundLimit = config.round().roundLimit();
         this.roundEndDelay = config.round().roundEndDelay();
         this.animationTime = config.round().animationTime();
-        this.colorScheme = new ColorScheme();
+        this.colorScheme = new ColorScheme(config.palette());
         this.playerKeyboardAvailable = true;
         this.actualRoundNumber = 0;
         this.roundList = new ArrayList<>();
