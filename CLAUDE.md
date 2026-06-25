@@ -106,6 +106,7 @@ every failure mode lives in `tools/AgentWorkflow.md` (owner). The essentials:
 - `GameRules.md` — game mechanics & UI. **Read before touching game logic.**
 - `refactor/STATE.md` — authoritative architecture map + established contracts.
 - `NewFeatures.md` — current feature backlog (work top-to-bottom, cluster by cluster).
+- `OnlineMode.md` — online multiplayer design (host-authoritative deterministic lockstep) + staged backlog.
 - `tools/AgentWorkflow.md` — build/sandbox workflow & every known failure mode.
 - `tools/OpenRewritePlan.md` — OpenRewrite codemod plan for AI-readiness (dormant in `pom.xml`).
 - `refactor/RefactorPrompt.md` — original refactor brief (historical; conventions distilled above).
@@ -119,5 +120,6 @@ Each topic has ONE authoritative home — read it there, don't trust a copy else
 - **Conventions for new-feature work** → this file (`CLAUDE.md`)
 - **Game mechanics & UI** → `GameRules.md`
 - **Feature backlog** → `NewFeatures.md`
+- **Online multiplayer design + protocol** → `OnlineMode.md`
 - **Codemods / OpenRewrite** → `tools/OpenRewritePlan.md`
 - *Historical (do not follow as live guidance):* `refactor/RefactorPlan.md`, `refactor/RefactorPrompt.md`, `notes/`

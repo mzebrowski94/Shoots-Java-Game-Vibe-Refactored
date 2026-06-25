@@ -15,19 +15,25 @@ import pl.mzebrows.shoots.ui.RoundEnum;
 import pl.mzebrows.shoots.input.GameAction;
 import pl.mzebrows.shoots.input.InputBridge;
 import pl.mzebrows.shoots.ai.AiPlayers;
+import pl.mzebrows.shoots.net.GameMode;
+import pl.mzebrows.shoots.net.OnlineSession;
+import pl.mzebrows.shoots.net.RoundFlow;
 import pl.mzebrows.shoots.world.PlayInput;
 import pl.mzebrows.shoots.world.PlayWorld;
 
 /**
- * Active gameplay state: manages the ROUND_BEGIN → ROUND_CONTINUES → ROUND_ENDS cycle.
+ * Active gameplay state: manages the ROUND_BEGIN -> ROUND_CONTINUES -> ROUND_ENDS cycle.
  * Transitions out to {@link PausedState} on {@link GameAction#PAUSE} or to
  * {@link GameOverState} when the match ends.
+ *
+ * <p>Phase ownership is delegated to a {@link RoundFlow}: OFFLINE (the default) decides every transition
+ * locally exactly as before; HOST decides locally AND broadcasts each transition; CLIENT follows the
+ * host's broadcast transitions instead of its own render-coupled timers (see {@code OnlineMode.md}, F2).
+ * The local transition CONDITIONS are unchanged -- only who may act on them differs by mode.
  */
 public final class PlayingState implements GameState {
 
     private static final Logger log = LoggerFactory.getLogger(PlayingState.class);
-
-    private enum Phase { BEGIN, CONTINUES, ENDS }
 
     private final GameSettings settings;
     private final GameScreen screen;
@@ -39,15 +45,30 @@ public final class PlayingState implements GameState {
     /** Computer-controlled players occupying the highest slots (empty when all-human). */
     private AiPlayers aiPlayers = AiPlayers.none();
 
+    /** Non-null in online mode: drives the match from the network instead of local hotseat input. */
+    private OnlineSession online;
+
+    /** Owns the BEGIN/CONTINUES/ENDS phase; mode-aware (OFFLINE by default, or HOST/CLIENT for online). */
+    private final RoundFlow flow;
+
     private GameState pausedState;
     private GameState gameOverState;
 
-    private Phase phase = Phase.BEGIN;
     private boolean phaseJustEntered = true;
     private boolean requestNextPhase = false;
 
-    // Tracks elapsed time for 1-second round ticks
-    private long lastSecondNano = System.nanoTime();
+    /**
+     * Simulation step rate; mirrors {@code GameLoop.UPDATES_PER_SECOND} (and {@code PlayWorld}'s step
+     * rate). The round clock is counted in SIM STEPS, not wall-clock, so it advances identically on
+     * every machine -- the determinism prerequisite for online lockstep (see {@code OnlineMode.md}, F0).
+     */
+    private static final int STEPS_PER_ROUND_SECOND = 120;
+
+    // Simulation steps elapsed within the current round-second (tick-based, replaces a wall-clock timer).
+    private int stepsSinceRoundSecond = 0;
+
+    // Monotonic sim-frame counter used to stamp host-broadcast control events (advances during play).
+    private long flowFrame = 0;
 
     private boolean restartRequested = false;
 
@@ -55,13 +76,19 @@ public final class PlayingState implements GameState {
         this(settings, frame, new PlayWorld(GameConfigLoader.load()));
     }
 
-    /** Constructor allowing a pre-built {@link PlayWorld} (used by tests with a seeded map). */
+    /** Constructor allowing a pre-built {@link PlayWorld} (used by tests with a seeded map); OFFLINE flow. */
     public PlayingState(GameSettings settings, GameFrame frame, PlayWorld world) {
+        this(settings, frame, world, RoundFlow.offline());
+    }
+
+    /** Full constructor: a pre-built world and a {@link RoundFlow} (OFFLINE / HOST / CLIENT). */
+    public PlayingState(GameSettings settings, GameFrame frame, PlayWorld world, RoundFlow flow) {
         this.settings = settings;
         this.screen  = frame.getGameScreen();
         this.counter = frame.getGameCounter();
         this.pointer = frame.getGamePointer();
         this.world   = world;
+        this.flow    = flow;
     }
 
     /** The headless simulation backing this state, exposed for rendering and tests. */
@@ -75,20 +102,23 @@ public final class PlayingState implements GameState {
     /** Must be called after construction to complete the object graph. */
     public void setGameOverState(GameState gameOverState) { this.gameOverState = gameOverState; }
 
+    /** Puts this state into online mode (host/client); {@code null} keeps offline/hotseat play. */
+    public void setOnlineSession(OnlineSession online) { this.online = online; }
+
     /**
      * Requests that the next BEGIN phase restarts the full match instead of starting a new round.
      * Also resets the internal phase so we always start from BEGIN.
      */
     public void requestRestart() {
         restartRequested = true;
-        phase = Phase.BEGIN;
+        flow.reset();
         phaseJustEntered = true;
         requestNextPhase = false;
     }
 
     @Override
     public void enter() {
-        lastSecondNano = System.nanoTime();
+        stepsSinceRoundSecond = 0;
     }
 
     @Override
@@ -97,7 +127,7 @@ public final class PlayingState implements GameState {
             return pausedState;
         }
 
-        return switch (phase) {
+        return switch (flow.phase()) {
             case BEGIN -> updateBegin();
             case CONTINUES -> updateContinues(input);
             case ENDS -> updateEnds();
@@ -109,7 +139,7 @@ public final class PlayingState implements GameState {
 
     /** Current phase as {@link RoundEnum} for the legacy renderer. */
     public RoundEnum getRenderRoundEnum() {
-        return switch (phase) {
+        return switch (flow.phase()) {
             case BEGIN -> RoundEnum.ROUND_BEGIN;
             case CONTINUES -> RoundEnum.ROUND_CONTINUES;
             case ENDS -> RoundEnum.ROUND_ENDS;
@@ -133,10 +163,12 @@ public final class PlayingState implements GameState {
             phaseJustEntered = false;
         }
         screen.tick();
-        if (animationsEnded()) {
+        if (online != null) {
+            online.pump(); // receive the host's phase CONTROLs even though no input/step happens in BEGIN
+        }
+        if (flow.enterContinues(flowFrame, animationsEnded())) {
             restartAnimations();
             requestNextPhase = false;
-            phase = Phase.CONTINUES;
             phaseJustEntered = true;
         }
         return this;
@@ -146,26 +178,52 @@ public final class PlayingState implements GameState {
         if (phaseJustEntered) {
             settings.setPlayerKeyboardAvailable(true);
             phaseJustEntered = false;
-            lastSecondNano = System.nanoTime();
+            stepsSinceRoundSecond = 0;
         }
         counter.tick();
 
-        long now = System.nanoTime();
-        if (now - lastSecondNano >= 1_000_000_000L) {
-            lastSecondNano = now;
-            tickRoundSecond();
+        if (online != null) {
+            advanceOnline(input);
+        } else {
+            advanceOffline(input);
         }
 
+        if (flow.enterEnds(flowFrame, requestNextPhase)) {
+            phaseJustEntered = true;
+        }
+        return this;
+    }
+
+    /** Offline / hotseat advance: the unchanged single-machine path (round timer, local input, one step). */
+    private void advanceOffline(InputBridge input) {
+        // Count sim steps (this runs once per fixed step), not wall-clock, so the round clock is
+        // deterministic. The host/offline peer owns the round timer; a CLIENT follows the host's ENTER_ENDS.
+        if (flow.mode() != GameMode.CLIENT && ++stepsSinceRoundSecond >= STEPS_PER_ROUND_SECOND) {
+            stepsSinceRoundSecond = 0;
+            tickRoundSecond();
+        }
         if (settings.isPlayerKeyboardAvailable()) {
             PlayInput.apply(input, world);
             aiPlayers.think(world);
         }
         world.step();
-        if (requestNextPhase) {
-            phase = Phase.ENDS;
-            phaseJustEntered = true;
+        flowFrame++;
+    }
+
+    /**
+     * Online advance: the {@link OnlineSession} exchanges this command frame and steps the shared world
+     * only once every peer's input is in (lockstep). The round clock + frame counter advance only on a
+     * real step; AI is not run online. Phase transitions still flow through the session's host-driven
+     * {@code flow} (a CLIENT follows the broadcast CONTROLs).
+     */
+    private void advanceOnline(InputBridge input) {
+        if (online.advance(input)) {
+            if (flow.mode() != GameMode.CLIENT && ++stepsSinceRoundSecond >= STEPS_PER_ROUND_SECOND) {
+                stepsSinceRoundSecond = 0;
+                tickRoundSecond();
+            }
+            flowFrame++;
         }
-        return this;
     }
 
     private GameState updateEnds() {
@@ -177,16 +235,23 @@ public final class PlayingState implements GameState {
         }
         screen.tick();
         pointer.tick();
-        if (animationsEnded()) {
-            restartAnimations();
-            requestNextPhase = false;
-            if (world.isMatchOver()) {
+        if (online != null) {
+            online.pump(); // receive the host's NEXT_ROUND / MATCH_OVER even though no step happens in ENDS
+        }
+        switch (flow.resolveEnds(flowFrame, animationsEnded(), world.isMatchOver())) {
+            case MATCH_OVER -> {
+                restartAnimations();
+                requestNextPhase = false;
                 world.resolveMatchWinners();
                 settings.setGameEnd(true);
                 return gameOverState;
             }
-            phase = Phase.BEGIN;
-            phaseJustEntered = true;
+            case NEXT_ROUND -> {
+                restartAnimations();
+                requestNextPhase = false;
+                phaseJustEntered = true;
+            }
+            case STAY -> { /* still animating the round-end screen */ }
         }
         return this;
     }

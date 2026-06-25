@@ -164,3 +164,101 @@
       ignored), gated by the knob + `ai.baseAttackEnabled`. Per-skill on/off `AiSkillToggles`
       (`ai.skill.*`, checked once at round start) added for EVERY AI skill so any one behaviour can be
       switched off without disabling the AI. Tests: `AiAggressivenessTest`, `GameConfigLoaderTest`.
+
+## [ ] F. Online multiplayer (LAN + manual IP)
+> Host-authoritative **deterministic lockstep**: peers sync only player INPUT (aim + shoot, ~3 bits);
+> every peer re-simulates the identical world from the same master seed — no world-state snapshots.
+> Chosen because the sim is already deterministic, input is already abstracted (`PlayWorld.applyInput`/
+> `applyShoot`), and an AI is already "just another input source". New AWT-free, unit-testable `net`
+> package (interface-first transport, `LoopbackTransport` for tests + single-process play); the
+> offline/hotseat path stays unchanged behind a `GameMode { OFFLINE, HOST, CLIENT }` switch.
+> **Full rationale, trade-offs, protocol, package layout, and determinism plan: root `OnlineMode.md`
+> (authoritative for this topic — read it before starting).** v1 scope: LAN + manual IP, listen
+> server, up to 4 human players, no AI online (pipeline kept AI-ready). TCP + a minimal text protocol, ~30 Hz command
+> frame over the 120 Hz sim, ~100 ms input delay. Build/verify with `./mvnw test`; new logic tested
+> via `LoopbackTransport` without sockets.
+>
+> **The real prerequisite is determinism of the ROUND FLOW, not the physics.** `PlayingState` advances
+> the round clock on `System.nanoTime()` and gates phase transitions on render `animationsEnded()` —
+> both differ per machine and would desync. F0 fixes that first.
+
+- [x] **F0. Determinism prerequisite (round/match flow).** **[DONE — 259 tests green.]** Round time is
+      now counted in SIM TICKS, not `System.nanoTime()` (`PlayingState.STEPS_PER_ROUND_SECOND` = 120), so
+      the round clock advances identically on every peer. Lockstep-invariant guard added
+      (`PlayWorldDeterminismTest`): two same-seed worlds fed an identical scripted input stream stay
+      bit-identical EVERY tick for 600 ticks, plus a "sim actually progresses" guard. Sim-purity audit:
+      `discOwners` (IdentityHashMap) is lookup-only and `blockHitByTile` is render-only — neither affects
+      sim order; the disc list is an index-loop. **Re-scoped from the original plan:** the
+      `BEGIN→CONTINUES→ENDS` phase transitions are gated by `animationElementEnd`, which is set during
+      DRAW (machine-dependent render cadence, absent when headless). Making those deterministic is folded
+      into **F2**, where the host commands transitions and clients obey — so clients need no local phase
+      timing. `Math` vs `StrictMath` decision deferred to the F5 hash test.
+- [ ] **F1. `net` core + `LoopbackTransport`.** `NetTransport` (interface), `NetMessage` + JSON
+      `MessageCodec` (length-prefixed framing), `TickInput`/`InputFrame`, `LockstepCoordinator`
+      (input-delay buffer + completeness gate). Route the existing loop's input through the coordinator
+      IN-PROCESS (no sockets) and prove the world steps identically to the direct path. Tests:
+      coordinator gates until a frame is complete; loopback path == direct path.
+- [x] **F2. Host round-flow authority.** **[DONE — 271 tests green.]** New `net.RoundFlow` owns the
+      BEGIN/CONTINUES/ENDS phase, mode-aware: OFFLINE decides locally (unchanged), HOST decides locally
+      AND broadcasts each transition as a tick-stamped `ControlEvent` over a `ControlChannel`
+      (`LoopbackControlChannel` for now), CLIENT follows those events instead of its render-coupled
+      timers. `PlayingState` now delegates phase ownership to `RoundFlow` via a new 4-arg constructor
+      (OFFLINE by default, so the single-machine path is byte-for-byte unchanged). This SUBSUMES the
+      phase-transition determinism deferred from F0. Tests (`RoundFlowTest`/`LoopbackControlChannelTest`):
+      a CLIENT reproduces the HOST's exact phase sequence across a multi-round match incl. match-over;
+      client stalls without events; restart resets to BEGIN. The named `GameServer` aggregator (inputs +
+      clients + control over a socket) lands with the transport in F3.
+- [x] **F3. TCP transport, two processes on localhost.** **[DONE — 281 tests green.]** `MatchCode`
+      (6-letter `ABCXYZ`); `NetMessage` (sealed: Join/Welcome/Input/Frame/Control) + text `MessageCodec`
+      with length-prefixed framing; `TcpConnection` (daemon reader thread + framed send), `TcpClientTransport`
+      (connect + `JOIN` + await `WELCOME`), `TcpServer` (accept, assign slot, `WELCOME` = slot + master
+      seed + player count + **match code**; broadcast; slot-tagged poll). Match code is match metadata,
+      NOT simulation state. Client rebuilds config locally from seed + player count (shared build);
+      full-config payload deferred. Tests: `MessageCodecTest` (round-trips incl. match code; framing
+      across 1-byte reads), `MatchCodeTest`, `TcpTransportTest` (localhost handshake + bidirectional
+      exchange). NOT YET wired into the live `PlayingState` loop — that online-loop integration (combining
+      the F1 coordinator + F2 flow + this transport) is the next step.
+- [x] **F1–F3 online-loop integration.** **[DONE — 283 tests green.]** `OnlineHost` (aggregate all
+      slots via `LockstepCoordinator` → broadcast `Frame` → apply with `LockstepApplier`) + `OnlineClient`
+      (send local `Input` → apply the host's authoritative `Frame`s → follow host `Control` via a CLIENT
+      `RoundFlow`), running over the F3 TCP transport; both are step-driven (no internal thread) so the
+      game loop can call them per command frame. `OnlineLoopIntegrationTest` proves over REAL localhost
+      sockets that host & client worlds stay BIT-IDENTICAL every frame with a RANDOM host seed (so the
+      seed genuinely travels via `WELCOME`), and that a host round-flow `CONTROL` drives the client's
+      phase. Remaining to make it playable: hook `OnlineHost`/`OnlineClient` into the AWT
+      `GameLoop`/`PlayingState` online path, selected from the F6 menu.
+- [x] **F4. Connect UX — LAN auto-discovery + internet manual IP.** **[DONE — 291 tests green.]**
+      `LanAnnouncement` (UDP beacon payload; ignores non-beacon traffic), `LanBeacon` (periodic sender;
+      `broadcast()` to the segment on port 48888 in prod, explicit target for tests), `LanDiscovery`
+      (UDP listener + TTL'd live table that expires hosts whose beacons stop; pairs each beacon with the
+      packet's source IP). The joiner picks a `DiscoveredMatch` and connects via `TcpClientTransport`;
+      the internet path parses a manual `HostAddress` (`ip:port`). **Disconnect policy:** host-loss ⇒
+      match ends; client-loss ⇒ host pauses then drops the slot / aborts — detection via
+      `TcpClientTransport.isOpen()` / `TcpServer.connectedClients()`; enforcement is wired in F6. Tests:
+      `LanAnnouncementTest`, `LanDiscoveryTest` (table add/expire with an injected clock + a real
+      loopback-UDP beacon→discovery smoke), `HostAddressTest`.
+- [x] **F5. Up to 4 players + desync hash.** **[DONE — 295 tests green.]** 4 players verified end to end:
+      `FourPlayerOnlineTest` runs a host + 3 clients over real localhost TCP staying bit-identical
+      (compared via `WorldHash`) every frame (slot assignment + 4-slot aggregation in `LockstepCoordinator`).
+      Desync net: `WorldHash` (order-stable hash of quantized disc pos/angle/bounces + aim + capture points
+      + scores) + a `NetMessage.Hash` the client sends; `OnlineHost` records its own per-frame hash,
+      compares incoming client hashes, and flags mismatches (`desyncCount`/`lastDesyncFrame` + `log.error`).
+      Tests: `WorldHashTest` (identical worlds hash equal / divergence detected), `OnlineDesyncTest`
+      (matching hashes pass, a bogus hash is detected over TCP), `FourPlayerOnlineTest`.
+- [~] **F6. Online launch + loop wiring.** **[PLAYABLE via config — 296 tests green; in-menu button
+      deferred, see below.]** `OnlineConfig` reads `online.mode` (`off`|`host`|`client`) +
+      `online.host`/`online.port` from `game.properties`. `OnlineSession` bootstraps a host (server + LAN
+      beacon + `OnlineHost`) or a client (explicit `IP:port` or LAN auto-discovery + `OnlineClient`),
+      builds the shared world from the master seed, and drives one lockstep command frame per tick.
+      `PlayingState` gained an online branch (the OFFLINE/hotseat path is byte-identical) that drives the
+      session and follows the host's `RoundFlow`; `GameLoop` builds the session at startup when
+      `online.mode != off` and starts the match (offline still shows the menu). Engine proven headlessly
+      over loopback (`OnlineSessionTest`: host + client stay bit-identical). **Deferred (needs a playtest
+      pass / can't be verified from here):** the in-menu `PLAY_ONLINE` button + network sub-screen
+      (AWT — config launch covers playtesting without it; the menu reflow risks layout overflow on the
+      900px window); input-delay / command-frame-rate tuning for higher-latency internet (v1 is a D=0
+      one-step-per-frame lockstep, ideal on localhost/LAN); in-loop enforcement of the disconnect policy.
+      Playtest instructions: `OnlineMode.md` → "Playtesting online (v1)".
+
+> **Deferred (post-v1, noted in `OnlineMode.md`):** lobby server, UPnP port-forwarding, binary protocol,
+> host migration, AI in online matches, client-side prediction.

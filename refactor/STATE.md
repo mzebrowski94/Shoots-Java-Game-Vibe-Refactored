@@ -119,6 +119,12 @@
   colours). `GameSettings` owns `GraphicsConfig`; `GameConfigLoader.load()` merges both property files.
 
 ## Open Decisions / Backlog
+- **Online multiplayer (PLANNED, not started).** Host-authoritative deterministic *lockstep*: sync
+  player inputs (tiny: aim+shoot), every peer re-simulates from the same master seed — NO world-state
+  snapshots. New AWT-free `net` package (interface-first transport: Loopback/TCP), gated `world.step()`,
+  host-driven round flow; offline/hotseat path unchanged. Prereq: make `PlayingState` round flow
+  tick-driven (today uses `System.nanoTime()` + render `animationsEnded()` gating). Full rationale +
+  protocol + staged F0–F6 backlog: root `OnlineMode.md` (single source of truth for this topic).
 - **DONE c1-c17.** Full migration + cleanup complete. Live game runs entirely on the
   `world`/`score`/`entity`/`spatial`/`ui`/`app` model; legacy deleted.
   - c15: `PSConst`->`GameDimensions` (`TABLESIZE`->`TABLE_SIZE`); `GameSettings` SCREAMING_SNAKE
