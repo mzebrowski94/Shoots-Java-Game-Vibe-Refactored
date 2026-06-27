@@ -58,6 +58,9 @@ public final class PlayingState implements GameState {
     private boolean phaseJustEntered = true;
     private boolean requestNextPhase = false;
 
+    /** Online: this peer opened the pause menu, so on returning it must broadcast RESUME to unfreeze peers (#3). */
+    private boolean localPauseInitiated = false;
+
     /**
      * Simulation step rate; mirrors {@code GameLoop.UPDATES_PER_SECOND} (and {@code PlayWorld}'s step
      * rate). The round clock is counted in SIM STEPS, not wall-clock, so it advances identically on
@@ -112,7 +115,7 @@ public final class PlayingState implements GameState {
      */
     public void requestRestart() {
         // Returning to a local match from a prior online one: drop the network session + restore offline flow.
-        online = null;
+        endOnline();
         flow = RoundFlow.offline();
         restartRequested = true;
         flow.reset();
@@ -126,8 +129,10 @@ public final class PlayingState implements GameState {
      * points the screen/pointer at the networked world. No AI runs online.
      */
     public void startOnline(OnlineSession session) {
+        endOnline(); // close any prior session first so its host port is freed before this one runs
         this.online = session;
         this.world = session.world();
+        applyOnlineRoundSettings(session.world().config().round());
         this.flow = session.flow();
         flow.reset();
         settings.restartGame();
@@ -150,7 +155,18 @@ public final class PlayingState implements GameState {
 
     @Override
     public GameState update(InputBridge input) {
+        // Returned from our own pause menu: tell peers to resume so everyone unfreezes together (#3).
+        if (online != null && localPauseInitiated) {
+            online.requestPause(false);
+            localPauseInitiated = false;
+        }
+
         if (input.isJustPressed(GameAction.PAUSE)) {
+            // Online: pausing is match-wide -- freeze every peer (and their round timer) until we resume (#3).
+            if (online != null) {
+                online.requestPause(true);
+                localPauseInitiated = true;
+            }
             return pausedState;
         }
 
@@ -197,6 +213,8 @@ public final class PlayingState implements GameState {
             restartAnimations();
             requestNextPhase = false;
             phaseJustEntered = true;
+        } else if (online != null && online.mode() == GameMode.CLIENT && !online.isConnected()) {
+            return abortToOnlineMenu("Host left the game"); // host vanished during the round intro (#5)
         }
         return this;
     }
@@ -207,11 +225,14 @@ public final class PlayingState implements GameState {
             phaseJustEntered = false;
             stepsSinceRoundSecond = 0;
         }
-        counter.tick();
 
         if (online != null) {
-            advanceOnline(input);
+            GameState next = advanceOnlinePhase(input);
+            if (next != this) {
+                return next;
+            }
         } else {
+            counter.tick();
             advanceOffline(input);
         }
 
@@ -219,6 +240,48 @@ public final class PlayingState implements GameState {
             phaseJustEntered = true;
         }
         return this;
+    }
+
+    /**
+     * Online CONTINUES driver. Refreshes pause/connection status, then: bails to the online menu if the host
+     * vanished (#5); freezes the sim AND the round-timer animation while a remote peer has paused, showing a
+     * "PLAYER n PAUSED" banner (#3); otherwise advances the lockstep frame normally. Returns a non-{@code this}
+     * state only when leaving play (host loss).
+     */
+    private GameState advanceOnlinePhase(InputBridge input) {
+        online.pump(); // refresh pause/connection + drain control even on a frozen/stalled tick
+
+        if (online.mode() == GameMode.CLIENT && !online.isConnected()) {
+            return abortToOnlineMenu("Host left the game");
+        }
+
+        int pausedBy = online.pausedBy();
+        if (pausedBy >= 0 && pausedBy != online.localSlot()) {
+            // A different player paused: hold the round timer and the simulation, and show who paused.
+            screen.setOnlinePauseNotice("PLAYER " + (pausedBy + 1) + " PAUSED");
+            return this;
+        }
+        screen.setOnlinePauseNotice(null);
+
+        counter.tick();
+        advanceOnline(input);
+        return this;
+    }
+
+    /**
+     * Tears down the online session and drops the player onto the PLAY ONLINE connect screen with a notice;
+     * the match bookkeeping is reset so the stale match isn't resumable from the menu (#5).
+     */
+    private GameState abortToOnlineMenu(String message) {
+        log.info("Online match aborted: {}", message);
+        endOnline();
+        flow = RoundFlow.offline();
+        settings.setPlayerKeyboardAvailable(false);
+        settings.restartGame();
+        settings.setGameEnd(false);
+        screen.setOnlinePauseNotice(null);
+        screen.getMenuLayout().showOnlineDisconnected(message);
+        return pausedState;
     }
 
     /** Offline / hotseat advance: the unchanged single-machine path (round timer, local input, one step). */
@@ -271,6 +334,9 @@ public final class PlayingState implements GameState {
                 requestNextPhase = false;
                 world.resolveMatchWinners();
                 settings.setGameEnd(true);
+                // Match is decided: the host has already broadcast MATCH_OVER (flushed), so closing now frees
+                // its port for a fresh host and drops the client socket cleanly (#6).
+                endOnline();
                 return gameOverState;
             }
             case NEXT_ROUND -> {
@@ -278,13 +344,37 @@ public final class PlayingState implements GameState {
                 requestNextPhase = false;
                 phaseJustEntered = true;
             }
-            case STAY -> { /* still animating the round-end screen */ }
+            case STAY -> {
+                if (online != null && online.mode() == GameMode.CLIENT && !online.isConnected()) {
+                    return abortToOnlineMenu("Host left the game"); // host vanished during the round outro (#5)
+                }
+            }
         }
         return this;
     }
 
     // -------------------------------------------------------------------------
     // Helpers
+
+    /** Closes and clears any active online session (frees the host's port; drops a client's socket). */
+    private void endOnline() {
+        if (online != null) {
+            online.close();
+            online = null;
+        }
+    }
+
+    /**
+     * Mirrors the online match's authoritative {@link RoundConfig} (built from the host's menu choices) onto
+     * the local {@link GameSettings} so the round clock and the on-screen round-timer reflect the chosen
+     * round time / limit on every peer, not each machine's {@code game.properties} default (#7).
+     */
+    private void applyOnlineRoundSettings(RoundConfig round) {
+        settings.setRoundTime(round.roundTimeSeconds());
+        settings.setRoundLimit(round.roundLimit());
+        settings.setRoundEndDelay(round.roundEndDelay());
+        settings.setAnimationTime(round.animationTime());
+    }
 
     private void tickRoundSecond() {
         settings.getActualRound().roundTick();

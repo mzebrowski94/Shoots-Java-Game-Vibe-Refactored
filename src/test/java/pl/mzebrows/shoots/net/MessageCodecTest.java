@@ -20,6 +20,18 @@ class MessageCodecTest {
         assertRoundTrip(new NetMessage.Welcome(2, 4, 1234567890123L, "ABCXYZ"));
         assertRoundTrip(new NetMessage.Input(17, new TickInput(PlayWorld.AimInput.LEFT, true)));
         assertRoundTrip(new NetMessage.Control(480, ControlEvent.Kind.ENTER_ENDS));
+        assertRoundTrip(new NetMessage.Pause(2, true));
+        assertRoundTrip(new NetMessage.Pause(0, false));
+    }
+
+    @Test
+    void startCarriesRoundPacing() {
+        var decoded = (NetMessage.Start) MessageCodec.decode(
+                MessageCodec.encode(new NetMessage.Start(99L, new int[] {0, 1}, 45, 7)));
+        assertThat(decoded.seed()).isEqualTo(99L);
+        assertThat(decoded.orderedSlots()).containsExactly(0, 1);
+        assertThat(decoded.roundTimeSeconds()).isEqualTo(45);
+        assertThat(decoded.roundLimit()).isEqualTo(7);
     }
 
     @Test

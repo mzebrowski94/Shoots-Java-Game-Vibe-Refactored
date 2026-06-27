@@ -44,7 +44,10 @@ public final class MessageCodec {
             case NetMessage.Lobby m ->
                     "LOBBY" + SEP + "names=" + encodeNames(m.slotNames());
             case NetMessage.Start m ->
-                    "START" + SEP + "seed=" + m.seed() + SEP + "slots=" + encodeInts(m.orderedSlots());
+                    "START" + SEP + "seed=" + m.seed() + SEP + "slots=" + encodeInts(m.orderedSlots())
+                            + SEP + "rt=" + m.roundTimeSeconds() + SEP + "rl=" + m.roundLimit();
+            case NetMessage.Pause m ->
+                    "PAUSE" + SEP + "slot=" + m.slot() + SEP + "paused=" + m.paused();
         };
     }
 
@@ -72,7 +75,9 @@ public final class MessageCodec {
                     longField(f, "frame"), ControlEvent.Kind.valueOf(f.get("kind")));
             case "HASH" -> new NetMessage.Hash(longField(f, "frame"), longField(f, "hash"));
             case "LOBBY" -> new NetMessage.Lobby(decodeNames(f.getOrDefault("names", "")));
-            case "START" -> new NetMessage.Start(longField(f, "seed"), decodeInts(f.getOrDefault("slots", "")));
+            case "START" -> new NetMessage.Start(longField(f, "seed"), decodeInts(f.getOrDefault("slots", "")),
+                    Integer.parseInt(f.getOrDefault("rt", "0")), Integer.parseInt(f.getOrDefault("rl", "0")));
+            case "PAUSE" -> new NetMessage.Pause(intField(f, "slot"), Boolean.parseBoolean(require(f, "paused")));
             default -> throw new IllegalArgumentException("unknown message type: " + type);
         };
     }

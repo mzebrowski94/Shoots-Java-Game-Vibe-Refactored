@@ -9,7 +9,7 @@ import pl.mzebrows.shoots.world.PlayWorld;
  */
 public sealed interface NetMessage
         permits NetMessage.Join, NetMessage.Welcome, NetMessage.Input, NetMessage.Frame, NetMessage.Control,
-                NetMessage.Hash, NetMessage.Lobby, NetMessage.Start {
+                NetMessage.Hash, NetMessage.Lobby, NetMessage.Start, NetMessage.Pause {
 
     /** client -> server: request to join, with a display name and the protocol version. */
     record Join(String name, int protocolVersion) implements NetMessage { }
@@ -38,9 +38,23 @@ public sealed interface NetMessage
     /**
      * server -> clients: begin the match. seed = master seed; orderedSlots = participating lobby slots in
      * ascending order, so a peer's final 0-based player id is the INDEX of its own lobby slot within
-     * orderedSlots, and the player count is orderedSlots.length.
+     * orderedSlots, and the player count is orderedSlots.length. {@code roundTimeSeconds}/{@code roundLimit}
+     * carry the host's menu-chosen round pacing so every peer builds an identical match (#7); {@code 0}
+     * means "unset -> keep the local default" (back-compatible with the pre-#7 two-field form).
      */
-    record Start(long seed, int[] orderedSlots) implements NetMessage { }
+    record Start(long seed, int[] orderedSlots, int roundTimeSeconds, int roundLimit) implements NetMessage {
+        /** Back-compatible form without round pacing (used by tests/older callers); leaves both at 0 = unset. */
+        Start(long seed, int[] orderedSlots) {
+            this(seed, orderedSlots, 0, 0);
+        }
+    }
+
+    /**
+     * pause toggle. client -> server: a request to pause/resume (the host is the authority); server ->
+     * clients: the authoritative broadcast that a given player slot paused or resumed the whole match (#3).
+     * {@code slot} is the player who paused, so peers can show "PLAYER n PAUSED".
+     */
+    record Pause(int slot, boolean paused) implements NetMessage { }
 
     /** Convenience: neutral aim constant re-exported so callers needn't import PlayWorld. */
     static PlayWorld.AimInput none() {

@@ -7,6 +7,7 @@ import java.util.Random;
 
 import lombok.extern.slf4j.Slf4j;
 import pl.mzebrows.shoots.config.GameConfig;
+import pl.mzebrows.shoots.config.RoundConfig;
 import pl.mzebrows.shoots.world.PlayWorld;
 
 /**
@@ -147,7 +148,7 @@ public final class OnlineLobby implements AutoCloseable {
             hostLeft = true;
             return;
         }
-        GameConfig cfg = base.withPlayerNumber(start.orderedSlots().length).withSeed(start.seed());
+        GameConfig cfg = base.withRound(roundFrom(start)).withPlayerNumber(start.orderedSlots().length).withSeed(start.seed());
         var world = new PlayWorld(cfg);
         started = OnlineSession.startedClient(world, transport, playerId, matchCode);
         log.info("Match {} starting: {} players, local player id {}", matchCode, start.orderedSlots().length, playerId);
@@ -164,7 +165,8 @@ public final class OnlineLobby implements AutoCloseable {
             return false;
         }
         int[] slots = occupiedSlots();
-        server.broadcast(new NetMessage.Start(seed, slots));
+        // Carry the host's chosen round pacing so every client builds an identical match (#7).
+        server.broadcast(new NetMessage.Start(seed, slots, base.round().roundTimeSeconds(), base.round().roundLimit()));
         GameConfig cfg = base.withPlayerNumber(slots.length).withSeed(seed);
         var world = new PlayWorld(cfg);
         started = OnlineSession.startedHost(world, server, beacon, matchCode);
@@ -257,6 +259,14 @@ public final class OnlineLobby implements AutoCloseable {
     }
 
     // -- helpers ------------------------------------------------------------
+
+    /** Overlays the host's START round pacing onto the local base round config; {@code 0} fields keep the local default. */
+    private RoundConfig roundFrom(NetMessage.Start start) {
+        RoundConfig local = base.round();
+        int time = start.roundTimeSeconds() > 0 ? start.roundTimeSeconds() : local.roundTimeSeconds();
+        int limit = start.roundLimit() > 0 ? start.roundLimit() : local.roundLimit();
+        return new RoundConfig(time, limit, local.roundEndDelay(), local.animationTime());
+    }
 
     private LanAnnouncement announcement() {
         boolean joinable = started == null && occupiedCount() < maxPlayers;

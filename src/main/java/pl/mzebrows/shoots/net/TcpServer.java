@@ -39,7 +39,11 @@ public final class TcpServer implements AutoCloseable {
 
     /** Binds the server (use {@code port == 0} for an OS-assigned ephemeral port). */
     public TcpServer(int port, int playerCount, long seed, String matchCode) throws IOException {
-        this.serverSocket = new ServerSocket(port);
+        // SO_REUSEADDR so a freshly-closed host can immediately re-bind the same port (TIME_WAIT) -- this is
+        // what lets a host quit a match and host a new one on the same port without an "address in use" error.
+        this.serverSocket = new ServerSocket();
+        this.serverSocket.setReuseAddress(true);
+        this.serverSocket.bind(new java.net.InetSocketAddress(port));
         this.playerCount = playerCount;
         this.seed = seed;
         this.matchCode = matchCode;
@@ -158,6 +162,19 @@ public final class TcpServer implements AutoCloseable {
 
     public int connectedClients() {
         return clients.size();
+    }
+
+    /** Whether a client currently occupies {@code slot} (the host slot 0 is always considered present). */
+    public boolean isSlotConnected(int slot) {
+        if (slot == HOST_SLOT) {
+            return true;
+        }
+        for (Client c : clients) {
+            if (c.slot() == slot && c.connection().isOpen()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

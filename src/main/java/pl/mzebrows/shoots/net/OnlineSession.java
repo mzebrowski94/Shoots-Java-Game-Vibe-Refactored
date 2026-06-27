@@ -18,14 +18,27 @@ import pl.mzebrows.shoots.world.PlayWorld;
  * {@link #advance} each tick and renders {@link #world()}; the engine pieces underneath are the
  * fully-tested F1-F5 stack. See OnlineMode.md (F6).
  *
- * <p>v1 uses a one-step-per-command-frame, zero-input-delay lockstep (each {@link #advance} progresses a
- * frame only once every peer's input for it is in). That is ideal on localhost/LAN; raising the input
- * delay / batching for higher-latency internet is the playtest-tuning follow-up noted in OnlineMode.md.
+ * <p>Lockstep runs with a small <b>input delay</b> ({@link #INPUT_DELAY_FRAMES}): the input sampled at
+ * apply-frame {@code f} is scheduled for frame {@code f + delay}, and frames {@code [0, delay)} are
+ * pre-seeded with neutral input. This keeps every peer's input buffered a few frames ahead, so a peer
+ * advances without waiting a full network round-trip per frame -- the game then runs at real-time speed
+ * on localhost/LAN instead of stalling to the round-trip rate (which made the whole match crawl).
  */
 @Slf4j
 public final class OnlineSession implements AutoCloseable {
 
     private static final long WELCOME_TIMEOUT_MS = 5000;
+
+    /**
+     * Command frames of input delay. The local input read at apply-frame {@code f} takes effect at frame
+     * {@code f + delay}; frames {@code [0, delay)} use neutral input. A few frames of buffer hide the
+     * localhost/LAN round-trip so {@link #advance} returns {@code true} every tick (real-time pacing);
+     * the cost is ~{@code delay/120 s} of input latency, imperceptible at this small a value.
+     */
+    private static final int INPUT_DELAY_FRAMES = 3;
+
+    /** Neutral "no aim, not shooting" input used to pre-seed the delay window. */
+    private static final TickInput NEUTRAL = new TickInput(PlayWorld.AimInput.NONE, false);
 
     private final GameMode mode;
     private final PlayWorld world;
@@ -40,6 +53,7 @@ public final class OnlineSession implements AutoCloseable {
 
     private long frame;
     private boolean dispatched; // local input already sent/submitted for the current frame
+    private boolean primed;     // the neutral input for the delay window [0, delay) has been dispatched
 
     private OnlineSession(GameMode mode, PlayWorld world, int localSlot, String matchCode,
                           OnlineHost host, OnlineClient client,
@@ -121,9 +135,10 @@ public final class OnlineSession implements AutoCloseable {
 
     /** Advances one command frame from an explicit local input (used by tests); returns whether stepped. */
     boolean advanceWith(TickInput local) {
+        prime();
         if (mode == GameMode.HOST) {
             if (!dispatched) {
-                host.submitLocalInput(frame, local);
+                host.submitLocalInput(frame + INPUT_DELAY_FRAMES, local);
                 dispatched = true;
             }
             host.pumpInbound();
@@ -135,7 +150,7 @@ public final class OnlineSession implements AutoCloseable {
             return false;
         }
         if (!dispatched) {
-            client.sendLocalInput(frame, local);
+            client.sendLocalInput(frame + INPUT_DELAY_FRAMES, local);
             dispatched = true;
         }
         client.pump();
@@ -145,6 +160,24 @@ public final class OnlineSession implements AutoCloseable {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Dispatches this peer's neutral input for the delay window {@code [0, delay)} once, so those leading
+     * frames complete immediately and the gate can start releasing while real (delayed) inputs flow in.
+     */
+    private void prime() {
+        if (primed) {
+            return;
+        }
+        for (long f = 0; f < INPUT_DELAY_FRAMES; f++) {
+            if (mode == GameMode.HOST) {
+                host.submitLocalInput(f, NEUTRAL);
+            } else {
+                client.sendLocalInput(f, NEUTRAL);
+            }
+        }
+        primed = true;
     }
 
     /** Builds the local player's {@link TickInput} from the P1 keys, mapped onto this peer's own slot. */
@@ -176,6 +209,28 @@ public final class OnlineSession implements AutoCloseable {
         } else {
             client.pump();
         }
+    }
+
+    /**
+     * Requests a match-wide pause/resume from this peer (#3). The HOST broadcasts it directly; a CLIENT asks
+     * the host, which re-broadcasts authoritatively. Every peer then observes it via {@link #pausedBy()}.
+     */
+    public void requestPause(boolean paused) {
+        if (mode == GameMode.HOST) {
+            host.setLocalPaused(paused);
+        } else {
+            client.sendPause(localSlot, paused);
+        }
+    }
+
+    /** Slot of the player who paused the match, or {@code -1} when running (same value on every peer). */
+    public int pausedBy() {
+        return mode == GameMode.HOST ? host.pausedBy() : client.pausedBy();
+    }
+
+    /** Player slots that dropped mid-match and are now played idle (#4); empty for a client. */
+    public boolean[] leftSlots() {
+        return host != null ? host.leftSlots() : new boolean[world.playerCount()];
     }
 
     /** The round flow this peer follows (HOST decides + broadcasts, CLIENT follows); for {@code PlayingState}. */

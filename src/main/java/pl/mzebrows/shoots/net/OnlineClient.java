@@ -22,6 +22,9 @@ public final class OnlineClient {
     private final int stepsPerFrame;
     private long lastAppliedFrame = -1;
 
+    /** Slot of the player who paused (from the host's authoritative broadcast), or {@code -1} when running. */
+    private int pausedBy = -1;
+
     public OnlineClient(PlayWorld world, TcpClientTransport transport, int stepsPerFrame) {
         this.world = world;
         this.transport = transport;
@@ -58,9 +61,20 @@ public final class OnlineClient {
                     lastAppliedFrame = f.frame();
                 }
                 case NetMessage.Control c -> inboundControl.send(new ControlEvent(c.frame(), c.kind()));
+                case NetMessage.Pause p -> pausedBy = p.paused() ? p.slot() : -1;
                 default -> { /* WELCOME consumed at connect; JOIN/Input are server-bound */ }
             }
         }
+    }
+
+    /** Sends this client's pause/resume request to the host (the authority that broadcasts it to all). */
+    public void sendPause(int slot, boolean paused) {
+        transport.send(new NetMessage.Pause(slot, paused));
+    }
+
+    /** Slot of the player who paused (per the host's last broadcast), or {@code -1} when running. */
+    public int pausedBy() {
+        return pausedBy;
     }
 
     /** Round flow following the host (advance methods consume the queued {@code CONTROL}s). */

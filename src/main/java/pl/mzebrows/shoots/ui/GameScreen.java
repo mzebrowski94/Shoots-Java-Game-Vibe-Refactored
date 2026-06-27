@@ -36,6 +36,9 @@ public class GameScreen extends GameCanvas {
     private PlayWorld world;
     private double alpha;
 
+    /** Non-null while a remote peer has paused an online match: the centred "PLAYER n PAUSED" banner (#3). */
+    private volatile String onlinePauseNotice;
+
     /** Per-frame render state (interpolation factor + animation phases) shared by the object renderers. */
     private final RenderFrame frame = new RenderFrame();
 
@@ -107,6 +110,9 @@ public class GameScreen extends GameCanvas {
                     } else if (roundState == RoundEnum.ROUND_ENDS) {
                         drawRoundEnding();
                     }
+                    if (onlinePauseNotice != null) {
+                        drawOnlinePauseNotice();
+                    }
                 }
                 g2d.dispose();
             } while (strategy.contentsRestored());
@@ -150,6 +156,22 @@ public class GameScreen extends GameCanvas {
         for (MapObjectRenderer renderer : objectRenderers) {
             renderer.render(g2d, world, frame);
         }
+    }
+
+    /** Sets (or clears, with {@code null}) the centred banner shown when a remote peer pauses online (#3). */
+    public void setOnlinePauseNotice(String notice) {
+        this.onlinePauseNotice = notice;
+    }
+
+    /** Dims the frozen field and centres the "PLAYER n PAUSED" banner so paused peers know why play stopped. */
+    private void drawOnlinePauseNotice() {
+        g2d.setColor(gameSettings.getColorScheme().getMenuStandardColor());
+        g2d.fillRect(0, 0, width, height);
+        g2d.setColor(gameSettings.getColorScheme().getBackgroundFontColor());
+        g2d.setFont(gameSettings.getGameFont().deriveFont(28f));
+        var fm = g2d.getFontMetrics();
+        int x = (width - fm.stringWidth(onlinePauseNotice)) / 2;
+        g2d.drawString(onlinePauseNotice, x, height / 2);
     }
 
     @Override

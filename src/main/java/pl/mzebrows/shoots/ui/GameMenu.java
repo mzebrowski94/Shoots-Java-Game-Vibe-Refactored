@@ -4,8 +4,10 @@ package pl.mzebrows.shoots.ui;
 import pl.mzebrows.shoots.app.GameSettings;
 
 import pl.mzebrows.shoots.ai.AiDifficulty;
+import pl.mzebrows.shoots.config.GameConfig;
 import pl.mzebrows.shoots.config.MenuConfig;
 import pl.mzebrows.shoots.config.OnlineConfig;
+import pl.mzebrows.shoots.config.RoundConfig;
 import pl.mzebrows.shoots.input.GameAction;
 import pl.mzebrows.shoots.net.DiscoveredMatch;
 import pl.mzebrows.shoots.net.LanSearch;
@@ -871,6 +873,18 @@ public class GameMenu {
         onlineError = null;
     }
 
+    /**
+     * Drops a peer straight onto the PLAY ONLINE connect screen with a notice -- used when an in-progress
+     * online match ends abnormally (e.g. the host left), so the player lands back where they can re-host or
+     * re-join instead of a frozen game (#5).
+     */
+    public void showOnlineDisconnected(String message) {
+        closeOnline();
+        onlineScreen = OnlineScreen.CONNECT_MENU;
+        connectIndex = CONNECT_HOST;
+        onlineError = message;
+    }
+
     /** Drives the active online sub-screen each tick: advances its network state and handles its input. */
     private MenuEnum checkOnlineInput(InputBridge input) {
         return switch (onlineScreen) {
@@ -906,12 +920,25 @@ public class GameMenu {
 
     private void startHosting() {
         try {
-            lobby = OnlineLobby.host(gameSettings.getConfig(), menuConfig.maxPlayers(), onlineConfig.port(), playerName);
+            // #7: size the lobby by the menu's selected player count (online needs >= 2), and carry the menu's
+            // round time / limit into the hosted match via the base config.
+            int onlinePlayers = Math.max(2, Math.min(menuConfig.maxPlayers(), playerNumber));
+            lobby = OnlineLobby.host(onlineBaseConfig(), onlinePlayers, onlineConfig.port(), playerName);
             onlineScreen = OnlineScreen.HOST_LOBBY;
             onlineError = null;
         } catch (IOException e) {
             onlineError = "Could not host: " + e.getMessage();
         }
+    }
+
+    /** The base game config with the menu-selected round time / limit overlaid, for an online match (#7). */
+    private GameConfig onlineBaseConfig() {
+        GameConfig base = gameSettings.getConfig();
+        RoundConfig defaults = base.round();
+        if (roundNumber == defaults.roundLimit() && roundTime == defaults.roundTimeSeconds()) {
+            return base;
+        }
+        return base.withRound(new RoundConfig(roundTime, roundNumber, defaults.roundEndDelay(), defaults.animationTime()));
     }
 
     private void startLanSearch() {
