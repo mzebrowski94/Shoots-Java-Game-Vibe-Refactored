@@ -89,6 +89,29 @@ public final class OnlineSession implements AutoCloseable {
                 null, onlineClient, null, null, transport);
     }
 
+    /**
+     * Wraps an already-open host lobby into a live match: the {@code server} + {@code beacon} were opened
+     * during the waiting room ({@link OnlineLobby}) and keep their connected clients; only the
+     * {@link OnlineHost} (world aggregator) is created here. Called when the host presses START.
+     */
+    static OnlineSession startedHost(PlayWorld world, TcpServer server, LanBeacon beacon, String matchCode) {
+        var onlineHost = new OnlineHost(world, server, 1, 0);
+        return new OnlineSession(GameMode.HOST, world, TcpServer.HOST_SLOT, matchCode,
+                onlineHost, null, server, beacon, null);
+    }
+
+    /**
+     * Wraps an already-connected client lobby into a live match: the {@code transport} stays connected from
+     * the waiting room and the world is built from the host's START seed; only the {@link OnlineClient} is
+     * created here. {@code playerSlot} is this peer's final 0-based player id.
+     */
+    static OnlineSession startedClient(PlayWorld world, TcpClientTransport transport, int playerSlot,
+                                       String matchCode) {
+        var onlineClient = new OnlineClient(world, transport, 1);
+        return new OnlineSession(GameMode.CLIENT, world, playerSlot, matchCode,
+                null, onlineClient, null, null, transport);
+    }
+
     // -- per-tick drive -----------------------------------------------------
 
     /** Advances one command frame from the local keyboard; returns whether the world actually stepped. */

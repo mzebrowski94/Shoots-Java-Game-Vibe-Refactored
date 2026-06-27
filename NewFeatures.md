@@ -165,7 +165,7 @@
       (`ai.skill.*`, checked once at round start) added for EVERY AI skill so any one behaviour can be
       switched off without disabling the AI. Tests: `AiAggressivenessTest`, `GameConfigLoaderTest`.
 
-## [ ] F. Online multiplayer (LAN + manual IP)
+## [x] F. Online multiplayer (LAN + manual IP)
 > Host-authoritative **deterministic lockstep**: peers sync only player INPUT (aim + shoot, ~3 bits);
 > every peer re-simulates the identical world from the same master seed — no world-state snapshots.
 > Chosen because the sim is already deterministic, input is already abstracted (`PlayWorld.applyInput`/
@@ -193,7 +193,7 @@
       DRAW (machine-dependent render cadence, absent when headless). Making those deterministic is folded
       into **F2**, where the host commands transitions and clients obey — so clients need no local phase
       timing. `Math` vs `StrictMath` decision deferred to the F5 hash test.
-- [ ] **F1. `net` core + `LoopbackTransport`.** `NetTransport` (interface), `NetMessage` + JSON
+- [x] **F1. `net` core + `LoopbackTransport`.** `NetTransport` (interface), `NetMessage` + JSON
       `MessageCodec` (length-prefixed framing), `TickInput`/`InputFrame`, `LockstepCoordinator`
       (input-delay buffer + completeness gate). Route the existing loop's input through the coordinator
       IN-PROCESS (no sockets) and prove the world steps identically to the direct path. Tests:
@@ -245,7 +245,7 @@
       compares incoming client hashes, and flags mismatches (`desyncCount`/`lastDesyncFrame` + `log.error`).
       Tests: `WorldHashTest` (identical worlds hash equal / divergence detected), `OnlineDesyncTest`
       (matching hashes pass, a bogus hash is detected over TCP), `FourPlayerOnlineTest`.
-- [~] **F6. Online launch + loop wiring.** **[PLAYABLE via config — 296 tests green; in-menu button
+- [X] **F6. Online launch + loop wiring.** **[PLAYABLE via config — 296 tests green; in-menu button
       deferred, see below.]** `OnlineConfig` reads `online.mode` (`off`|`host`|`client`) +
       `online.host`/`online.port` from `game.properties`. `OnlineSession` bootstraps a host (server + LAN
       beacon + `OnlineHost`) or a client (explicit `IP:port` or LAN auto-discovery + `OnlineClient`),
@@ -259,6 +259,126 @@
       900px window); input-delay / command-frame-rate tuning for higher-latency internet (v1 is a D=0
       one-step-per-frame lockstep, ideal on localhost/LAN); in-loop enforcement of the disconnect policy.
       Playtest instructions: `OnlineMode.md` → "Playtesting online (v1)".
+
+- [x] **F7. Graphic network-play menu (in-menu launch + waiting room).** **[DONE — 305 tests green.]**
+      Replaces the F6 config-driven
+      launch (`online.mode` in `game.properties`) with a proper menu flow: a `PLAY ONLINE` entry, a
+      connect sub-screen (HOST / JOIN LAN / JOIN ONLINE), and a host/client **waiting room**, all in the
+      AWT shell (`ui.GameMenu`) over the existing AWT-free `net` package — `OnlineSession`/`OnlineHost`/
+      `OnlineClient`/`TcpServer`/`LanBeacon`/`LanDiscovery` do the work; the menu only drives them. The
+      offline/hotseat path stays byte-identical. The interrupted iteration already added the wire pieces
+      this needs: `NetMessage.Lobby` (roster broadcast, slot-indexed names, `""` = open) and
+      `NetMessage.Start` (master seed + `orderedSlots` → each peer's player id is the index of its own
+      lobby slot in `orderedSlots`, player count = `orderedSlots.length`), plus `MessageCodec`
+      encode/decode and `LobbyMessageTest`.
+>
+> **Design decisions locked (discussion 2026-06):**
+> - **`online.mode` is removed.** Mode (off / host / client) is chosen in the menu, not a property.
+>   `OnlineConfig` keeps only `online.host` + `online.port`; `OnlineSession` gains an explicit launch API
+>   (`host(playerCount)` / `joinLan()` / `joinByAddress(ip, port)`) the menu calls, instead of
+>   auto-launching at startup from `online.mode`. Port and default IP come from `game.properties`
+>   (`online.port`, `online.host`; `online.host` may be `127.0.0.1` for same-machine testing).
+> - **Sub-screens follow the `CONTROLS` precedent**, but there are several of them, so replace the single
+>   `showingControls` boolean with one small **`OnlineScreen` state** (`NONE`, `CONNECT_MENU`,
+>   `HOST_LOBBY`, `JOIN_LAN_SEARCH`, `JOIN_ONLINE_SEARCH`, `CLIENT_LOBBY`). While any online screen is
+>   active it swallows menu navigation (same as the controls overlay) and `ESC`/`PAUSE` steps back one
+>   level; each screen reuses the centred `drawMenuBackdrop` and ends with a `[ ESC to return ]` hint
+>   drawn exactly like the controls screen's return hint.
+> - **IP entry is read-only** (display only): the JOIN ONLINE row shows the configured `online.host`
+>   beneath it; there is no in-menu text editing (the input system is `GameAction`-based, not raw text).
+>   Change the target by editing `game.properties`.
+> - **Room name = match code.** The waiting room top line reads `Match code: ABCXYZ` (the existing
+>   host-generated `MatchCode`), with the port beside/below it. No new "room name" concept or wire field.
+> - **One LAN game per port** (stated assumption): LAN search joins the **first** `DiscoveredMatch` whose
+>   port matches `online.port`.
+> - **Animation is render-only.** The search spinner reuses the sweeping-arc style of
+>   `DisruptionRenderer#drawShield` (a rotating bright arc on a dim ring, angle = a function of elapsed
+>   frames); it is pure decoration and never gates simulation or networking.
+>
+> **UI/UX rationale:** the connect screen lists the three verbs top-to-bottom in order of friction (HOST,
+> then the zero-typing JOIN LAN, then the manual JOIN ONLINE) so the easiest path is the default focus;
+> the waiting room makes lobby state legible at a glance (who is in which slot, which slot is you, whether
+> the room is still fillable) before anyone commits; `START GAME` is shown only to the host and only when
+> ≥2 slots are filled, so clients never see a dead button and the host can't start an empty match.
+
+- [x] **F7a. Main-menu reflow + `PLAY ONLINE` entry.** Add `PLAY_ONLINE` to `MenuEnum` and place it
+      directly below `START NEW GAME`. Per the request, pull `START NEW GAME` up next to `CONTINUE`
+      (close today's blank row between `ROW_CONTINUE = 0` and `ROW_NEW_GAME = 2`) to make room, then
+      insert `PLAY ONLINE` and shift the `ROW_*` constants down by one. Wire it into
+      `changeMenuOptionUp/Down`, `selectedRow()`, `drawMenu`, and `drawChoosenMenuOption` (green action
+      row, like `CONTROLS`). Confirm the taller option block still fits the ~900 px window
+      (`panelHeight()`/`centeredMenuTop()` already clamp, but re-check the margin). Selecting `PLAY ONLINE`
+      (CONFIRM) opens the connect sub-screen (`OnlineScreen.CONNECT_MENU`). Tests (extend
+      `GameMenuControlsTest`-style coverage): `PLAY_ONLINE` reachable by navigation, opens the connect
+      screen, swallows menu input while open, `ESC` returns to the main menu.
+
+- [x] **F7b. Connect sub-screen (HOST / JOIN LAN / JOIN ONLINE).** A vertical list of the three options
+      with its own up/down selection; beneath `JOIN ONLINE`, a dim read-only line shows the target IP
+      (`online.host`); a `[ ESC to return ]` hint at the bottom returns to the main menu. CONFIRM on a row:
+      HOST → `OnlineSession.host(playerCount)` then `HOST_LOBBY`; JOIN LAN → `OnlineSession.joinLan()`
+      then `JOIN_LAN_SEARCH`; JOIN ONLINE → `OnlineSession.joinByAddress(online.host, online.port)` then
+      `JOIN_ONLINE_SEARCH`. Tests: navigation within the sub-screen, each row triggers the matching
+      session call (mock `OnlineSession`), IP line renders from config, `ESC` returns.
+
+- [x] **F7c. Host waiting room.** Header: `Match code: <CODE>` + `Port: <online.port>`. Four slot rows
+      (host = slot 0, marked "(you)"; filled slots show the joiner's name; empty = `OPEN`), fed by the
+      `NetMessage.Lobby` roster the host already broadcasts as clients join/leave. A `START GAME` action
+      row (host-only, enabled once ≥2 slots filled) and the `[ ESC to return ]` hint. CONFIRM on
+      `START GAME` → **F7f**. The host's `TcpServer` + `LanBeacon` run while this screen is open so the
+      match is discoverable/joinable. Tests: roster updates redraw the slots, an emptied slot shows `OPEN`
+      again, `START GAME` hidden/disabled below 2 players, enabled at ≥2.
+
+- [x] **F7d. JOIN LAN search.** On entry, start `LanDiscovery` and show the spinning-arc loader with the
+      two-line caption `Searching LAN game at` / `port: <online.port>` and `[ ESC to return ]` (which
+      cancels discovery and steps back to the connect screen). When the first matching `DiscoveredMatch`
+      arrives, `TcpClientTransport` connects and the screen switches to `CLIENT_LOBBY`. Tests (mock/inject
+      `LanDiscovery`): caption shows the configured port, a discovered match transitions to the client
+      lobby, `ESC` stops discovery and returns.
+
+- [x] **F7e. JOIN ONLINE search.** Same loader, caption `Searching online game at` /
+      `ip number: <online.host>` / `port: <online.port>`, with `[ ESC to return ]`. Drives a
+      `TcpClientTransport` connect attempt to `online.host:online.port`; on success → `CLIENT_LOBBY`; on
+      refusal/timeout, show a brief "could not connect" line and stay on the screen (don't crash).
+      Tests: caption renders IP+port from config, successful connect → client lobby, failed connect keeps
+      the screen with an error message.
+
+- [x] **F7f. Client lobby + START propagation + exit semantics.** The client waiting room mirrors F7c
+      (same `Match code:` header + slot list from `NetMessage.Lobby`) but **without** a `START GAME` row —
+      only the host starts. On `START GAME` the host broadcasts `NetMessage.Start(seed, orderedSlots)`;
+      every peer (host included) builds the shared world from the seed, takes its player id from its lobby
+      slot's index in `orderedSlots`, and enters `PlayingState` on the F6 online branch once the start
+      info has propagated. **Exit semantics:** if the **host** leaves the waiting room, it closes the room
+      (stop server/beacon) so every client drops back to the **main menu**; if a **client** leaves, its
+      slot is freed and the host re-broadcasts the roster so the slot shows `OPEN` (the room stays open).
+      Tests: host `START` drives both worlds into play with correct per-peer player ids (reuse the
+      loopback/localhost harness from `OnlineSessionTest`/`OnlineLoopIntegrationTest`); client-exit frees
+      the slot in the next roster; host-exit returns clients to the menu.
+
+- [x] **F7g. Periodic search logging (debug aid).** Add throttled SLF4j logging on the search paths for
+      debugging online discovery — emit at most once per ~1 s (a tick/wall-clock throttle, **never** per
+      frame, per the hot-loop logging rule): JOIN LAN logs `Searching LAN game on port <p> (<n>s
+      elapsed)` and `Discovered LAN match <CODE> at <ip>:<port>` on a hit; JOIN ONLINE logs `Connecting to
+      <ip>:<port> (<n>s elapsed)` and the connect result. `info` for lifecycle (search started/host
+      found/joined), `debug` for the periodic ticks, `error` + cause for connect failures. Keep it in the
+      `net`/session layer (AWT-free, testable). Tests: a search emits a periodic line and a terminal
+      found/failed line (capture via a test logger/appender).
+
+> **Verification (whole F7):** `./mvnw test` green; the new menu/state-machine tests above run headlessly
+> (no graphics context); the start-propagation tests reuse the existing loopback/localhost online harness.
+> Manual playtest per `OnlineMode.md` once wired (two instances on `127.0.0.1`).
+>
+> **[DONE — 305 tests green.]** Landed as: `net.OnlineLobby` (waiting room: host opens `TcpServer` +
+> `LanBeacon` and broadcasts the `NetMessage.Lobby` roster; client `joinAddress` + awaits `WELCOME`; world
+> built only at `startMatch`/`Start` from the master seed; slot==player id with a gap-free START guard),
+> `net.LanSearch` (non-blocking LAN discovery on `online.port`, throttled ~1/s debug logging) and
+> `net.LobbyJoiner` (background-thread connect so the spinner/ESC stay live); `OnlineSession.startedHost/
+> startedClient` adopt the live transport without reconnecting; `TcpServer` now tracks join names, assigns
+> the lowest free slot, prunes disconnected clients and exposes the roster. UI lives in `GameMenu` behind an
+> `OnlineScreen` state (CONNECT_MENU / HOST_LOBBY / JOIN_LAN_SEARCH / JOIN_ONLINE_SEARCH / CLIENT_LOBBY) with
+> a `drawShield`-style spinner; `PlayingState.startOnline` adopts the session's world + flow at runtime;
+> `online.mode` removed (`OnlineConfig` keeps host/port, blank host => `127.0.0.1`); `GameLoop` always boots
+> to the menu. Tests: `GameMenuOnlineTest`, `OnlineLobbyTest` (roster→START bit-identical worlds over real
+> TCP; client-exit frees the slot; host-exit drops the client), plus the pre-existing `LobbyMessageTest`.
 
 > **Deferred (post-v1, noted in `OnlineMode.md`):** lobby server, UPnP port-forwarding, binary protocol,
 > host migration, AI in online matches, client-side prediction.

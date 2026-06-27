@@ -48,6 +48,16 @@ public final class PausedState implements GameState {
                 playingState.requestRestart();
                 yield playingState;
             }
+            case START_ONLINE -> {
+                // The waiting room handed us a started network session (host pressed START, or START arrived).
+                var session = screen.getMenuLayout().takeStartedSession();
+                if (session == null) {
+                    yield this;
+                }
+                settings.setGameEnd(false);
+                playingState.startOnline(session);
+                yield playingState;
+            }
             case QUIT -> null; // null signals the state machine to quit
             default -> this;
         };

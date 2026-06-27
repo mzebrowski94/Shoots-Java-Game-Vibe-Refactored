@@ -4,23 +4,17 @@ package pl.mzebrows.shoots.net;
 import pl.mzebrows.shoots.world.PlayWorld;
 
 /**
- * Closed set of wire messages exchanged between host and clients (see {@code OnlineMode.md}). Kept as a
- * sealed hierarchy of small records so {@link MessageCodec} can switch exhaustively and so adding a
- * message is a compile-checked change. All variants are tiny and flat -- input sync, not world state.
+ * Closed set of wire messages exchanged between host and clients (see OnlineMode.md). Sealed hierarchy
+ * of small records so MessageCodec can switch exhaustively; adding a message is a compile-checked change.
  */
 public sealed interface NetMessage
         permits NetMessage.Join, NetMessage.Welcome, NetMessage.Input, NetMessage.Frame, NetMessage.Control,
-                NetMessage.Hash {
+                NetMessage.Hash, NetMessage.Lobby, NetMessage.Start {
 
     /** client -> server: request to join, with a display name and the protocol version. */
     record Join(String name, int protocolVersion) implements NetMessage { }
 
-    /**
-     * server -> client: everything a joiner needs to build an identical world -- its assigned player
-     * slot, the player count, the master seed, and the host's match code. The full {@code GameConfig}
-     * is reconstructed locally from the same {@code game.properties} via seed + player count (v1 assumes
-     * peers share a build); a full config payload is deferred (see {@code OnlineMode.md}).
-     */
+    /** server -> client: the joiner's assigned lobby slot and the host's match code (sent at connect). */
     record Welcome(int slot, int playerCount, long seed, String matchCode) implements NetMessage { }
 
     /** client -> server: this client's input for a command frame. */
@@ -32,10 +26,23 @@ public sealed interface NetMessage
     /** server -> clients: a host-dictated round-flow transition for a frame. */
     record Control(long frame, ControlEvent.Kind kind) implements NetMessage { }
 
-    /** client -> server: the client's {@code WorldHash} at a command frame, for desync detection. */
+    /** client -> server: the client's WorldHash at a command frame, for desync detection. */
     record Hash(long frame, long hash) implements NetMessage { }
 
-    /** Convenience: neutral aim constant re-exported so callers needn't import {@link PlayWorld}. */
+    /**
+     * server -> clients: the live lobby roster (waiting room). Indexed by lobby slot; entry 0 is the host,
+     * an empty string is an open slot, otherwise the player's display name.
+     */
+    record Lobby(String[] slotNames) implements NetMessage { }
+
+    /**
+     * server -> clients: begin the match. seed = master seed; orderedSlots = participating lobby slots in
+     * ascending order, so a peer's final 0-based player id is the INDEX of its own lobby slot within
+     * orderedSlots, and the player count is orderedSlots.length.
+     */
+    record Start(long seed, int[] orderedSlots) implements NetMessage { }
+
+    /** Convenience: neutral aim constant re-exported so callers needn't import PlayWorld. */
     static PlayWorld.AimInput none() {
         return PlayWorld.AimInput.NONE;
     }

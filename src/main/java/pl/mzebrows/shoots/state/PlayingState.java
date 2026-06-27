@@ -48,8 +48,9 @@ public final class PlayingState implements GameState {
     /** Non-null in online mode: drives the match from the network instead of local hotseat input. */
     private OnlineSession online;
 
-    /** Owns the BEGIN/CONTINUES/ENDS phase; mode-aware (OFFLINE by default, or HOST/CLIENT for online). */
-    private final RoundFlow flow;
+    /** Owns the BEGIN/CONTINUES/ENDS phase; mode-aware (OFFLINE by default, or HOST/CLIENT for online).
+     *  Mutable so an online match can be started into this state at runtime from the menu (see {@link #startOnline}). */
+    private RoundFlow flow;
 
     private GameState pausedState;
     private GameState gameOverState;
@@ -110,10 +111,36 @@ public final class PlayingState implements GameState {
      * Also resets the internal phase so we always start from BEGIN.
      */
     public void requestRestart() {
+        // Returning to a local match from a prior online one: drop the network session + restore offline flow.
+        online = null;
+        flow = RoundFlow.offline();
         restartRequested = true;
         flow.reset();
         phaseJustEntered = true;
         requestNextPhase = false;
+    }
+
+    /**
+     * Starts an online match into this state at runtime (selected from the menu's waiting room). Adopts the
+     * session's shared world + host/client {@link RoundFlow}, resets round bookkeeping to a fresh match, and
+     * points the screen/pointer at the networked world. No AI runs online.
+     */
+    public void startOnline(OnlineSession session) {
+        this.online = session;
+        this.world = session.world();
+        this.flow = session.flow();
+        flow.reset();
+        settings.restartGame();
+        settings.setAiNumber(0);
+        settings.setGameEnd(false);
+        phaseJustEntered = true;
+        requestNextPhase = false;
+        restartRequested = false;
+        flowFrame = 0;
+        stepsSinceRoundSecond = 0;
+        screen.setWorld(world, 0.0);
+        pointer.setWorld(world);
+        log.info("Online match started: mode {}, local slot {}", session.mode(), session.localSlot());
     }
 
     @Override

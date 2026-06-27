@@ -45,9 +45,9 @@ class GameMenuAiOptionsTest {
         input.poll();
     }
 
-    /** Navigate from the initial START_NEW_GAME down to the AI_NUMBER option (4 DOWN presses). */
+    /** Navigate from the initial START_NEW_GAME down to the AI_NUMBER option (5 DOWN presses). */
     private void gotoAiNumber() {
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 5; i++) {
             press(KeyEvent.VK_DOWN);
         }
         assertThat(menu.getMenuOption()).isEqualTo(MenuEnum.AI_NUMBER_OPTION);
@@ -97,7 +97,7 @@ class GameMenuAiOptionsTest {
         press(KeyEvent.VK_RIGHT); // NORMAL -> HARD
 
         // Go back up to START_NEW_GAME and confirm.
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 6; i++) {
             press(KeyEvent.VK_UP);
         }
         assertThat(menu.getMenuOption()).isEqualTo(MenuEnum.START_NEW_GAME);
@@ -113,7 +113,7 @@ class GameMenuAiOptionsTest {
         press(KeyEvent.VK_RIGHT);
         press(KeyEvent.VK_RIGHT); // aiNumber -> 2 (player count 2)
 
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 5; i++) {
             press(KeyEvent.VK_UP);
         }
         assertThat(menu.getMenuOption()).isEqualTo(MenuEnum.START_NEW_GAME);

@@ -5,14 +5,24 @@ import pl.mzebrows.shoots.app.GameSettings;
 
 import pl.mzebrows.shoots.ai.AiDifficulty;
 import pl.mzebrows.shoots.config.MenuConfig;
+import pl.mzebrows.shoots.config.OnlineConfig;
 import pl.mzebrows.shoots.input.GameAction;
+import pl.mzebrows.shoots.net.DiscoveredMatch;
+import pl.mzebrows.shoots.net.LanSearch;
+import pl.mzebrows.shoots.net.LobbyJoiner;
+import pl.mzebrows.shoots.net.OnlineLobby;
+import pl.mzebrows.shoots.net.OnlineSession;
 import pl.mzebrows.shoots.world.PlayWorld;
 import pl.mzebrows.shoots.input.InputBridge;
 
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
+import java.awt.Stroke;
+import java.io.IOException;
+import java.net.SocketException;
 
 /** The game menu: renders the menu UI, applies setting changes, handles menu input, and shows final results. */
 public class GameMenu {
@@ -60,6 +70,7 @@ public class GameMenu {
 
     String stringContinue = "[ CONTINUE ]";
     String stringNewGame = "[ START NEW GAME ]";
+    String stringPlayOnline = "[ PLAY ONLINE ]";
     String stringPlayerNumberText = "- Player Number -";
     String stringRoundLimitText = "- Round Limit -";
     String stringRoundTimeText = "- Round Time -";
@@ -68,6 +79,26 @@ public class GameMenu {
 
     /** When true, the menu shows the all-players controls panel instead of the option list. */
     boolean showingControls = false;
+
+    /** Which online sub-screen is showing (NONE = the normal option list / no online overlay). */
+    OnlineScreen onlineScreen = OnlineScreen.NONE;
+    /** Highlighted row in the connect sub-screen: 0 HOST, 1 JOIN LAN, 2 JOIN ONLINE. */
+    int connectIndex = 0;
+    /** Connection defaults (port + default JOIN ONLINE IP) read from {@code game.properties}. */
+    private final OnlineConfig onlineConfig = OnlineConfig.load();
+    /** Local player display name advertised to peers. */
+    private final String playerName = System.getProperty("user.name", "Player");
+    /** Live host/client waiting room (null until HOST/JOIN selected); LAN search + background connect handles. */
+    private OnlineLobby lobby;
+    private LanSearch lanSearch;
+    private LobbyJoiner joiner;
+    /** Set once the match begins; consumed by {@link #takeStartedSession()} as the menu hands off to play. */
+    private OnlineSession startedSession;
+    /** Transient message shown on the online screens (e.g. a failed connect). */
+    private String onlineError;
+    /** Frame counter driving the search spinner sweep (advanced each draw). */
+    private int spinnerFrame;
+
     String stringPlayerNumber;
     String stringRoundNumber;
     String stringRoundTime;
@@ -132,6 +163,11 @@ public class GameMenu {
             return;
         }
 
+        if (onlineScreen != OnlineScreen.NONE) {
+            drawOnline(g2d);
+            return;
+        }
+
         // UX: anchor the menu on a dark rounded backdrop so text keeps consistent
         // contrast regardless of the game frame behind it.
         drawMenuBackdrop(g2d);
@@ -145,6 +181,7 @@ public class GameMenu {
         Color valueIdle = menuValueColor;
 
         shadowStringCentered(g2d, stringNewGame, rowY(ROW_NEW_GAME), label);
+        shadowStringCentered(g2d, stringPlayOnline, rowY(ROW_PLAY_ONLINE), label);
         shadowStringCentered(g2d, stringPlayerNumberText, rowY(ROW_PLAYER_LABEL), sublabel);
         shadowStringCentered(g2d, stringPlayerNumber, rowY(ROW_PLAYER_VALUE), valueIdle);
         shadowStringCentered(g2d, stringRoundLimitText, rowY(ROW_ROUND_LIMIT_LABEL), sublabel);
@@ -233,8 +270,11 @@ public class GameMenu {
     private static final int END_SCREEN_OPTION_OFFSET_ROWS = 1;
 
     // --- Option-block row layout, in nextLine units measured from menuHeight (row 0 = CONTINUE). ---
+    // START NEW GAME sits directly under CONTINUE (no blank row), freeing row 2 for PLAY ONLINE; the
+    // setup rows below are unchanged, so the panel height is identical to before.
     private static final int ROW_CONTINUE = 0;
-    private static final int ROW_NEW_GAME = 2;
+    private static final int ROW_NEW_GAME = 1;
+    private static final int ROW_PLAY_ONLINE = 2;
     private static final int ROW_PLAYER_LABEL = 3;
     private static final int ROW_PLAYER_VALUE = 4;
     private static final int ROW_ROUND_LIMIT_LABEL = 5;
@@ -260,7 +300,7 @@ public class GameMenu {
     private int menuRowsWidth(Graphics2D g2d) {
         FontMetrics fm = g2d.getFontMetrics(menuFont);
         int widest = 0;
-        for (String row : new String[]{stringContinue, stringNewGame, stringPlayerNumberText,
+        for (String row : new String[]{stringContinue, stringNewGame, stringPlayOnline, stringPlayerNumberText,
                 stringRoundLimitText, stringRoundTimeText, stringAiNumberText, stringAiDifficultyText,
                 "--- AI Settings ---", stringQuit, "       WINNER(s) !     "}) {
             widest = Math.max(widest, fm.stringWidth(row));
@@ -279,6 +319,9 @@ public class GameMenu {
         int w = menuRowsWidth(g2d);
         if (showingControls) {
             w = Math.max(w, controlsWidth(g2d));
+        }
+        if (onlineScreen != OnlineScreen.NONE) {
+            w = Math.max(w, onlineWidth(g2d));
         }
         if (gameSettings.isGameEnd()) {
             w = Math.max(w, scoreboardWidth(g2d));
@@ -378,6 +421,7 @@ public class GameMenu {
         return switch (menuOption) {
             case CONTINUE -> ROW_CONTINUE;
             case START_NEW_GAME -> ROW_NEW_GAME;
+            case PLAY_ONLINE -> ROW_PLAY_ONLINE;
             case PLAYER_NUMBER_OPTION -> ROW_PLAYER_VALUE;
             case ROUND_NUMBER_OPTION -> ROW_ROUND_LIMIT_VALUE;
             case ROUND_TIME_OPTION -> ROW_ROUND_TIME_VALUE;
@@ -479,6 +523,11 @@ public class GameMenu {
             return MenuEnum.NO_OPTION;
         }
 
+        // While any online sub-screen is open it captures all input and drives the lobby network state.
+        if (onlineScreen != OnlineScreen.NONE) {
+            return checkOnlineInput(input);
+        }
+
         if (input.isJustPressed(GameAction.NAVIGATE_DOWN)) {
             changeMenuOptionDown();
         } else if (input.isJustPressed(GameAction.NAVIGATE_UP)) {
@@ -497,6 +546,11 @@ public class GameMenu {
                 gameSettings.setRoundLimit(roundNumber);
                 gameSettings.setAiNumber(Math.min(aiNumber, playerNumber));
                 gameSettings.setAiDifficulty(aiDifficulty);
+            }
+        } else if (menuOption == MenuEnum.PLAY_ONLINE) {
+            if (input.isJustPressed(GameAction.CONFIRM)) {
+                openConnectMenu();
+                choosenOption = MenuEnum.PLAY_ONLINE;
             }
         } else if (menuOption == MenuEnum.PLAYER_NUMBER_OPTION) {
             playerNumber = changeNumber(input, playerNumber, playerLimit, PLAYER_STEP);
@@ -619,6 +673,8 @@ public class GameMenu {
         if (menuOption == MenuEnum.CONTINUE) {
             menuOption = MenuEnum.START_NEW_GAME;
         } else if (menuOption == MenuEnum.START_NEW_GAME) {
+            menuOption = MenuEnum.PLAY_ONLINE;
+        } else if (menuOption == MenuEnum.PLAY_ONLINE) {
             menuOption = MenuEnum.PLAYER_NUMBER_OPTION;
         } else if (menuOption == MenuEnum.PLAYER_NUMBER_OPTION) {
             menuOption = MenuEnum.ROUND_NUMBER_OPTION;
@@ -653,8 +709,10 @@ public class GameMenu {
             } else {
                 menuOption = MenuEnum.QUIT;
             }
-        } else if (menuOption == MenuEnum.PLAYER_NUMBER_OPTION) {
+        } else if (menuOption == MenuEnum.PLAY_ONLINE) {
             menuOption = MenuEnum.START_NEW_GAME;
+        } else if (menuOption == MenuEnum.PLAYER_NUMBER_OPTION) {
+            menuOption = MenuEnum.PLAY_ONLINE;
         } else if (menuOption == MenuEnum.ROUND_NUMBER_OPTION) {
             menuOption = MenuEnum.PLAYER_NUMBER_OPTION;
         } else if (menuOption == MenuEnum.ROUND_TIME_OPTION) {
@@ -682,6 +740,8 @@ public class GameMenu {
             shadowStringCentered(g2d, stringContinue, rowY(ROW_CONTINUE), Color.green);
         } else if (menuOption == MenuEnum.START_NEW_GAME) {
             shadowStringCentered(g2d, stringNewGame, rowY(ROW_NEW_GAME), Color.green);
+        } else if (menuOption == MenuEnum.PLAY_ONLINE) {
+            shadowStringCentered(g2d, stringPlayOnline, rowY(ROW_PLAY_ONLINE), Color.green);
         } else if (menuOption == MenuEnum.PLAYER_NUMBER_OPTION) {
             shadowStringCentered(g2d, stringPlayerNumber, rowY(ROW_PLAYER_VALUE), Color.yellow);
         } else if (menuOption == MenuEnum.ROUND_NUMBER_OPTION) {
@@ -756,5 +816,361 @@ public class GameMenu {
             shadowString(g2d, rows[p], blockX, y + (3 + p) * nextLine, purple);
         }
         shadowStringCentered(g2d, "[ ENTER / ESC to return ]", y + (4 + rows.length) * nextLine, label);
+    }
+
+    // -------------------------------------------------------------------------
+    // Online play (F7): connect sub-screen, host/client waiting room, LAN/online search.
+
+    /** The online sub-screens, layered over the menu backdrop (NONE = the normal option list). */
+    public enum OnlineScreen { NONE, CONNECT_MENU, HOST_LOBBY, JOIN_LAN_SEARCH, JOIN_ONLINE_SEARCH, CLIENT_LOBBY }
+
+    /** Connect-screen rows, in display order (friction order: host, zero-typing LAN, manual internet). */
+    private static final String[] CONNECT_ROWS = {"[ HOST ]", "[ JOIN LAN ]", "[ JOIN ONLINE ]"};
+    private static final int CONNECT_HOST = 0;
+    private static final int CONNECT_JOIN_LAN = 1;
+    private static final int CONNECT_JOIN_ONLINE = 2;
+
+    /** Radius (px) of the search spinner ring. */
+    private static final int SPINNER_RADIUS = 26;
+
+    /** Whether an online sub-screen is currently shown (exposed for state wiring/tests). */
+    public boolean isOnline() {
+        return onlineScreen != OnlineScreen.NONE;
+    }
+
+    /** The current online sub-screen (exposed for tests). */
+    public OnlineScreen getOnlineScreen() {
+        return onlineScreen;
+    }
+
+    /** The current transient online error message (exposed for tests), or {@code null}. */
+    String onlineError() {
+        return onlineError;
+    }
+
+    /**
+     * Hands the started network session to the caller (the paused state, on a {@code START_ONLINE} signal)
+     * and clears the online overlay so the menu returns to its normal list behind the starting match.
+     */
+    public OnlineSession takeStartedSession() {
+        OnlineSession session = startedSession;
+        startedSession = null;
+        // The session now owns the transport/server; drop our lobby/search handles without closing them.
+        lobby = null;
+        closeQuietly(lanSearch);
+        lanSearch = null;
+        joiner = null;
+        onlineScreen = OnlineScreen.NONE;
+        onlineError = null;
+        return session;
+    }
+
+    private void openConnectMenu() {
+        onlineScreen = OnlineScreen.CONNECT_MENU;
+        connectIndex = CONNECT_HOST;
+        onlineError = null;
+    }
+
+    /** Drives the active online sub-screen each tick: advances its network state and handles its input. */
+    private MenuEnum checkOnlineInput(InputBridge input) {
+        return switch (onlineScreen) {
+            case CONNECT_MENU -> updateConnectMenu(input);
+            case HOST_LOBBY -> updateHostLobby(input);
+            case JOIN_LAN_SEARCH -> updateLanSearch(input);
+            case JOIN_ONLINE_SEARCH -> updateOnlineSearch(input);
+            case CLIENT_LOBBY -> updateClientLobby(input);
+            case NONE -> MenuEnum.NO_OPTION;
+        };
+    }
+
+    private MenuEnum updateConnectMenu(InputBridge input) {
+        if (input.isJustPressed(GameAction.PAUSE)) {
+            closeOnline();
+            return MenuEnum.NO_OPTION;
+        }
+        if (input.isJustPressed(GameAction.NAVIGATE_DOWN)) {
+            connectIndex = (connectIndex + 1) % CONNECT_ROWS.length;
+        } else if (input.isJustPressed(GameAction.NAVIGATE_UP)) {
+            connectIndex = (connectIndex - 1 + CONNECT_ROWS.length) % CONNECT_ROWS.length;
+        }
+        if (input.isJustPressed(GameAction.CONFIRM)) {
+            switch (connectIndex) {
+                case CONNECT_HOST -> startHosting();
+                case CONNECT_JOIN_LAN -> startLanSearch();
+                case CONNECT_JOIN_ONLINE -> startOnlineSearch();
+                default -> { /* unreachable */ }
+            }
+        }
+        return MenuEnum.NO_OPTION;
+    }
+
+    private void startHosting() {
+        try {
+            lobby = OnlineLobby.host(gameSettings.getConfig(), menuConfig.maxPlayers(), onlineConfig.port(), playerName);
+            onlineScreen = OnlineScreen.HOST_LOBBY;
+            onlineError = null;
+        } catch (IOException e) {
+            onlineError = "Could not host: " + e.getMessage();
+        }
+    }
+
+    private void startLanSearch() {
+        try {
+            lanSearch = new LanSearch(onlineConfig.port());
+            joiner = null;
+            onlineScreen = OnlineScreen.JOIN_LAN_SEARCH;
+            onlineError = null;
+        } catch (SocketException e) {
+            onlineError = "Could not search LAN: " + e.getMessage();
+        }
+    }
+
+    private void startOnlineSearch() {
+        joiner = new LobbyJoiner(gameSettings.getConfig(), onlineConfig.host(), onlineConfig.port(), playerName);
+        onlineScreen = OnlineScreen.JOIN_ONLINE_SEARCH;
+        onlineError = null;
+    }
+
+    private MenuEnum updateHostLobby(InputBridge input) {
+        lobby.pump();
+        if (input.isJustPressed(GameAction.PAUSE)) {
+            // Host leaves the room: closing the server drops every client, sending them back to the main menu.
+            closeOnline();
+            return MenuEnum.NO_OPTION;
+        }
+        if (input.isJustPressed(GameAction.CONFIRM) && lobby.startMatch()) {
+            startedSession = lobby.takeStarted();
+            return MenuEnum.START_ONLINE;
+        }
+        return MenuEnum.NO_OPTION;
+    }
+
+    private MenuEnum updateLanSearch(InputBridge input) {
+        if (input.isJustPressed(GameAction.PAUSE)) {
+            closeQuietly(lanSearch);
+            lanSearch = null;
+            closeQuietly(joiner);
+            joiner = null;
+            openConnectMenu();
+            return MenuEnum.NO_OPTION;
+        }
+        if (joiner == null) {
+            if (lanSearch == null) {
+                return MenuEnum.NO_OPTION;
+            }
+            DiscoveredMatch match = lanSearch.poll();
+            if (match != null) {
+                closeQuietly(lanSearch);
+                lanSearch = null;
+                joiner = new LobbyJoiner(gameSettings.getConfig(), match.host(), match.port(), playerName);
+            }
+            return MenuEnum.NO_OPTION;
+        }
+        return resolveJoiner(true);
+    }
+
+    private MenuEnum updateOnlineSearch(InputBridge input) {
+        if (input.isJustPressed(GameAction.PAUSE)) {
+            closeQuietly(joiner);
+            joiner = null;
+            openConnectMenu();
+            return MenuEnum.NO_OPTION;
+        }
+        return resolveJoiner(false);
+    }
+
+    /** Polls the background connect: enters the client lobby on success; on failure shows an error/retries. */
+    private MenuEnum resolveJoiner(boolean lanFailureReturnsToConnect) {
+        if (joiner == null) {
+            return MenuEnum.NO_OPTION; // a prior connect failed; the error stays shown until ESC
+        }
+        switch (joiner.status()) {
+            case JOINED -> {
+                lobby = joiner.lobby();
+                joiner = null;
+                onlineScreen = OnlineScreen.CLIENT_LOBBY;
+            }
+            case FAILED -> {
+                onlineError = "Could not connect to " + joiner.target();
+                closeQuietly(joiner);
+                joiner = null;
+                if (lanFailureReturnsToConnect) {
+                    openConnectMenu();
+                }
+                // JOIN ONLINE: stay on the search screen showing the error until the user presses ESC.
+            }
+            case CONNECTING -> { /* keep the spinner going */ }
+        }
+        return MenuEnum.NO_OPTION;
+    }
+
+    private MenuEnum updateClientLobby(InputBridge input) {
+        lobby.pump();
+        if (lobby.isStarted()) {
+            startedSession = lobby.takeStarted();
+            return MenuEnum.START_ONLINE;
+        }
+        if (lobby.hostLeft()) {
+            // Host closed the room -> back to the main menu (requirement: all players return to the menu).
+            closeOnline();
+            return MenuEnum.NO_OPTION;
+        }
+        if (input.isJustPressed(GameAction.PAUSE)) {
+            // Client leaves: closing the transport frees our slot, which the host re-broadcasts as OPEN.
+            closeQuietly(lobby);
+            lobby = null;
+            openConnectMenu();
+            return MenuEnum.NO_OPTION;
+        }
+        return MenuEnum.NO_OPTION;
+    }
+
+    /** Tears down every online handle and returns to the normal main-menu option list. */
+    private void closeOnline() {
+        closeQuietly(lobby);
+        lobby = null;
+        closeQuietly(lanSearch);
+        lanSearch = null;
+        closeQuietly(joiner);
+        joiner = null;
+        onlineScreen = OnlineScreen.NONE;
+        onlineError = null;
+    }
+
+    private static void closeQuietly(AutoCloseable resource) {
+        if (resource != null) {
+            try {
+                resource.close();
+            } catch (Exception ignored) {
+                // best-effort teardown
+            }
+        }
+    }
+
+    // --- online rendering ---------------------------------------------------
+
+    /** Backdrop width needed for the widest online caption (so search/lobby text never clips). */
+    private int onlineWidth(Graphics2D g2d) {
+        FontMetrics fm = g2d.getFontMetrics(menuFont);
+        int widest = 0;
+        for (String s : new String[]{"Searching online game at", "[ JOIN ONLINE ]",
+                "Match code: ABCXYZ", "Slot 4:  " + sampleName(), "ip number: 000.000.000.000",
+                "[ START GAME ]   ", "[ ESC to return ]"}) {
+            widest = Math.max(widest, fm.stringWidth(s));
+        }
+        return widest + 2 * panelPadX();
+    }
+
+    private String sampleName() {
+        return playerName.length() > 10 ? playerName.substring(0, 10) : playerName;
+    }
+
+    /** Routes to the active online sub-screen's renderer (all share the centred menu backdrop). */
+    private void drawOnline(Graphics2D g2d) {
+        g2d.setFont(menuFont);
+        drawMenuBackdrop(g2d);
+        switch (onlineScreen) {
+            case CONNECT_MENU -> drawConnectMenu(g2d);
+            case HOST_LOBBY -> drawHostLobby(g2d);
+            case JOIN_LAN_SEARCH -> drawSearchScreen(g2d, true);
+            case JOIN_ONLINE_SEARCH -> drawSearchScreen(g2d, false);
+            case CLIENT_LOBBY -> drawClientLobby(g2d);
+            case NONE -> { /* not reached */ }
+        }
+    }
+
+    private void drawConnectMenu(Graphics2D g2d) {
+        Color label = gameSettings.getColorScheme().getBackgroundFontColor();
+        Color dim = menuSublabelColor;
+        int y = panelTop() + PANEL_TOP_ROWS * nextLine;
+        shadowStringCentered(g2d, "PLAY ONLINE", y, label);
+        for (int i = 0; i < CONNECT_ROWS.length; i++) {
+            Color c = i == connectIndex ? Color.green : menuLabelColor;
+            shadowStringCentered(g2d, CONNECT_ROWS[i], y + (2 + i) * nextLine, c);
+        }
+        // Read-only JOIN ONLINE target (edited via game.properties, not in-menu).
+        shadowStringCentered(g2d, "target: " + onlineConfig.host() + ":" + onlineConfig.port(),
+                y + 5 * nextLine, dim);
+        if (onlineError != null) {
+            shadowStringCentered(g2d, onlineError, y + 6 * nextLine, Color.red);
+        }
+        shadowStringCentered(g2d, "[ ESC to return ]", y + 8 * nextLine, label);
+    }
+
+    private void drawHostLobby(Graphics2D g2d) {
+        Color label = gameSettings.getColorScheme().getBackgroundFontColor();
+        int y = panelTop() + PANEL_TOP_ROWS * nextLine;
+        shadowStringCentered(g2d, "Match code: " + lobby.matchCode(), y, label);
+        shadowStringCentered(g2d, "Port: " + lobby.port(), y + nextLine, menuSublabelColor);
+        drawSlots(g2d, y + 3 * nextLine, lobby.roster(), lobby.localSlot());
+
+        boolean canStart = lobby.canStart();
+        Color startColor = canStart ? Color.green : menuSublabelColor;
+        String startText = canStart ? "[ START GAME ]" : "[ START GAME ]  (need 2 players)";
+        shadowStringCentered(g2d, startText, y + 8 * nextLine, startColor);
+        shadowStringCentered(g2d, "[ ESC to return ]", y + 10 * nextLine, label);
+    }
+
+    private void drawClientLobby(Graphics2D g2d) {
+        Color label = gameSettings.getColorScheme().getBackgroundFontColor();
+        int y = panelTop() + PANEL_TOP_ROWS * nextLine;
+        shadowStringCentered(g2d, "Match code: " + lobby.matchCode(), y, label);
+        shadowStringCentered(g2d, "Port: " + onlineConfig.port(), y + nextLine, menuSublabelColor);
+        drawSlots(g2d, y + 3 * nextLine, lobby.roster(), lobby.localSlot());
+        shadowStringCentered(g2d, "Waiting for host to start...", y + 8 * nextLine, menuSublabelColor);
+        shadowStringCentered(g2d, "[ ESC to return ]", y + 10 * nextLine, label);
+    }
+
+    /** Draws the four (or fewer) player slots; the local player is tagged "(you)", empty slots read OPEN. */
+    private void drawSlots(Graphics2D g2d, int topY, String[] roster, int localSlot) {
+        for (int s = 0; s < roster.length; s++) {
+            String name = roster[s];
+            boolean open = name == null || name.isEmpty();
+            String suffix = s == localSlot ? "  (you)" : "";
+            String text = "Slot " + (s + 1) + ":  " + (open ? "OPEN" : name) + (open ? "" : suffix);
+            Color c = open ? menuSublabelColor : menuValueColor;
+            shadowStringCentered(g2d, text, topY + s * nextLine, c);
+        }
+    }
+
+    private void drawSearchScreen(Graphics2D g2d, boolean lan) {
+        Color label = gameSettings.getColorScheme().getBackgroundFontColor();
+        int y = panelTop() + PANEL_TOP_ROWS * nextLine;
+        spinnerFrame++;
+        drawSpinner(g2d, menuCenterX(), y + nextLine, spinnerFrame);
+
+        int captionY = y + 3 * nextLine;
+        boolean connecting = joiner != null && joiner.status() == LobbyJoiner.Status.CONNECTING;
+        if (lan) {
+            shadowStringCentered(g2d, "Searching LAN game at", captionY, label);
+            shadowStringCentered(g2d, "port: " + onlineConfig.port(), captionY + nextLine, menuSublabelColor);
+            if (connecting) {
+                shadowStringCentered(g2d, "host found - connecting...", captionY + 2 * nextLine, menuValueColor);
+            }
+        } else {
+            shadowStringCentered(g2d, "Searching online game at", captionY, label);
+            shadowStringCentered(g2d, "ip number: " + onlineConfig.host(), captionY + nextLine, menuSublabelColor);
+            shadowStringCentered(g2d, "port: " + onlineConfig.port(), captionY + 2 * nextLine, menuSublabelColor);
+        }
+        if (onlineError != null) {
+            shadowStringCentered(g2d, onlineError, captionY + 4 * nextLine, Color.red);
+        }
+        shadowStringCentered(g2d, "[ ESC to return ]", captionY + 5 * nextLine, label);
+    }
+
+    /**
+     * Spinning loader: a dim ring with a bright leading arc that sweeps around as {@code frame} advances
+     * (the same idea as {@code DisruptionRenderer#drawShield}). Pure decoration -- it gates nothing.
+     */
+    private void drawSpinner(Graphics2D g2d, int cx, int cy, int frame) {
+        Stroke old = g2d.getStroke();
+        int d = 2 * SPINNER_RADIUS;
+        g2d.setStroke(new BasicStroke(3.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2d.setColor(menuSeparatorColor);
+        g2d.drawOval(cx - SPINNER_RADIUS, cy - SPINNER_RADIUS, d, d);
+        int start = (frame * 6) % 360;
+        g2d.setColor(Color.green);
+        g2d.drawArc(cx - SPINNER_RADIUS, cy - SPINNER_RADIUS, d, d, start, 80);
+        g2d.setStroke(old);
     }
 }

@@ -13,10 +13,9 @@ import java.util.StringJoiner;
 import pl.mzebrows.shoots.world.PlayWorld;
 
 /**
- * Serialises {@link NetMessage}s to a single, human-readable line ({@code TYPE|key=value|...}) and frames
- * them on a stream with a 4-byte big-endian length prefix. Text was chosen over JSON/binary for
- * debuggability with zero extra dependencies (the messages are tiny and flat); the framing makes the
- * format safe over TCP, where reads arrive in arbitrary chunks. See {@code OnlineMode.md}.
+ * Serialises NetMessages to a single human-readable line (TYPE|key=value|...) and frames them on a
+ * stream with a 4-byte big-endian length prefix. Text over JSON/binary for zero-dependency debuggability;
+ * the framing makes it safe over TCP, where reads arrive in arbitrary chunks. See OnlineMode.md.
  */
 public final class MessageCodec {
 
@@ -27,9 +26,6 @@ public final class MessageCodec {
     private MessageCodec() {
     }
 
-    // -- line encoding ------------------------------------------------------
-
-    /** Encodes a message to its single-line wire form (no trailing newline). */
     public static String encode(NetMessage message) {
         return switch (message) {
             case NetMessage.Join m ->
@@ -45,10 +41,13 @@ public final class MessageCodec {
                     "CONTROL" + SEP + "frame=" + m.frame() + SEP + "kind=" + m.kind().name();
             case NetMessage.Hash m ->
                     "HASH" + SEP + "frame=" + m.frame() + SEP + "hash=" + m.hash();
+            case NetMessage.Lobby m ->
+                    "LOBBY" + SEP + "names=" + encodeNames(m.slotNames());
+            case NetMessage.Start m ->
+                    "START" + SEP + "seed=" + m.seed() + SEP + "slots=" + encodeInts(m.orderedSlots());
         };
     }
 
-    /** Parses a single-line wire form back into a message. */
     public static NetMessage decode(String line) {
         if (line == null || line.isEmpty()) {
             throw new IllegalArgumentException("empty message line");
@@ -72,13 +71,12 @@ public final class MessageCodec {
             case "CONTROL" -> new NetMessage.Control(
                     longField(f, "frame"), ControlEvent.Kind.valueOf(f.get("kind")));
             case "HASH" -> new NetMessage.Hash(longField(f, "frame"), longField(f, "hash"));
+            case "LOBBY" -> new NetMessage.Lobby(decodeNames(f.getOrDefault("names", "")));
+            case "START" -> new NetMessage.Start(longField(f, "seed"), decodeInts(f.getOrDefault("slots", "")));
             default -> throw new IllegalArgumentException("unknown message type: " + type);
         };
     }
 
-    // -- stream framing (length-prefixed) -----------------------------------
-
-    /** Writes {@code message} as a length-prefixed frame and flushes. */
     public static void writeFrame(OutputStream out, NetMessage message) throws IOException {
         byte[] body = encode(message).getBytes(StandardCharsets.UTF_8);
         out.write(new byte[] {
@@ -88,11 +86,6 @@ public final class MessageCodec {
         out.flush();
     }
 
-    /**
-     * Reads exactly one frame from {@code in}, tolerating reads that arrive in arbitrary chunks.
-     * Returns {@code null} on a clean end-of-stream (no bytes left); throws {@link EOFException} if a
-     * frame is truncated mid-way.
-     */
     public static NetMessage readFrame(InputStream in) throws IOException {
         byte[] header = in.readNBytes(4);
         if (header.length == 0) {
@@ -112,8 +105,6 @@ public final class MessageCodec {
         }
         return decode(new String(body, StandardCharsets.UTF_8));
     }
-
-    // -- helpers ------------------------------------------------------------
 
     private static String encodeTick(TickInput t) {
         return t.aim().name() + FIELD_SEP + t.shootHeld();
@@ -141,7 +132,38 @@ public final class MessageCodec {
         return result;
     }
 
-    /** Strips wire-reserved characters from a free-text field (e.g. a player name). */
+    private static String encodeNames(String[] names) {
+        var joiner = new StringJoiner(SLOT_SEP);
+        for (String name : names) {
+            joiner.add(sanitize(name));
+        }
+        return joiner.toString();
+    }
+
+    private static String[] decodeNames(String raw) {
+        return raw.isEmpty() ? new String[0] : raw.split(SLOT_SEP, -1);
+    }
+
+    private static String encodeInts(int[] values) {
+        var joiner = new StringJoiner(SLOT_SEP);
+        for (int v : values) {
+            joiner.add(Integer.toString(v));
+        }
+        return joiner.toString();
+    }
+
+    private static int[] decodeInts(String raw) {
+        if (raw.isEmpty()) {
+            return new int[0];
+        }
+        String[] parts = raw.split(SLOT_SEP, -1);
+        int[] values = new int[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            values[i] = Integer.parseInt(parts[i]);
+        }
+        return values;
+    }
+
     private static String sanitize(String s) {
         return s == null ? "" : s.replaceAll("[|=;,\\r\\n]", " ").trim();
     }

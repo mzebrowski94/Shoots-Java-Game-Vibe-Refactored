@@ -16,11 +16,6 @@ import pl.mzebrows.shoots.state.GameStateMachine;
 import pl.mzebrows.shoots.state.PausedState;
 import pl.mzebrows.shoots.state.PlayingState;
 import pl.mzebrows.shoots.world.PlayWorld;
-import pl.mzebrows.shoots.config.GameConfig;
-import pl.mzebrows.shoots.config.GameConfigLoader;
-import pl.mzebrows.shoots.config.OnlineConfig;
-import pl.mzebrows.shoots.net.LanDiscovery;
-import pl.mzebrows.shoots.net.OnlineSession;
 
 /**
  * Top-level game loop: fixed-timestep simulation with an accumulator, max-delta clamp, and
@@ -118,18 +113,8 @@ public final class GameLoop implements Runnable {
     }
 
     private void initializeLogic() {
-        OnlineConfig onlineConfig = OnlineConfig.load();
-        OnlineSession session = onlineConfig.isOnline() ? buildOnlineSession(onlineConfig) : null;
-
-        if (session != null) {
-            playingState = new PlayingState(gameSettings, gameFrame, session.world(), session.flow());
-            playingState.setOnlineSession(session);
-            gameFrame.getGameScreen().setWorld(session.world(), 0.0);
-            gameFrame.getGamePointer().setWorld(session.world());
-            log.info("Online match {} ready ({})", session.matchCode(), session.mode());
-        } else {
-            playingState = new PlayingState(gameSettings, gameFrame);
-        }
+        // Always start at the menu; online host/join is chosen there (F7) and started into PlayingState.
+        playingState = new PlayingState(gameSettings, gameFrame);
 
         var pausedState = new PausedState(gameSettings, gameFrame.getGameScreen(), playingState);
         var gameOverState = new GameOverState(gameSettings, gameFrame.getGameScreen(), playingState);
@@ -139,49 +124,6 @@ public final class GameLoop implements Runnable {
 
         gameSettings.setActualRoundNumber(0);
 
-        // Online: start the match immediately (lockstep handshake already done); offline: show the menu.
-        stateMachine = new GameStateMachine(session != null ? playingState : pausedState);
-    }
-
-    /**
-     * Builds the online session from {@code game.properties}: {@code online.mode=host} hosts (and beacons
-     * on the LAN); {@code online.mode=client} joins {@code online.host:online.port} if set, otherwise picks
-     * the first LAN-discovered host. Returns {@code null} (and the game starts offline) on any failure.
-     */
-    private OnlineSession buildOnlineSession(OnlineConfig oc) {
-        GameConfig base = GameConfigLoader.load();
-        String name = System.getProperty("user.name", "Player");
-        try {
-            if (oc.isHost()) {
-                int players = Math.max(2, Math.min(4, base.menu().initialPlayers()));
-                return OnlineSession.host(base, players, oc.port(), name);
-            }
-            if (oc.hasHostAddress()) {
-                return OnlineSession.join(base, oc.host(), oc.port(), name);
-            }
-            return joinViaDiscovery(base, name);
-        } catch (Exception e) {
-            log.error("Online setup failed (mode={}); starting offline", oc.mode(), e);
-            return null;
-        }
-    }
-
-    /** Waits briefly for a LAN host beacon and joins the first one found; {@code null} if none appears. */
-    private OnlineSession joinViaDiscovery(GameConfig base, String name) throws Exception {
-        try (var discovery = new LanDiscovery(4000)) {
-            discovery.start();
-            long deadline = System.nanoTime() + 15_000L * 1_000_000L;
-            while (System.nanoTime() < deadline) {
-                var matches = discovery.matches();
-                if (!matches.isEmpty()) {
-                    var match = matches.get(0);
-                    log.info("Joining discovered LAN match {} at {}:{}", match.matchCode(), match.host(), match.port());
-                    return OnlineSession.join(base, match.host(), match.port(), name);
-                }
-                Thread.sleep(100);
-            }
-        }
-        log.error("No LAN host discovered; starting offline");
-        return null;
+        stateMachine = new GameStateMachine(pausedState);
     }
 }

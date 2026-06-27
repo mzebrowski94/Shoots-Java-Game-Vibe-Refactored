@@ -7,6 +7,12 @@ public enum MenuEnum {
     /** Start a new game. */
     START_NEW_GAME,
 
+    /** Open the online play (host / join) sub-screen. */
+    PLAY_ONLINE,
+
+    /** Signals that an online match has begun (host pressed START, or a client received START). */
+    START_ONLINE,
+
     /** Continue the current game. */
     CONTINUE,
 

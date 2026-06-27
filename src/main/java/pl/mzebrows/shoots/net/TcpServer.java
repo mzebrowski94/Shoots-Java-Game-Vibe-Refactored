@@ -27,7 +27,7 @@ public final class TcpServer implements AutoCloseable {
     /** A client message tagged with the slot it arrived from. */
     public record Inbound(int slot, NetMessage message) { }
 
-    private record Client(int slot, TcpConnection connection) { }
+    private record Client(int slot, String name, TcpConnection connection) { }
 
     private final ServerSocket serverSocket;
     private final int playerCount;
@@ -76,20 +76,66 @@ public final class TcpServer implements AutoCloseable {
         var conn = new TcpConnection(socket);
         conn.startReader("net-client-reader-" + clients.size());
         NetMessage join = awaitFrame(conn, JOIN_TIMEOUT_MS);
-        if (!(join instanceof NetMessage.Join)) {
+        if (!(join instanceof NetMessage.Join j)) {
             log.warn("Client did not JOIN first (got {}); dropping", join);
             conn.close();
             return;
         }
-        if (clients.size() + 1 >= playerCount) {
-            log.warn("Match full ({} players); rejecting client", playerCount);
+        removeDisconnected(); // reclaim slots freed by clients that left, before assigning a new one
+        int slot = lowestFreeSlot();
+        if (slot < 0) {
+            log.warn("Match full ({} players); rejecting client {}", playerCount, j.name());
             conn.close();
             return;
         }
-        int slot = clients.size() + 1; // host occupies slot 0
         conn.send(new NetMessage.Welcome(slot, playerCount, seed, matchCode));
-        clients.add(new Client(slot, conn));
-        log.info("Client joined as slot {} (match {})", slot, matchCode);
+        clients.add(new Client(slot, j.name(), conn));
+        log.info("Client '{}' joined as slot {} (match {})", j.name(), slot, matchCode);
+    }
+
+    /** Lowest unoccupied player slot in {@code 1..playerCount-1} (host holds 0), or {@code -1} if full. */
+    private int lowestFreeSlot() {
+        for (int s = HOST_SLOT + 1; s < playerCount; s++) {
+            boolean taken = false;
+            for (Client c : clients) {
+                if (c.slot() == s) {
+                    taken = true;
+                    break;
+                }
+            }
+            if (!taken) {
+                return s;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Drops clients whose connection has closed, freeing their slot for reuse (lobby waiting-room churn).
+     * Returns whether any client was removed, so callers can refresh/rebroadcast the roster.
+     */
+    public boolean removeDisconnected() {
+        boolean changed = false;
+        for (Client c : clients) {
+            if (!c.connection().isOpen()) {
+                clients.remove(c);
+                log.info("Client '{}' (slot {}) disconnected", c.name(), c.slot());
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+    /**
+     * Writes each connected client's display name into {@code dest} at its slot index (host slot 0 is left
+     * for the caller to fill); unoccupied slots are untouched. Used to build the lobby roster.
+     */
+    public void fillRoster(String[] dest) {
+        for (Client c : clients) {
+            if (c.slot() >= 0 && c.slot() < dest.length) {
+                dest[c.slot()] = c.name();
+            }
+        }
     }
 
     /** Sends {@code message} to every connected client. */

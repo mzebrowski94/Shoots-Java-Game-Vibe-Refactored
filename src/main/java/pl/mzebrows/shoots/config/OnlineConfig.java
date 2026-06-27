@@ -6,30 +6,20 @@ import java.io.InputStream;
 import java.util.Properties;
 
 /**
- * Online-mode settings read from {@code game.properties} (see OnlineMode.md, F6). LAN host/join needs no
- * address (discovery handles it); {@code online.host}/{@code online.port} are the INTERNET join target
- * (typed-IP entry was intentionally deferred). {@code online.mode=off} (default) keeps the game offline.
+ * Online-mode settings read from {@code game.properties} (see OnlineMode.md, F7). The mode (host / join) is
+ * now chosen in the menu, not via a property, so only the connection defaults live here: {@code online.port}
+ * is the host's listen port (and the port LAN search scans), and {@code online.host} is the default JOIN
+ * ONLINE target shown in the menu ({@code 127.0.0.1} when blank, for same-machine testing).
  */
-public record OnlineConfig(String mode, String host, int port) {
+public record OnlineConfig(String host, int port) {
+
+    /** Default join target when {@code online.host} is blank (same-machine play). */
+    public static final String DEFAULT_HOST = "127.0.0.1";
+
+    /** Default host listen / LAN-search port when {@code online.port} is absent or invalid. */
+    public static final int DEFAULT_PORT = 48900;
 
     private static final String RESOURCE = "game.properties";
-
-    public boolean isHost() {
-        return "host".equalsIgnoreCase(mode);
-    }
-
-    public boolean isClient() {
-        return "client".equalsIgnoreCase(mode);
-    }
-
-    public boolean isOnline() {
-        return isHost() || isClient();
-    }
-
-    /** Whether an explicit internet host address is configured (else a client uses LAN discovery). */
-    public boolean hasHostAddress() {
-        return host != null && !host.isBlank();
-    }
 
     /** Loads online settings from the bundled {@code game.properties}; absent keys fall back to defaults. */
     public static OnlineConfig load() {
@@ -41,17 +31,18 @@ public record OnlineConfig(String mode, String host, int port) {
         } catch (IOException ignored) {
             // fall back to defaults below
         }
-        return new OnlineConfig(
-                props.getProperty("online.mode", "off").trim(),
-                props.getProperty("online.host", "").trim(),
-                parsePort(props.getProperty("online.port", "48900")));
+        String host = props.getProperty("online.host", "").trim();
+        if (host.isEmpty()) {
+            host = DEFAULT_HOST;
+        }
+        return new OnlineConfig(host, parsePort(props.getProperty("online.port", String.valueOf(DEFAULT_PORT))));
     }
 
     private static int parsePort(String raw) {
         try {
             return Integer.parseInt(raw.trim());
         } catch (NumberFormatException e) {
-            return 48900;
+            return DEFAULT_PORT;
         }
     }
 }

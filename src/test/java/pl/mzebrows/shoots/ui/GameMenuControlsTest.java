@@ -52,8 +52,8 @@ class GameMenuControlsTest {
 
     @Test
     void confirmingControlsOpensThePanel() {
-        // START_NEW_GAME -> PLAYER -> ROUND_NUMBER -> ROUND_TIME -> AI_NUMBER -> AI_DIFFICULTY -> CONTROLS
-        for (int i = 0; i < 6; i++) {
+        // START_NEW_GAME -> PLAY_ONLINE -> PLAYER -> ROUND_NUMBER -> ROUND_TIME -> AI_NUMBER -> AI_DIFFICULTY -> CONTROLS
+        for (int i = 0; i < 7; i++) {
             press(KeyEvent.VK_DOWN);
         }
         MenuEnum chosen = press(KeyEvent.VK_ENTER);
@@ -63,7 +63,7 @@ class GameMenuControlsTest {
 
     @Test
     void enterReturnsFromTheControlsPanel() {
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < 7; i++) {
             press(KeyEvent.VK_DOWN);
         }
         press(KeyEvent.VK_ENTER);            // open controls
@@ -76,7 +76,7 @@ class GameMenuControlsTest {
 
     @Test
     void escapeAlsoClosesTheControlsPanel() {
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < 7; i++) {
             press(KeyEvent.VK_DOWN);
         }
         press(KeyEvent.VK_ENTER);            // open controls
@@ -88,7 +88,7 @@ class GameMenuControlsTest {
 
     @Test
     void whileControlsOpenMenuNavigationIsSwallowed() {
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < 7; i++) {
             press(KeyEvent.VK_DOWN);
         }
         press(KeyEvent.VK_ENTER);            // open controls
