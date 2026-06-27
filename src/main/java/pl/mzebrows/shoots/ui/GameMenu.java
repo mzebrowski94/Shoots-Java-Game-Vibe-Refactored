@@ -269,7 +269,7 @@ public class GameMenu {
     private static final int WIN_PULSE_MAX = 100;
 
     /** Rows the option list is pushed down on the end screen so the scoreboard above it never overlaps. */
-    private static final int END_SCREEN_OPTION_OFFSET_ROWS = 1;
+    private static final int END_SCREEN_OPTION_OFFSET_ROWS = 2;
 
     // --- Option-block row layout, in nextLine units measured from menuHeight (row 0 = CONTINUE). ---
     // START NEW GAME sits directly under CONTINUE (no blank row), freeing row 2 for PLAY ONLINE; the

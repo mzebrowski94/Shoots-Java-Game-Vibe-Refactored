@@ -103,8 +103,23 @@ class OnlineLobbyTest {
                     }
                     Thread.sleep(0, 200_000);
                 }
+                // Input delay lets the host run a few frames ahead; align to a common frame before comparing.
+                long target = Math.max(hostSession.frame(), clientSession.frame());
+                while (hostSession.frame() < target || clientSession.frame() < target) {
+                    if (hostSession.frame() < target) {
+                        hostSession.advanceWith(tick(0, hostSession.frame()));
+                    }
+                    if (clientSession.frame() < target) {
+                        clientSession.advanceWith(tick(1, clientSession.frame()));
+                    }
+                    if (System.nanoTime() > deadline) {
+                        throw new AssertionError("could not align frames");
+                    }
+                    Thread.sleep(0, 200_000);
+                }
+                assertThat(clientSession.frame()).isEqualTo(hostSession.frame());
                 assertThat(WorldHash.of(clientSession.world()))
-                        .as("host and client worlds stay identical after %d frames", frames)
+                        .as("host and client worlds stay identical at frame %d", hostSession.frame())
                         .isEqualTo(WorldHash.of(hostSession.world()));
             }
         } finally {
@@ -147,6 +162,39 @@ class OnlineLobbyTest {
             awaitTrue(() -> { client.pump(); return client.hostLeft(); });
             assertThat(client.hostLeft()).isTrue();
             assertThat(client.isStarted()).isFalse();
+        }
+    }
+
+    @Test
+    @Timeout(40)
+    void startPropagatesHostRoundPacingToClient() throws Exception {
+        // Host chooses a 5s / 3-round match; the client's LOCAL default is 15s / 2 rounds -- it must adopt the
+        // host's pacing from START, proving the menu's round-time/limit choice reaches every peer (#7/#1).
+        GameConfig hostBase = base().withRound(new RoundConfig(5, 3, 2, 1));
+        GameConfig clientBase = base();
+        OnlineLobby host = OnlineLobby.host(hostBase, 4, 0, "Host");
+        int port = host.port();
+        OnlineLobby client = OnlineLobby.joinAddress(clientBase, "127.0.0.1", port, "Client");
+        try {
+            awaitTrue(() -> { host.pump(); return host.occupiedCount() == 2; });
+            awaitTrue(() -> { client.pump(); return !client.roster()[1].isEmpty(); });
+
+            assertThat(host.startMatch()).isTrue();
+            OnlineSession hostSession = host.takeStarted();
+            awaitTrue(() -> { client.pump(); return client.isStarted(); });
+            OnlineSession clientSession = client.takeStarted();
+
+            try (hostSession; clientSession) {
+                assertThat(hostSession.world().config().round().roundTimeSeconds()).isEqualTo(5);
+                assertThat(hostSession.world().config().round().roundLimit()).isEqualTo(3);
+                assertThat(clientSession.world().config().round().roundTimeSeconds())
+                        .as("client adopts the host's round time, not its own 15s default")
+                        .isEqualTo(5);
+                assertThat(clientSession.world().config().round().roundLimit()).isEqualTo(3);
+            }
+        } finally {
+            host.close();
+            client.close();
         }
     }
 }

@@ -61,6 +61,14 @@ public final class PlayingState implements GameState {
     /** Online: this peer opened the pause menu, so on returning it must broadcast RESUME to unfreeze peers (#3). */
     private boolean localPauseInitiated = false;
 
+    /** Whether the most recent {@link #update} actually advanced the sim; false on an online lockstep stall or
+     *  remote pause. The game loop reads this to avoid draining real time while the world is frozen (#1). */
+    private boolean steppedThisUpdate = true;
+
+    // Round-timing diagnostics (#1): wall-clock start of the current play phase + a one-shot expiry log guard.
+    private long roundStartNanos;
+    private boolean roundExpiryLogged;
+
     /**
      * Simulation step rate; mirrors {@code GameLoop.UPDATES_PER_SECOND} (and {@code PlayWorld}'s step
      * rate). The round clock is counted in SIM STEPS, not wall-clock, so it advances identically on
@@ -133,6 +141,7 @@ public final class PlayingState implements GameState {
         this.online = session;
         this.world = session.world();
         applyOnlineRoundSettings(session.world().config().round());
+        counter.restartAnimationTime(); // refresh the on-screen round-timer bar to the online round time (#1)
         this.flow = session.flow();
         flow.reset();
         settings.restartGame();
@@ -155,6 +164,7 @@ public final class PlayingState implements GameState {
 
     @Override
     public GameState update(InputBridge input) {
+        steppedThisUpdate = true; // assume real progress; the online path clears it on a stall/pause
         // Returned from our own pause menu: tell peers to resume so everyone unfreezes together (#3).
         if (online != null && localPauseInitiated) {
             online.requestPause(false);
@@ -224,6 +234,10 @@ public final class PlayingState implements GameState {
             settings.setPlayerKeyboardAvailable(true);
             phaseJustEntered = false;
             stepsSinceRoundSecond = 0;
+            roundStartNanos = System.nanoTime();
+            roundExpiryLogged = false;
+            log.info("Round {} playing: roundTime={}s, roundLimit={}, mode={}",
+                    settings.getActualRoundNumber(), settings.getRoundTime(), settings.getRoundLimit(), flow.mode());
         }
 
         if (online != null) {
@@ -259,13 +273,22 @@ public final class PlayingState implements GameState {
         if (pausedBy >= 0 && pausedBy != online.localSlot()) {
             // A different player paused: hold the round timer and the simulation, and show who paused.
             screen.setOnlinePauseNotice("PLAYER " + (pausedBy + 1) + " PAUSED");
+            steppedThisUpdate = false; // frozen: no real time should be consumed by the loop
             return this;
         }
         screen.setOnlinePauseNotice(null);
 
-        counter.tick();
-        advanceOnline(input);
+        boolean stepped = advanceOnline(input);
+        if (stepped) {
+            counter.tick(); // advance the round-timer bar in lockstep with the simulation, not wall-clock
+        }
+        steppedThisUpdate = stepped; // a lockstep stall (false) tells the loop to refund the consumed step (#1)
         return this;
+    }
+
+    /** Whether the last {@link #update} advanced the simulation (false on an online stall/pause); see {@link GameLoop}. */
+    public boolean lastUpdateAdvancedSim() {
+        return steppedThisUpdate;
     }
 
     /**
@@ -306,14 +329,16 @@ public final class PlayingState implements GameState {
      * real step; AI is not run online. Phase transitions still flow through the session's host-driven
      * {@code flow} (a CLIENT follows the broadcast CONTROLs).
      */
-    private void advanceOnline(InputBridge input) {
-        if (online.advance(input)) {
+    private boolean advanceOnline(InputBridge input) {
+        boolean stepped = online.advance(input);
+        if (stepped) {
             if (flow.mode() != GameMode.CLIENT && ++stepsSinceRoundSecond >= STEPS_PER_ROUND_SECOND) {
                 stepsSinceRoundSecond = 0;
                 tickRoundSecond();
             }
             flowFrame++;
         }
+        return stepped;
     }
 
     private GameState updateEnds() {
@@ -378,11 +403,23 @@ public final class PlayingState implements GameState {
 
     private void tickRoundSecond() {
         settings.getActualRound().roundTick();
+        log.debug("Round {} clock: {}/{}s elapsed ({} active discs)", settings.getActualRoundNumber(),
+                settings.getActualRound().getRoundTime(), settings.getRoundTime(), countActiveDiscs());
         if (settings.getActualRound().isRoundEnd()) {
             settings.setPlayerKeyboardAvailable(false);
+            if (!roundExpiryLogged) {
+                roundExpiryLogged = true;
+                log.info("Round {} timer hit {}s after {} ms wall-clock; waiting for {} disc(s) to settle",
+                        settings.getActualRoundNumber(), settings.getRoundTime(),
+                        (System.nanoTime() - roundStartNanos) / 1_000_000L, countActiveDiscs());
+            }
             if (countActiveDiscs() == 0) {
                 settings.getActualRound().setRoundEndTimeDelay(settings.getActualRound().getRoundEndTimeDelay() + 1);
                 if (settings.getActualRound().getRoundEndTimeDelay() >= settings.getRoundEndDelay()) {
+                    if (!requestNextPhase) {
+                        log.info("Round {} ending after {} ms wall-clock (target {}s)", settings.getActualRoundNumber(),
+                                (System.nanoTime() - roundStartNanos) / 1_000_000L, settings.getRoundTime());
+                    }
                     requestNextPhase = true;
                 }
             }

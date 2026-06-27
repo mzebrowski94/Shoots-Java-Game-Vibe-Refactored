@@ -39,6 +39,18 @@ public final class GameOverState implements GameState {
                 playingState.requestRestart();
                 yield playingState;
             }
+            case START_ONLINE -> {
+                // After a match the menu can host/join another online game; consume the started session and
+                // hand it to the playing state, just like the pause/lobby menu does (#3 -- previously ignored
+                // here, which left the menu frozen after "Starting match ...").
+                var session = screen.getMenuLayout().takeStartedSession();
+                if (session == null) {
+                    yield this;
+                }
+                settings.setGameEnd(false);
+                playingState.startOnline(session);
+                yield playingState;
+            }
             case QUIT -> null;
             default -> this;
         };

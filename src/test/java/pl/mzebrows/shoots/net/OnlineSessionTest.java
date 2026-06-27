@@ -72,8 +72,26 @@ class OnlineSessionTest {
                     Thread.sleep(0, 200_000);
                 }
 
+                // Input delay lets the host run a few frames ahead; bring both to a common frame so the
+                // comparison is at equal applied-frame counts (advance only whichever peer is behind).
+                long target = Math.max(hostSession.frame(), clientSession.frame());
+                while (hostSession.frame() < target || clientSession.frame() < target) {
+                    if (hostSession.frame() < target) {
+                        hostSession.advanceWith(tick(0, hostSession.frame()));
+                    }
+                    if (clientSession.frame() < target) {
+                        clientSession.advanceWith(tick(1, clientSession.frame()));
+                    }
+                    if (System.nanoTime() > deadline) {
+                        throw new AssertionError("could not align frames (host " + hostSession.frame()
+                                + ", client " + clientSession.frame() + ")");
+                    }
+                    Thread.sleep(0, 200_000);
+                }
+
+                assertThat(clientSession.frame()).isEqualTo(hostSession.frame());
                 assertThat(WorldHash.of(clientSession.world()))
-                        .as("host and client worlds must match after %d frames", FRAMES)
+                        .as("host and client worlds must match at frame %d", hostSession.frame())
                         .isEqualTo(WorldHash.of(hostSession.world()));
             }
         }

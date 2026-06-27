@@ -74,6 +74,30 @@ class FixedTimestepTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void refundReturnsAConsumedStepSoStallTimeIsNotLost() {
+        var ts = new FixedTimestep(STEP, MAX_FRAME);
+        ts.accumulate(STEP * 2);
+
+        assertThat(ts.consumeStep()).isTrue(); // pop one step...
+        ts.refund();                           // ...but the sim could not advance, so give it back
+
+        // The refunded step is available again: we can still drain two whole steps in total.
+        assertThat(drain(ts)).isEqualTo(2);
+    }
+
+    @Test
+    void refundIsCappedAtMaxFrameNanos() {
+        var ts = new FixedTimestep(STEP, MAX_FRAME);
+        ts.accumulate(MAX_FRAME);   // accumulator at the clamp
+        ts.consumeStep();           // one step out -> 4 steps remain
+        ts.refund();
+        ts.refund();                // refunding twice must not exceed the clamp
+
+        assertThat(ts.accumulatedNanos()).isLessThanOrEqualTo(MAX_FRAME);
+        assertThat(drain(ts)).isEqualTo(5);
+    }
+
     private static int drain(FixedTimestep ts) {
         int steps = 0;
         while (ts.consumeStep()) {

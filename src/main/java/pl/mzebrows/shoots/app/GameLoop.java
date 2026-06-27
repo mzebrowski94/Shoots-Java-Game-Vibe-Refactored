@@ -67,6 +67,13 @@ public final class GameLoop implements Runnable {
                 input.poll();
                 stateMachine.update(input);
                 stepped = true;
+                // Online lockstep: if this update could not advance the simulation (waiting on a peer's frame,
+                // or paused), give the consumed step back and stop catching up this render frame. Otherwise the
+                // accumulator drains while the world is frozen and the whole match runs in slow motion (#1).
+                if (stateMachine.current() == playingState && !playingState.lastUpdateAdvancedSim()) {
+                    timestep.refund();
+                    break;
+                }
             }
 
             if (stepped) {

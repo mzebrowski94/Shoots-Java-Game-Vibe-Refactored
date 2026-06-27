@@ -67,6 +67,16 @@ public final class FixedTimestep {
         return false;
     }
 
+    /**
+     * Returns one fixed step's worth of time to the accumulator -- used when {@link #consumeStep()} popped a
+     * step but the simulation could NOT actually advance (e.g. a networked lockstep frame was not yet ready,
+     * or the match is paused). Without this the accumulator would drain while the world stands still, slowing
+     * the whole simulation to the stall rate (#1). Capped at {@link #maxFrameNanos} to keep the catch-up bound.
+     */
+    public void refund() {
+        accumulator = Math.min(accumulator + stepNanos, maxFrameNanos);
+    }
+
     /** Render interpolation factor in {@code [0,1)}: fraction of the next step already elapsed. */
     public double alpha() {
         return (double) accumulator / stepNanos;

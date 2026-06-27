@@ -47,8 +47,14 @@ public final class LanDiscovery implements AutoCloseable {
      */
     public void record(String sourceHost, LanAnnouncement announcement, long nowNanos) {
         String key = announcement.matchCode() + "@" + sourceHost + ":" + announcement.port();
+        boolean firstSighting = !byKey.containsKey(key);
         byKey.put(key, new DiscoveredMatch(announcement.matchCode(), announcement.hostName(), sourceHost,
                 announcement.port(), announcement.players(), announcement.joinable(), nowNanos));
+        if (firstSighting) {
+            log.info("LAN discovery: found match {} from {}:{} (host '{}', {} players, joinable {})",
+                    announcement.matchCode(), sourceHost, announcement.port(), announcement.hostName(),
+                    announcement.players(), announcement.joinable());
+        }
     }
 
     /** Matches still alive as of {@code nowNanos} (beacon seen within the TTL), ordered by match code. */
@@ -70,6 +76,7 @@ public final class LanDiscovery implements AutoCloseable {
         socket.setReuseAddress(true);
         socket.bind(new InetSocketAddress(port));
         running = true;
+        log.info("LAN discovery listening for host beacons on UDP port {}", socket.getLocalPort());
         listener = new Thread(this::listenLoop, "lan-discovery");
         listener.setDaemon(true);
         listener.start();
@@ -94,6 +101,9 @@ public final class LanDiscovery implements AutoCloseable {
                 LanAnnouncement announcement = LanAnnouncement.fromBytes(packet.getData(), packet.getLength());
                 if (announcement != null) {
                     record(packet.getAddress().getHostAddress(), announcement, System.nanoTime());
+                } else {
+                    log.debug("Ignored non-beacon UDP packet ({} bytes) from {}",
+                            packet.getLength(), packet.getAddress().getHostAddress());
                 }
             } catch (IOException e) {
                 if (running) {
