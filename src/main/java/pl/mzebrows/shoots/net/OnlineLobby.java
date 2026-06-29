@@ -6,6 +6,8 @@ import java.util.Arrays;
 import java.util.Random;
 
 import lombok.extern.slf4j.Slf4j;
+import pl.mzebrows.shoots.config.DiscConfig;
+import pl.mzebrows.shoots.config.DisruptionConfig;
 import pl.mzebrows.shoots.config.GameConfig;
 import pl.mzebrows.shoots.config.RoundConfig;
 import pl.mzebrows.shoots.world.PlayWorld;
@@ -74,6 +76,10 @@ public final class OnlineLobby implements AutoCloseable {
         beacon.start();
         lobby.beacon = beacon;
         log.info("Hosting lobby {} on port {} (up to {} players)", lobby.matchCode, server.port(), lobby.maxPlayers);
+        log.info("Host reachable at {} on TCP port {} -- a LAN client must be able to open a TCP connection to"
+                + " one of these addresses. If discovery finds the match but joining times out, allow inbound"
+                + " TCP {} through the HOST firewall (Private network).", localIpv4Addresses(), server.port(),
+                server.port());
         return lobby;
     }
 
@@ -149,6 +155,7 @@ public final class OnlineLobby implements AutoCloseable {
             return;
         }
         GameConfig cfg = base.withRound(roundFrom(start)).withPlayerNumber(start.orderedSlots().length).withSeed(start.seed());
+        cfg = applyGameplayFrom(start, cfg);
         var world = new PlayWorld(cfg);
         started = OnlineSession.startedClient(world, transport, playerId, matchCode);
         log.info("Match {} starting: {} players, local player id {}", matchCode, start.orderedSlots().length, playerId);
@@ -166,7 +173,9 @@ public final class OnlineLobby implements AutoCloseable {
         }
         int[] slots = occupiedSlots();
         // Carry the host's chosen round pacing so every client builds an identical match (#7).
-        server.broadcast(new NetMessage.Start(seed, slots, base.round().roundTimeSeconds(), base.round().roundLimit()));
+        server.broadcast(new NetMessage.Start(seed, slots, base.round().roundTimeSeconds(), base.round().roundLimit(),
+                base.disc().moveSpeed(), base.disc().maxBounces(), base.disc().laserMaxBounces(),
+                base.disruption().durationSeconds(), base.disruption().graceSeconds()));
         GameConfig cfg = base.withPlayerNumber(slots.length).withSeed(seed);
         var world = new PlayWorld(cfg);
         started = OnlineSession.startedHost(world, server, beacon, matchCode);
@@ -266,6 +275,44 @@ public final class OnlineLobby implements AutoCloseable {
         int time = start.roundTimeSeconds() > 0 ? start.roundTimeSeconds() : local.roundTimeSeconds();
         int limit = start.roundLimit() > 0 ? start.roundLimit() : local.roundLimit();
         return new RoundConfig(time, limit, local.roundEndDelay(), local.animationTime());
+    }
+
+    /**
+     * Overlays the host's gameplay options carried by START (disc speed/bounces, laser, disruption/grace
+     * timings) onto the local config so every client builds an identical world (#4.8). A {@code discSpeed}
+     * of {@code 0} marks a pre-#4.8 START with no gameplay payload, in which case the local tunables stand.
+     */
+    private GameConfig applyGameplayFrom(NetMessage.Start start, GameConfig cfg) {
+        if (start.discSpeed() <= 0.0) {
+            return cfg;
+        }
+        DiscConfig d = cfg.disc();
+        DiscConfig disc = new DiscConfig(d.bigRadius(), d.smallRadius(), start.discSpeed(), start.maxDiscBounces(),
+                d.maxPerPlayer(), d.maxPerShot(), start.maxLaserBounces(), d.bounceSpeedGain(), d.maxSpeedFactor(),
+                d.laserBounceAlphaFalloff());
+        DisruptionConfig dis = new DisruptionConfig(cfg.disruption().enabled(),
+                start.disruptionSeconds(), start.graceSeconds());
+        return cfg.withDisc(disc).withDisruption(dis);
+    }
+
+    /** Best-effort list of this host's non-loopback IPv4 addresses, for the "host reachable at" diagnostic. */
+    private static java.util.List<String> localIpv4Addresses() {
+        var addresses = new java.util.ArrayList<String>();
+        try {
+            for (var ni : java.util.Collections.list(java.net.NetworkInterface.getNetworkInterfaces())) {
+                if (!ni.isUp() || ni.isLoopback()) {
+                    continue;
+                }
+                for (var addr : java.util.Collections.list(ni.getInetAddresses())) {
+                    if (addr instanceof java.net.Inet4Address && !addr.isLoopbackAddress()) {
+                        addresses.add(addr.getHostAddress() + " (" + ni.getDisplayName() + ")");
+                    }
+                }
+            }
+        } catch (java.net.SocketException e) {
+            log.debug("Could not enumerate host addresses: {}", e.toString());
+        }
+        return addresses;
     }
 
     private LanAnnouncement announcement() {

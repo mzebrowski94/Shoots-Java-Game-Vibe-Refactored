@@ -48,8 +48,33 @@ public final class MapGenerator {
         addBlocks(tiles);
         addCapturePoints(tiles);
         addPlayerBases(tiles, playerNumber);
+        addCenterWall(tiles);
         return tiles;
     }
+
+    /**
+     * Stamps a wall block at the map centre so two opposing bases can never shoot each other on a
+     * straight, unbroken line of sight (a problem on maps where the central lane stayed open). Applied
+     * AFTER every random step so it overrides whatever tile landed there without perturbing the seed's
+     * RNG sequence (the rest of the map is byte-for-byte identical to before for a given seed). A base
+     * tile is never overwritten -- bases sit at the borders, far from the centre. The block size is a
+     * single tile today but is expressed via {@link #CENTER_WALL_HALF} so a larger central obstacle is a
+     * one-line change should a future map want one.
+     */
+    private void addCenterWall(TileType[][] tiles) {
+        int cx = size / 2;
+        int cy = size / 2;
+        for (int x = cx - CENTER_WALL_HALF; x <= cx + CENTER_WALL_HALF; x++) {
+            for (int y = cy - CENTER_WALL_HALF; y <= cy + CENTER_WALL_HALF; y++) {
+                if (x > 0 && y > 0 && x < size - 1 && y < size - 1 && tiles[x][y] != TileType.PLAYER_BASE) {
+                    tiles[x][y] = TileType.WALL;
+                }
+            }
+        }
+    }
+
+    /** Half-extent (in tiles) of the central wall block: {@code 0} = a single tile, {@code 1} = 3x3, etc. */
+    private static final int CENTER_WALL_HALF = 0;
 
     private void addBorderWalls(TileType[][] tiles) {
         for (int i = 0; i < size; i++) {

@@ -132,6 +132,27 @@ public final class PlayingState implements GameState {
     }
 
     /**
+     * Abandons the current match and returns to the main menu WITHOUT quitting the application (#6). Closes
+     * any online session, restores offline flow, and clears all round bookkeeping so the menu shows a fresh
+     * main menu (CONTINUE unavailable, GAMEPLAY OPTIONS editable again). Unlike {@link #abortToOnlineMenu},
+     * this lands on the normal main menu rather than the PLAY ONLINE connect screen.
+     */
+    public void abandonMatch() {
+        endOnline();
+        flow = RoundFlow.offline();
+        flow.reset();
+        settings.setPlayerKeyboardAvailable(false);
+        settings.restartGame();
+        settings.setGameEnd(false);
+        screen.setOnlinePauseNotice(null);
+        localPauseInitiated = false;
+        phaseJustEntered = true;
+        requestNextPhase = false;
+        restartRequested = false;
+        log.info("Match abandoned; returned to main menu");
+    }
+
+    /**
      * Starts an online match into this state at runtime (selected from the menu's waiting room). Adopts the
      * session's shared world + host/client {@link RoundFlow}, resets round bookkeeping to a fresh match, and
      * points the screen/pointer at the networked world. No AI runs online.
@@ -467,7 +488,9 @@ public final class PlayingState implements GameState {
      * which would otherwise ignore a 3- or 4-player choice (bases/discs for P3/P4 never appear).
      */
     private void rebuildWorldForSelectedPlayers() {
-        GameConfig base = GameConfigLoader.load();
+        // Overlay the live GAMEPLAY OPTIONS (disc speed/bounces, laser, disruption/grace timings, round
+        // time) onto the loaded defaults first, then apply the menu's player count + round limit on top.
+        GameConfig base = settings.getGameplayOptions().applyTo(GameConfigLoader.load());
         int selected = Math.max(1, Math.min(4, settings.getPlayerNumber()));
         RoundConfig round = applySelectedRoundSettings(base.round(),
                 settings.getRoundLimit(), settings.getRoundTime());
@@ -478,6 +501,8 @@ public final class PlayingState implements GameState {
             base = base.withRound(round);
         }
         world = new PlayWorld(base);
+        // Keep the HUD round timer in sync with the world the options actually produced.
+        settings.setRoundTime(base.round().roundTimeSeconds());
         rebuildAiForCurrentMap();
         screen.setWorld(world, 0.0);
         pointer.setWorld(world);

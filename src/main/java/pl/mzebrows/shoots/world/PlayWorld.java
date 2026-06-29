@@ -335,13 +335,15 @@ public final class PlayWorld {
     }
 
     /**
-     * Drives a human player's shoot key for this step (hold-to-charge, auto-fire when full):
+     * Drives a human player's shoot key for this step (hold-to-charge):
      * <ul>
-     *   <li>press (rising edge): fires a normal disc immediately (classic feel) and starts charging;</li>
+     *   <li>press (rising edge): starts charging -- it does NOT fire a normal disc yet (#3.1);</li>
      *   <li>hold: fills the charge ring and auto-releases ONE power disc the moment it fills;</li>
-     *   <li>release: clears the charge.</li>
+     *   <li>release before the ring fills: fires a single normal disc (the tap shot).</li>
      * </ul>
-     * The AI does not use this path -- it fires via {@link #fire}/{@link #firePower} directly.
+     * So a quick tap yields a normal disc on key-up and a full hold yields a power disc -- a tap never
+     * sneaks a normal disc out ahead of a charge. With the power shot disabled, a press fires a normal disc
+     * immediately (classic feel). The AI does not use this path -- it fires via {@link #fire}/{@link #firePower}.
      */
     public void applyShoot(int playerId, boolean shootHeld) {
         // While disrupted the player cannot shoot or charge; swallow the input and keep the charge clear.
@@ -353,11 +355,23 @@ public final class PlayWorld {
             return;
         }
         boolean prev = shootHeldPrev[playerId];
-        if (shootHeld && !prev) {
-            fire(playerId);
+        boolean pressed = shootHeld && !prev;
+        boolean released = !shootHeld && prev;
+
+        if (!powerEnabled) {
+            // No charging path: a single tap fires a normal disc on press (classic behaviour).
+            if (pressed) {
+                fire(playerId);
+            }
+            shootHeldPrev[playerId] = shootHeld;
+            return;
+        }
+
+        if (pressed) {
+            // Begin charging; do NOT fire a normal disc yet -- it is released on key-up (#3.1).
             chargeTicks[playerId] = 0;
             chargeConsumed[playerId] = false;
-            charging[playerId] = powerEnabled;
+            charging[playerId] = true;
         } else if (shootHeld) {
             if (charging[playerId] && !chargeConsumed[playerId]) {
                 chargeTicks[playerId]++;
@@ -367,6 +381,15 @@ public final class PlayWorld {
                     charging[playerId] = false;
                 }
             }
+        } else if (released) {
+            // Released before the ring filled -> fire the normal disc now (#3.1). A consumed charge
+            // (power disc already auto-fired) releases nothing.
+            if (!chargeConsumed[playerId]) {
+                fire(playerId);
+            }
+            chargeTicks[playerId] = 0;
+            chargeConsumed[playerId] = false;
+            charging[playerId] = false;
         } else {
             chargeTicks[playerId] = 0;
             chargeConsumed[playerId] = false;

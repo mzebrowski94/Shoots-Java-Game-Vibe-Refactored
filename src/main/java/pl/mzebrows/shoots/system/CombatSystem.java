@@ -22,7 +22,7 @@ import pl.mzebrows.shoots.pool.ObjectPool;
 public final class CombatSystem implements EntitySpawner {
 
     /** Power config used by the back-compat constructors that predate the charged shot (disabled). */
-    private static final PowerShotConfig POWER_DISABLED = new PowerShotConfig(false, 1.0, 1.0, 0, 1);
+    private static final PowerShotConfig POWER_DISABLED = new PowerShotConfig(false, 1.0, 1.0, 1.0, 1);
 
     private final ObjectPool<Entity> discPool;
     private final DiscConfig discConfig;
@@ -53,7 +53,7 @@ public final class CombatSystem implements EntitySpawner {
         }
         boolean asPower = powered && powerConfig.enabled();
         double speed = asPower ? discConfig.moveSpeed() * powerConfig.speedFactor() : discConfig.moveSpeed();
-        int maxBounces = asPower ? powerConfig.maxBounces() : discConfig.maxBounces();
+        int maxBounces = asPower ? powerConfig.effectiveMaxBounces(discConfig.maxBounces()) : discConfig.maxBounces();
         int captureStrength = asPower ? powerConfig.captureStrength() : 1;
 
         disc.setType(EntityType.DISC);

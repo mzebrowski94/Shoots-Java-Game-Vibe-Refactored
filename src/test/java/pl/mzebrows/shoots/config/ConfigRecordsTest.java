@@ -56,7 +56,7 @@ class ConfigRecordsTest {
 
     @Test
     void gameConfigRejectsInvalidPlayerCount() {
-        var d = GameConfigLoader.defaults();
+        var d = GameConfigLoader.load();
         assertThatThrownBy(() -> new GameConfig(0, d.seed(), d.grid(), d.disc(), d.collision(), d.round(), d.palette(), d.ai()))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new GameConfig(5, d.seed(), d.grid(), d.disc(), d.collision(), d.round(), d.palette(), d.ai()))

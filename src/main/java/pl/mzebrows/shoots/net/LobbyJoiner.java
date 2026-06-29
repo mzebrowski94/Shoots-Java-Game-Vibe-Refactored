@@ -43,6 +43,15 @@ public final class LobbyJoiner implements AutoCloseable {
             error = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
             status = Status.FAILED;
             log.error("Connect to {}:{} failed: {}", ip, port, error);
+            if (e instanceof java.net.SocketTimeoutException || e instanceof java.net.ConnectException) {
+                // Discovery (UDP) already reached us, but the host's TCP game port refused/dropped us. On a LAN
+                // this is almost always a firewall on the HOST blocking inbound TCP on the game port.
+                log.warn("Host {} was discovered but its game port {} did not accept a TCP connection. Most likely"
+                        + " the HOST's firewall is blocking inbound TCP {} -- allow this app/Java through the"
+                        + " firewall for Private networks (or open TCP {}), and make sure the host's network is"
+                        + " set to Private, not Public.", ip, port, port, port);
+            }
+            log.debug("Connection failure details:", e);
         }
     }
 

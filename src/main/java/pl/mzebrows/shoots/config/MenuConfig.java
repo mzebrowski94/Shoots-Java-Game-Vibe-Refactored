@@ -6,7 +6,6 @@ package pl.mzebrows.shoots.config;
  * ranges/steps (the values the player cycles through in the menu) with the menu's visual layout
  * (font size, row spacing, and panel padding) so the menu carries no hard-coded magic numbers.
  *
- * @param initialPlayers     player count pre-selected when the menu first opens
  * @param maxPlayers         largest selectable player count (also the scoreboard column count)
  * @param initialRoundLimit  round-limit value pre-selected when the menu first opens
  * @param maxRoundLimit      largest selectable round limit
@@ -21,7 +20,6 @@ package pl.mzebrows.shoots.config;
  * @param panelMargin        minimum gap (px) kept between the panel and the window edges
  */
 public record MenuConfig(
-        int initialPlayers,
         int maxPlayers,
         int initialRoundLimit,
         int maxRoundLimit,
@@ -38,9 +36,6 @@ public record MenuConfig(
     public MenuConfig {
         if (maxPlayers < 1) {
             throw new IllegalArgumentException("maxPlayers must be >= 1: " + maxPlayers);
-        }
-        if (initialPlayers < 1 || initialPlayers > maxPlayers) {
-            throw new IllegalArgumentException("initialPlayers must be in [1, maxPlayers]: " + initialPlayers);
         }
         if (roundLimitStep < 1) {
             throw new IllegalArgumentException("roundLimitStep must be >= 1: " + roundLimitStep);

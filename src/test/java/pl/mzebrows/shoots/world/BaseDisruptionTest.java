@@ -21,15 +21,15 @@ import pl.mzebrows.shoots.config.RoundConfig;
  * opponent's shooting and laser for a configured duration, after which the victim gets a short immunity
  * (grace) window during which they may shoot but cannot be re-disrupted.
  *
- * <p>Uses a fixed seed whose generated map leaves a clear straight (0-bounce) lane up shared column 12
- * from P0's base (bottom) to P1's base (top), so the disruption can be triggered deterministically by
- * aiming P0 up and firing.
+ * <p>Uses a fixed seed whose generated map yields a deterministic bounce path from P0's base (bottom)
+ * into P1's base (top). The central wall block (#3) blocks the straight column-12 lane, so a bounce
+ * aim is used; the disruption still triggers deterministically when P0 aims to that angle and fires.
  */
 class BaseDisruptionTest {
 
-    private static final long SEED = 42L;
-    /** Aim angle (deg) that sends a P0 disc straight up column 12 into P1's base on this seed's map. */
-    private static final double STRAIGHT_UP = 179.0;
+    private static final long SEED = 3L;
+    /** Aim angle (deg) that sends a P0 disc on a bounce path into P1's base on this seed's map. */
+    private static final double STRAIGHT_UP = 187.0;
     /** 1.0s disruption + 0.5s grace at 120 steps/s -> 120 and 60 ticks. */
     private static final DisruptionConfig DISRUPT = new DisruptionConfig(true, 1.0, 0.5);
     private static final int DISRUPT_TICKS = 120;

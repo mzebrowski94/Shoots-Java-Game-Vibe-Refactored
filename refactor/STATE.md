@@ -230,3 +230,54 @@
 - **`SpatialCollider` is now just `tileAt`** (tile-content query); `UniformGridCollider` keeps tileAt +
   `fromLegacyMatrix`. The band-based `resolve` and `CollisionResult` are retired (CollisionResult.java is
   now unused/dead — safe to delete). `BounceMovementStrategy`/`MovementSystem` remain for generic entities.
+
+## New-feature contracts (window / options / map — features #1-#6)
+- **Elastic scaled window (#1).** Window size is decoupled from the grid/pixels and fully resizable. The
+  three AWT panels are laid out at a fixed LOGICAL resolution inside a `gamePanel` centred by a
+  `GridBagLayout` (spare space letterboxes); `GameFrame.rescale()` computes one uniform scale on resize and
+  pushes it to each panel (`GameCanvas.setRenderScale` + per-panel `BufferStrategy` recreation via
+  `recreateStrategyIfResized`). Panels draw in logical coords; `applyRenderScale` scales the acquired
+  `Graphics2D`. Scale 1.0 path is byte-identical to the old fixed window. Simulation untouched → online
+  determinism unaffected.
+- **Fixed map size (#2).** `grid.unit`/`grid.tableSize` removed from `game.properties`; the 25x25 "normal"
+  grid lives in `GameConfigLoader.defaults()`. The loader still honours an explicit `grid.*` override so a
+  future map size is a one-line change. Window pixels no longer derive from the grid for sizing purposes.
+- **Centre wall (#3).** `MapGenerator.addCenterWall` stamps a wall at the map centre (size `CENTER_WALL_HALF`,
+  single tile today) as the LAST generate step — overrides whatever landed there without perturbing the
+  seed's RNG, so maps are identical to before except the centre tile. Blocks the straight P1/P2 (col 12) and
+  P3/P4 (row 12) base-to-base lanes.
+- **GAMEPLAY OPTIONS (#4).** `app.GameplayOptions` (held by `GameSettings`) = live, in-memory tunables
+  (round time, disc speed, max disc bounces, max laser projections, distortion/guard timings, host IP/port)
+  seeded from config and clamped to `config.GameplayLimits` (`opt.*` caps in `game.properties` = min/max/step;
+  defaults are the existing keys). No save button — `applyTo(GameConfig)` overlays them when a world is built
+  (`PlayingState.rebuildWorldForSelectedPlayers`); power-shot speed stays proportional via `power.speedFactor`.
+  Menu: `MenuEnum.GAMEPLAY_OPTIONS` replaces the old ROUND_TIME row (round time moved inside); a sub-screen
+  edits numerics via LEFT/RIGHT and the IP/port via typed text (`InputBridge` text-capture: `setTextCapture`
+  /`drainTypedText`, IP validated by a dotted-quad regex).
+- **Online propagation (#4.8).** `NetMessage.Start` carries the host's gameplay payload (disc speed/bounces,
+  laser, disruption/grace); `MessageCodec` round-trips it; `OnlineLobby.startMatch` broadcasts it and
+  `applyGameplayFrom` overlays it on each client's config so every peer builds an identical world.
+  `discSpeed==0` marks a pre-#4.8 Start (keep local). Back-compat 2-/4-arg `Start` ctors preserved.
+- **Mid-game gating (#5/#6).** `GameSettings.isMatchInProgress()` (= round started, not ended). GAMEPLAY
+  OPTIONS is locked/dimmed and un-openable while a match is in progress (#5). In-game QUIT calls
+  `PlayingState.abandonMatch()` (ends any online session, restores offline flow, clears round bookkeeping)
+  and returns to the main menu instead of exiting the app; QUIT from the fresh main menu / game-over screen
+  still exits (#6).
+
+## QoL round 2 (config strictness, menu, power, charge)
+- **Config = single source of truth, no defaults.** `GameConfigLoader.defaults()`/`graphicsDefaults()` removed;
+  every key required via `requireInt/Double/Float/Bool/Color` -> `ConfigException` (logged + `System.exit(1)`
+  in `ProjectShoots.main`). `GameplayLimits` is strict too. Map size is a fixed code constant
+  (`GRID_UNIT`/`TABLE_SIZE`), no longer a property. `game.properties` reorganised (online+run, round, then
+  physics) with hierarchical names (`round.timeSeconds`, `disc.speed`, ...) and GAMEPLAY-OPTIONS caps inline
+  as `<key>.min/.max/.step`. `graphic.properties` holds rendering/UI keys (merged at load).
+- **Power shot scales off the disc.** `PowerShotConfig.maxBounces` -> `maxBouncesFactor` (`power.maxBouncesFactor`,
+  ~1.5); `effectiveMaxBounces(discMaxBounces)` used in `CombatSystem`. Online propagation already carries
+  `disc.maxBounces`, so power bounces stay identical across peers.
+- **Charge fires on release (#3.1).** `PlayWorld.applyShoot`: press starts charging (no instant normal disc);
+  a release before the ring fills fires one normal disc; a full hold auto-fires the power disc. Power-disabled
+  keeps press-to-fire.
+- **Menu (#1).** Round limit moved into GAMEPLAY OPTIONS (now: round time, round limit, disc speed, max disc
+  bounces, max laser projections, distortion, shield, host IP, host port). Main menu order: CONTINUE, (gap),
+  START NEW GAME, PLAY ONLINE, GAMEPLAY OPTIONS, player number, AI players, AI difficulty, (gap), CONTROLS,
+  QUIT. "--- AI Settings ---" banner removed; GAMEPLAY OPTIONS is always gray while a match is in progress.

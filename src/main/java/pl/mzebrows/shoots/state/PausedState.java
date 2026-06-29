@@ -58,7 +58,16 @@ public final class PausedState implements GameState {
                 playingState.startOnline(session);
                 yield playingState;
             }
-            case QUIT -> null; // null signals the state machine to quit
+            case QUIT -> {
+                if (settings.isMatchInProgress()) {
+                    // Mid-game QUIT abandons the current match and returns to the main menu rather than
+                    // exiting the application; GAMEPLAY OPTIONS become editable again afterwards (#6).
+                    playingState.abandonMatch();
+                    screen.getMenuLayout().selectStartNewGame();
+                    yield this;
+                }
+                yield null; // from the fresh main menu / game-over screen: quit the application
+            }
             default -> this;
         };
     }

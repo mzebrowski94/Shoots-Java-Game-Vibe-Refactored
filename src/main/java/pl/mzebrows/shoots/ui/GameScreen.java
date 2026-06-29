@@ -93,9 +93,11 @@ public class GameScreen extends GameCanvas {
         if (strategy == null) {
             return;
         }
+        recreateStrategyIfResized();
         do {
             do {
                 g2d = (Graphics2D) strategy.getDrawGraphics();
+                applyRenderScale(g2d);
                 g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
                         RenderingHints.VALUE_INTERPOLATION_BICUBIC);

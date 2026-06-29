@@ -58,11 +58,11 @@ public record GameConfig(
 
     /** Default menu layout used when a caller supplies only the gameplay sub-configs. */
     private static final MenuConfig DEFAULT_MENU =
-            new MenuConfig(2, 4, 2, 20, 4, 15, 60, 5, 0, 30f, 46, 28, 16);
+            new MenuConfig(4, 2, 20, 4, 15, 60, 5, 0, 30f, 46, 28, 16);
     /** Default window sizing used when a caller supplies only the gameplay sub-configs. */
     private static final WindowConfig DEFAULT_WINDOW = new WindowConfig(25, 2, 4);
     /** Default charged-shot tuning used when a caller supplies only the gameplay sub-configs. */
-    private static final PowerShotConfig DEFAULT_POWER = new PowerShotConfig(true, 0.6, 1.8, 14, 2);
+    private static final PowerShotConfig DEFAULT_POWER = new PowerShotConfig(true, 0.6, 1.8, 1.5, 2);
     /** Default base-disruption tuning used when a caller supplies only the gameplay sub-configs. */
     private static final DisruptionConfig DEFAULT_DISRUPTION = new DisruptionConfig(true, 4.0, 2.0);
 
@@ -79,5 +79,15 @@ public record GameConfig(
     /** Returns a copy with a different round config, preserving every other tunable. */
     public GameConfig withRound(RoundConfig newRound) {
         return new GameConfig(playerNumber, seed, grid, disc, collision, newRound, palette, ai, menu, window, power, disruption);
+    }
+
+    /** Returns a copy with a different disc config, preserving every other tunable. */
+    public GameConfig withDisc(DiscConfig newDisc) {
+        return new GameConfig(playerNumber, seed, grid, newDisc, collision, round, palette, ai, menu, window, power, disruption);
+    }
+
+    /** Returns a copy with a different base-disruption config, preserving every other tunable. */
+    public GameConfig withDisruption(DisruptionConfig newDisruption) {
+        return new GameConfig(playerNumber, seed, grid, disc, collision, round, palette, ai, menu, window, power, newDisruption);
     }
 }

@@ -35,6 +35,31 @@ class MessageCodecTest {
     }
 
     @Test
+    void startCarriesGameplayOptions() {
+        var decoded = (NetMessage.Start) MessageCodec.decode(MessageCodec.encode(
+                new NetMessage.Start(5L, new int[] {0, 1, 2}, 90, 4, 4.5, 11, 6, 3.5, 1.5)));
+        assertThat(decoded.seed()).isEqualTo(5L);
+        assertThat(decoded.orderedSlots()).containsExactly(0, 1, 2);
+        assertThat(decoded.roundTimeSeconds()).isEqualTo(90);
+        assertThat(decoded.roundLimit()).isEqualTo(4);
+        assertThat(decoded.discSpeed()).isEqualTo(4.5);
+        assertThat(decoded.maxDiscBounces()).isEqualTo(11);
+        assertThat(decoded.maxLaserBounces()).isEqualTo(6);
+        assertThat(decoded.disruptionSeconds()).isEqualTo(3.5);
+        assertThat(decoded.graceSeconds()).isEqualTo(1.5);
+    }
+
+    @Test
+    void preGameplayStartDecodesWithZeroPayload() {
+        // The 4-arg (pre-#4.8) form leaves the gameplay fields at 0 = unset, so a client keeps its local tunables.
+        var decoded = (NetMessage.Start) MessageCodec.decode(
+                MessageCodec.encode(new NetMessage.Start(9L, new int[] {0, 1}, 30, 2)));
+        assertThat(decoded.discSpeed()).isZero();
+        assertThat(decoded.maxDiscBounces()).isZero();
+        assertThat(decoded.disruptionSeconds()).isZero();
+    }
+
+    @Test
     void roundTripsAMultiSlotFrame() {
         TickInput[] slots = {
                 new TickInput(PlayWorld.AimInput.NONE, false),

@@ -18,14 +18,16 @@ import pl.mzebrows.shoots.config.RoundConfig;
 import pl.mzebrows.shoots.entity.Entity;
 
 /**
- * Feature #3: the hold-to-charge power shot. A press fires a normal disc immediately; holding fills
- * the charge bar and auto-releases ONE power disc when full; releasing clears the charge.
+ * Feature #3 / #3.1: the hold-to-charge power shot. Pressing starts charging WITHOUT firing a normal disc;
+ * holding fills the bar and auto-releases ONE power disc when full; a release before the bar fills fires a
+ * single normal disc on key-up. The power disc's bounce budget scales off the disc's own maxBounces (#2.4).
  */
 class PowerShotChargeTest {
 
     private static final long SEED = 7L;
-    // 0.5s charge at 120 steps/s -> 60 ticks; speed x2, more bounces, capture strength 3.
-    private static final PowerShotConfig POWER = new PowerShotConfig(true, 0.5, 2.0, 20, 3);
+    private static final int DISC_MAX_BOUNCES = 7;
+    // 0.5s charge at 120 steps/s -> 60 ticks; speed x2, bounces x1.5, capture strength 3.
+    private static final PowerShotConfig POWER = new PowerShotConfig(true, 0.5, 2.0, 1.5, 3);
     private static final int CHARGE_TICKS = 60;
 
     private PlayWorld newWorld() {
@@ -36,10 +38,8 @@ class PowerShotChargeTest {
                 new RgbColor(68, 74, 80), new RgbColor(35, 35, 35, 10),
                 List.of(new RgbColor(124, 252, 0), new RgbColor(48, 213, 200),
                         new RgbColor(252, 3, 0), new RgbColor(237, 26, 116)));
-        // Build via the 8-arg gameplay convenience (defaults menu/window), then re-create with our
-        // explicit power config via the canonical constructor, reusing the defaulted menu/window.
         var base = new GameConfig(2, SEED, new GridConfig(36, 25),
-                new DiscConfig(18, 10, 2.0, 7, 4, 3, 4), new CollisionConfig(4),
+                new DiscConfig(18, 10, 2.0, DISC_MAX_BOUNCES, 4, 3, 4), new CollisionConfig(4),
                 new RoundConfig(15, 2, 2, 1), palette, new AiConfig(24, 4, true));
         var cfg = new GameConfig(base.playerNumber(), base.seed(), base.grid(), base.disc(),
                 base.collision(), base.round(), base.palette(), base.ai(), base.menu(), base.window(), POWER);
@@ -51,12 +51,13 @@ class PowerShotChargeTest {
     }
 
     @Test
-    void tapFiresOnlyANormalShot() {
+    void pressDoesNotFireYetAndReleaseFiresOneNormalDisc() {
         var world = newWorld();
 
-        world.applyShoot(0, true);   // press: immediate normal disc + start charging
-        world.applyShoot(0, false);  // release before the bar fills
+        world.applyShoot(0, true);   // press: begin charging, NO disc yet (#3.1)
+        assertThat(world.discs()).isEmpty();
 
+        world.applyShoot(0, false);  // release before the bar fills -> one normal disc
         assertThat(world.discs()).hasSize(1);
         assertThat(world.discs().get(0).isPowered()).isFalse();
         assertThat(world.chargeProgress(0)).isZero();
@@ -66,9 +67,9 @@ class PowerShotChargeTest {
     void holdingFillsTheBarThenAutoFiresOnePowerDisc() {
         var world = newWorld();
 
-        world.applyShoot(0, true); // press: normal disc, begin charge
+        world.applyShoot(0, true); // press: begin charge, still no disc
         assertThat(poweredCount(world)).isZero();
-        assertThat(world.discs()).hasSize(1);
+        assertThat(world.discs()).isEmpty();
 
         boolean fired = false;
         double midProgress = 0.0;
@@ -86,7 +87,7 @@ class PowerShotChargeTest {
 
         Entity power = world.discs().stream().filter(Entity::isPowered).findFirst().orElseThrow();
         assertThat(power.getMoveSpeed()).isEqualTo(2.0 * POWER.speedFactor());
-        assertThat(power.getMaxBounces()).isEqualTo(POWER.maxBounces());
+        assertThat(power.getMaxBounces()).isEqualTo(POWER.effectiveMaxBounces(DISC_MAX_BOUNCES));
         assertThat(power.getCaptureStrength()).isEqualTo(POWER.captureStrength());
 
         // Only one power disc per hold; charge resets after firing even while still held.
@@ -96,7 +97,7 @@ class PowerShotChargeTest {
     }
 
     @Test
-    void releasingClearsTheChargeSoItDoesNotAutoFire() {
+    void releasingEarlyClearsTheChargeSoItDoesNotAutoFire() {
         var world = newWorld();
 
         world.applyShoot(0, true);
@@ -104,8 +105,9 @@ class PowerShotChargeTest {
             world.applyShoot(0, true); // not quite full
         }
         assertThat(poweredCount(world)).isZero();
-        world.applyShoot(0, false);    // release resets the charge
+        world.applyShoot(0, false);    // release: fires a normal disc, clears the charge
         assertThat(world.chargeProgress(0)).isZero();
+        assertThat(poweredCount(world)).isZero();
 
         // Holding again must start from zero, not resume near-full.
         world.applyShoot(0, true);

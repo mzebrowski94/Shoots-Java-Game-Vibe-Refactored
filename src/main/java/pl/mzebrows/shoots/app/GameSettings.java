@@ -8,7 +8,9 @@ import lombok.extern.slf4j.Slf4j;
 import pl.mzebrows.shoots.ai.AiDifficulty;
 import pl.mzebrows.shoots.config.GameConfig;
 import pl.mzebrows.shoots.config.GameConfigLoader;
+import pl.mzebrows.shoots.config.GameplayLimits;
 import pl.mzebrows.shoots.config.GraphicsConfig;
+import pl.mzebrows.shoots.config.OnlineConfig;
 import pl.mzebrows.shoots.input.InputBridge;
 import pl.mzebrows.shoots.ui.ColorScheme;
 import pl.mzebrows.shoots.ui.GameScreen;
@@ -44,6 +46,14 @@ public class GameSettings {
     /** The loaded rendering configuration (menu chrome + map-object styling) from {@code graphic.properties}. */
     @Setter(AccessLevel.NONE)
     private final GraphicsConfig graphics;
+
+    /**
+     * Live, in-memory gameplay tunables edited in the GAMEPLAY OPTIONS menu (round time, disc speed/bounces,
+     * laser projections, disruption/grace timings, host IP/port). Seeded from the loaded config; applied when
+     * a match is built and propagated host->clients online. Held here so menu, state, and net all share one copy.
+     */
+    @Setter(AccessLevel.NONE)
+    private final GameplayOptions gameplayOptions;
 
     private int playerNumber;
     /**
@@ -102,6 +112,7 @@ public class GameSettings {
     public GameSettings(GameConfig config) {
         this.config = config;
         this.graphics = GameConfigLoader.loadGraphics();
+        this.gameplayOptions = new GameplayOptions(config, OnlineConfig.load(), GameplayLimits.load());
 
         var grid = config.grid();
         var window = config.window();
@@ -114,7 +125,7 @@ public class GameSettings {
         this.defaultPointerHeight = unit * window.windowTiles();
         this.defaultCounterWidth = defaultWidth + defaultPointerWidth;
 
-        this.playerNumber = config.menu().initialPlayers();
+        this.playerNumber = config.playerNumber();
         this.aiNumber = config.menu().initialAiPlayers();
         this.roundTime = config.round().roundTimeSeconds();
         this.roundLimit = config.round().roundLimit();
@@ -166,6 +177,12 @@ public class GameSettings {
         actualRoundNumber = 0;
         roundList.clear();
         previousRound = null;
+    }
+
+    /** Whether a match is currently in progress (a round has begun and the match has not ended). Used to
+     *  gate mid-game-only behaviour: GAMEPLAY OPTIONS are locked (#5) and QUIT abandons to menu (#6). */
+    public boolean isMatchInProgress() {
+        return actualRoundNumber != 0 && !gameEnd;
     }
 
     private static File loadFont(String fileName) throws IOException {

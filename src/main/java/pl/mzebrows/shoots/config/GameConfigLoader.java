@@ -9,12 +9,24 @@ import java.util.Properties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Loads {@link GameConfig} from a classpath {@code .properties} file, falling back to defaults. */
+/**
+ * Loads {@link GameConfig} (+ {@link GraphicsConfig}) from the bundled {@code game.properties} and
+ * {@code graphic.properties}. The property files are the SINGLE SOURCE OF TRUTH: there are no code-side
+ * defaults. Every key a config needs is required -- a missing or unparseable key throws a
+ * {@link ConfigException} (which the application logs before exiting). The only fixed-in-code value is the
+ * map geometry ({@link #GRID_UNIT} / {@link #TABLE_SIZE}), kept as a deliberate constant so a future map
+ * size is a one-line change here rather than a runtime property.
+ */
 public final class GameConfigLoader {
 
     private static final Logger log = LoggerFactory.getLogger(GameConfigLoader.class);
-    private static final String DEFAULT_RESOURCE = "game.properties";
+    private static final String GAME_RESOURCE = "game.properties";
     private static final String GRAPHICS_RESOURCE = "graphic.properties";
+
+    /** Fixed logical tile size in pixels (the rendering/scale unit); the map is authored against this. */
+    public static final int GRID_UNIT = 36;
+    /** Fixed "normal" map size in tiles (square). Change here (and re-tune the map) for a different size. */
+    public static final int TABLE_SIZE = 25;
 
     private GameConfigLoader() {
     }
@@ -24,15 +36,15 @@ public final class GameConfigLoader {
         return fromProperties(bundledProperties());
     }
 
-    /** Loads rendering config from the bundled resources, defaulting any absent key. */
+    /** Loads rendering config from the bundled resources. */
     public static GraphicsConfig loadGraphics() {
         return graphicsFromProperties(bundledProperties());
     }
 
-    /** Reads both bundled resources into one Properties (graphic over game); absent keys just stay absent. */
-    private static Properties bundledProperties() {
+    /** Reads both bundled resources into one Properties (graphic over game). Exposed for tests. */
+    public static Properties bundledProperties() {
         var props = new Properties();
-        readInto(props, DEFAULT_RESOURCE);
+        readInto(props, GAME_RESOURCE);
         readInto(props, GRAPHICS_RESOURCE);
         return props;
     }
@@ -40,225 +52,140 @@ public final class GameConfigLoader {
     private static void readInto(Properties props, String resourceName) {
         try (InputStream in = Thread.currentThread().getContextClassLoader().getResourceAsStream(resourceName)) {
             if (in == null) {
-                log.warn("Config resource '{}' not found on classpath; using built-in defaults for its keys", resourceName);
-                return;
+                throw new ConfigException("Required config resource not found on classpath: " + resourceName);
             }
             props.load(in);
             log.debug("Loaded configuration from '{}'", resourceName);
-        } catch (IOException | RuntimeException e) {
-            log.error("Failed to read config resource '{}'; using built-in defaults for its keys", resourceName, e);
+        } catch (IOException e) {
+            throw new ConfigException("Failed to read config resource '" + resourceName + "': " + e.getMessage());
         }
     }
 
-    /** Loads from {@code resourceName}; returns {@link #defaults()} if missing or unreadable. */
-    public static GameConfig load(String resourceName) {
-        var props = new Properties();
-        try (InputStream in = Thread.currentThread().getContextClassLoader().getResourceAsStream(resourceName)) {
-            if (in == null) {
-                log.warn("Config resource '{}' not found on classpath; using built-in defaults", resourceName);
-                return defaults();
-            }
-            props.load(in);
-            log.debug("Loaded game configuration from '{}'", resourceName);
-            return fromProperties(props);
-        } catch (IOException | RuntimeException e) {
-            log.error("Failed to read config resource '{}'; using built-in defaults", resourceName, e);
-            return defaults();
-        }
-    }
-
-    /** Builds a config from already-parsed properties, defaulting any absent key. */
+    /** Builds a config from already-parsed properties; every required key must be present and parseable. */
     public static GameConfig fromProperties(Properties props) {
-        var defaults = defaults();
-
-        var grid = new GridConfig(
-                intValue(props, "grid.unit", defaults.grid().unit()),
-                intValue(props, "grid.tableSize", defaults.grid().tableSize()));
+        var grid = new GridConfig(GRID_UNIT, TABLE_SIZE);
 
         var disc = new DiscConfig(
-                intValue(props, "disc.bigRadius", defaults.disc().bigRadius()),
-                intValue(props, "disc.smallRadius", defaults.disc().smallRadius()),
-                doubleValue(props, "disc.moveSpeed", defaults.disc().moveSpeed()),
-                intValue(props, "disc.maxBounces", defaults.disc().maxBounces()),
-                intValue(props, "disc.maxPerPlayer", defaults.disc().maxPerPlayer()),
-                intValue(props, "disc.maxPerShot", defaults.disc().maxPerShot()),
-                intValue(props, "laser.maxBounces", defaults.disc().laserMaxBounces()),
-                doubleValue(props, "disc.bounceSpeedGain", defaults.disc().bounceSpeedGain()),
-                doubleValue(props, "disc.maxSpeedFactor", defaults.disc().maxSpeedFactor()),
-                doubleValue(props, "laser.bounceAlphaFalloff", defaults.disc().laserBounceAlphaFalloff()));
+                requireInt(props, "disc.bigRadius"),
+                requireInt(props, "disc.smallRadius"),
+                requireDouble(props, "disc.speed"),
+                requireInt(props, "disc.maxBounces"),
+                requireInt(props, "disc.maxPerPlayer"),
+                requireInt(props, "disc.maxPerShot"),
+                requireInt(props, "laser.maxBounces"),
+                requireDouble(props, "disc.bounceSpeedGain"),
+                requireDouble(props, "disc.maxSpeedFactor"),
+                requireDouble(props, "laser.bounceAlphaFalloff"));
 
-        var collision = new CollisionConfig(
-                intValue(props, "collision.ballCollisionSize", defaults.collision().ballCollisionSize()));
+        var collision = new CollisionConfig(requireInt(props, "collision.ballCollisionSize"));
 
         var round = new RoundConfig(
-                intValue(props, "round.roundTimeSeconds", defaults.round().roundTimeSeconds()),
-                intValue(props, "round.roundLimit", defaults.round().roundLimit()),
-                intValue(props, "round.roundEndDelay", defaults.round().roundEndDelay()),
-                intValue(props, "round.animationTime", defaults.round().animationTime()));
+                requireInt(props, "round.timeSeconds"),
+                requireInt(props, "round.limit"),
+                requireInt(props, "round.endDelay"),
+                requireInt(props, "round.animationTime"));
 
-        var palette = paletteFromProperties(props, defaults.palette());
+        var palette = paletteFromProperties(props);
 
         var aiToggles = new AiSkillToggles(
-                boolValue(props, "ai.skill.accuracy", defaults.ai().toggles().accuracy()),
-                boolValue(props, "ai.skill.cursorSpeed", defaults.ai().toggles().cursorSpeed()),
-                boolValue(props, "ai.skill.retake", defaults.ai().toggles().retake()),
-                boolValue(props, "ai.skill.defend", defaults.ai().toggles().defend()),
-                boolValue(props, "ai.skill.bouncePath", defaults.ai().toggles().bouncePath()),
-                boolValue(props, "ai.skill.powerShot", defaults.ai().toggles().powerShot()),
-                boolValue(props, "ai.skill.baseAttack", defaults.ai().toggles().baseAttack()));
+                requireBool(props, "ai.skill.accuracy"),
+                requireBool(props, "ai.skill.cursorSpeed"),
+                requireBool(props, "ai.skill.retake"),
+                requireBool(props, "ai.skill.defend"),
+                requireBool(props, "ai.skill.bouncePath"),
+                requireBool(props, "ai.skill.powerShot"),
+                requireBool(props, "ai.skill.baseAttack"));
         var ai = new AiConfig(
-                intValue(props, "ai.scanAngles", defaults.ai().scanAngles()),
-                intValue(props, "ai.scanBudgetPerFrame", defaults.ai().scanBudgetPerFrame()),
-                boolValue(props, "ai.skillsEnabled", defaults.ai().skillsEnabled()),
-                boolValue(props, "ai.powerShotEnabled", defaults.ai().powerShotEnabled()),
-                intValue(props, "ai.powerShotMinBounces", defaults.ai().powerShotMinBounces()),
-                boolValue(props, "ai.baseAttackEnabled", defaults.ai().baseAttackEnabled()),
+                requireInt(props, "ai.scanAngles"),
+                requireInt(props, "ai.scanBudgetPerFrame"),
+                requireBool(props, "ai.skillsEnabled"),
+                requireBool(props, "ai.powerShotEnabled"),
+                requireInt(props, "ai.powerShotMinBounces"),
+                requireBool(props, "ai.baseAttackEnabled"),
                 aiToggles);
 
         var power = new PowerShotConfig(
-                boolValue(props, "power.enabled", defaults.power().enabled()),
-                doubleValue(props, "power.chargeSeconds", defaults.power().chargeSeconds()),
-                doubleValue(props, "power.speedFactor", defaults.power().speedFactor()),
-                intValue(props, "power.maxBounces", defaults.power().maxBounces()),
-                intValue(props, "power.captureStrength", defaults.power().captureStrength()));
+                requireBool(props, "power.enabled"),
+                requireDouble(props, "power.chargeSeconds"),
+                requireDouble(props, "power.speedFactor"),
+                requireDouble(props, "power.maxBouncesFactor"),
+                requireInt(props, "power.captureStrength"));
 
         var disruption = new DisruptionConfig(
-                boolValue(props, "disruption.enabled", defaults.disruption().enabled()),
-                doubleValue(props, "disruption.durationSeconds", defaults.disruption().durationSeconds()),
-                doubleValue(props, "disruption.graceSeconds", defaults.disruption().graceSeconds()));
+                requireBool(props, "disruption.enabled"),
+                requireDouble(props, "disruption.durationSeconds"),
+                requireDouble(props, "disruption.graceSeconds"));
 
         var menu = new MenuConfig(
-                intValue(props, "menu.initialPlayers", defaults.menu().initialPlayers()),
-                intValue(props, "menu.maxPlayers", defaults.menu().maxPlayers()),
-                intValue(props, "menu.initialRoundLimit", defaults.menu().initialRoundLimit()),
-                intValue(props, "menu.maxRoundLimit", defaults.menu().maxRoundLimit()),
-                intValue(props, "menu.roundLimitStep", defaults.menu().roundLimitStep()),
-                intValue(props, "menu.initialRoundTime", defaults.menu().initialRoundTime()),
-                intValue(props, "menu.maxRoundTime", defaults.menu().maxRoundTime()),
-                intValue(props, "menu.roundTimeStep", defaults.menu().roundTimeStep()),
-                intValue(props, "menu.initialAiPlayers", defaults.menu().initialAiPlayers()),
-                floatValue(props, "menu.fontSize", defaults.menu().fontSize()),
-                intValue(props, "menu.rowSpacing", defaults.menu().rowSpacing()),
-                intValue(props, "menu.panelPadX", defaults.menu().panelPadX()),
-                intValue(props, "menu.panelMargin", defaults.menu().panelMargin()));
+                requireInt(props, "menu.maxPlayers"),
+                requireInt(props, "menu.initialRoundLimit"),
+                requireInt(props, "menu.maxRoundLimit"),
+                requireInt(props, "menu.roundLimitStep"),
+                requireInt(props, "menu.initialRoundTime"),
+                requireInt(props, "menu.maxRoundTime"),
+                requireInt(props, "menu.roundTimeStep"),
+                requireInt(props, "menu.initialAiPlayers"),
+                requireFloat(props, "menu.fontSize"),
+                requireInt(props, "menu.rowSpacing"),
+                requireInt(props, "menu.panelPadX"),
+                requireInt(props, "menu.panelMargin"));
 
         var window = new WindowConfig(
-                intValue(props, "window.windowTiles", defaults.window().windowTiles()),
-                intValue(props, "window.counterHeightTiles", defaults.window().counterHeightTiles()),
-                intValue(props, "window.pointerWidthTiles", defaults.window().pointerWidthTiles()));
+                requireInt(props, "window.windowTiles"),
+                requireInt(props, "window.counterHeightTiles"),
+                requireInt(props, "window.pointerWidthTiles"));
 
         return new GameConfig(
-                intValue(props, "playerNumber", defaults.playerNumber()),
+                requireInt(props, "round.initialPlayerNumber"),
                 resolveSeed(props),
                 grid, disc, collision, round, palette, ai, menu, window, power, disruption);
     }
 
-    /** Built-in defaults mirroring the legacy hard-coded values. */
-    public static GameConfig defaults() {
-        var grid = new GridConfig(36, 25);
-        // Acceleration on by default: a subtle per-bounce speed gain, capped at a safe multiple.
-        var disc = new DiscConfig(18, 10, 2.0, 7, 3, 3, 4, 1.06, 1.7, 0.6);
-        var collision = new CollisionConfig(4);
-        var round = new RoundConfig(15, 2, 2, 1);
-        var power = new PowerShotConfig(true, 0.6, 1.9, 16, 2);
-        var palette = new ColorPalette(
-                new RgbColor(95, 99, 104),
-                new RgbColor(25, 25, 25),
-                new RgbColor(68, 74, 80),
-                new RgbColor(102, 0, 102),
-                new RgbColor(102, 75, 102),
-                new RgbColor(192, 192, 192),
-                new RgbColor(68, 74, 80),
-                new RgbColor(35, 35, 35, 10),
-                List.of(
-                        new RgbColor(124, 252, 0),
-                        new RgbColor(48, 213, 200),
-                        new RgbColor(252, 3, 0),
-                        new RgbColor(237, 26, 116)));
-        var ai = new AiConfig(24, 4, true, true, 2, true, AiSkillToggles.allEnabled());
-        var menu = new MenuConfig(2, 4, 2, 20, 4, 15, 60, 5, 0, 30f, 46, 28, 16);
-        var window = new WindowConfig(25, 2, 4);
-        var disruption = new DisruptionConfig(true, 4.0, 2.0);
-        return new GameConfig(2, System.nanoTime(), grid, disc, collision, round, palette, ai, menu, window, power, disruption);
-    }
-
-    /** Builds rendering config from already-parsed properties, defaulting any absent key. */
+    /** Builds rendering config (menu chrome + map-object styling) from properties; all keys required. */
     public static GraphicsConfig graphicsFromProperties(Properties props) {
-        var d = graphicsDefaults();
         var menu = new MenuTheme(
-                colorValue(props, "menu.theme.label", d.menu().label()),
-                colorValue(props, "menu.theme.sublabel", d.menu().sublabel()),
-                colorValue(props, "menu.theme.value", d.menu().value()),
-                colorValue(props, "menu.theme.separator", d.menu().separator()),
-                colorValue(props, "menu.theme.panelFill", d.menu().panelFill()),
-                colorValue(props, "menu.theme.panelBorder", d.menu().panelBorder()),
-                colorValue(props, "menu.theme.panelGlow", d.menu().panelGlow()),
-                colorValue(props, "menu.theme.highlightFill", d.menu().highlightFill()),
-                colorValue(props, "menu.theme.highlightBorder", d.menu().highlightBorder()),
-                colorValue(props, "menu.theme.shadow", d.menu().shadow()),
-                intValue(props, "menu.theme.panelArc", d.menu().panelArc()));
+                requireColor(props, "menu.theme.label"),
+                requireColor(props, "menu.theme.sublabel"),
+                requireColor(props, "menu.theme.value"),
+                requireColor(props, "menu.theme.separator"),
+                requireColor(props, "menu.theme.panelFill"),
+                requireColor(props, "menu.theme.panelBorder"),
+                requireColor(props, "menu.theme.panelGlow"),
+                requireColor(props, "menu.theme.highlightFill"),
+                requireColor(props, "menu.theme.highlightBorder"),
+                requireColor(props, "menu.theme.shadow"),
+                requireInt(props, "menu.theme.panelArc"));
         var objects = new ObjectStyle(
-                intValue(props, "object.base.ringBig", d.objects().baseRingBig()),
-                intValue(props, "object.base.ringSmall", d.objects().baseRingSmall()),
-                intValue(props, "object.disc.coreRadius", d.objects().discCoreRadius()),
-                doubleValue(props, "object.cursor.sizeFactor", d.objects().cursorSizeFactor()),
-                doubleValue(props, "object.cursor.standoffFactor", d.objects().cursorStandoffFactor()),
-                doubleValue(props, "object.charge.glowThreshold", d.objects().chargeGlowThreshold()));
+                requireInt(props, "object.base.ringBig"),
+                requireInt(props, "object.base.ringSmall"),
+                requireInt(props, "object.disc.coreRadius"),
+                requireDouble(props, "object.cursor.sizeFactor"),
+                requireDouble(props, "object.cursor.standoffFactor"),
+                requireDouble(props, "object.charge.glowThreshold"));
         return new GraphicsConfig(menu, objects);
     }
 
-    /** Built-in rendering defaults mirroring the legacy hard-coded visuals. */
-    public static GraphicsConfig graphicsDefaults() {
-        var menu = new MenuTheme(
-                new RgbColor(200, 160, 255),
-                new RgbColor(160, 200, 220),
-                new RgbColor(170, 130, 220),
-                new RgbColor(255, 200, 80, 200),
-                new RgbColor(20, 15, 40, 185),
-                new RgbColor(130, 60, 180, 120),
-                new RgbColor(160, 80, 220, 45),
-                new RgbColor(200, 160, 255, 55),
-                new RgbColor(200, 140, 255, 90),
-                new RgbColor(0, 0, 0, 160),
-                28);
-        var objects = new ObjectStyle(25, 15, 3, 0.5, 2.0, 0.8);
-        return new GraphicsConfig(menu, objects);
-    }
-
-    private static ColorPalette paletteFromProperties(Properties props, ColorPalette defaults) {
+    private static ColorPalette paletteFromProperties(Properties props) {
         List<RgbColor> players = new ArrayList<>();
         for (int i = 1; i <= 4; i++) {
-            RgbColor fallback = defaults.players().get(Math.min(i, defaults.players().size()) - 1);
-            players.add(colorValue(props, "color.player" + i, fallback));
+            players.add(requireColor(props, "color.player" + i));
         }
         return new ColorPalette(
-                colorValue(props, "color.background", defaults.background()),
-                colorValue(props, "color.standard", defaults.standard()),
-                colorValue(props, "color.winBlock", defaults.winBlock()),
-                colorValue(props, "color.deadLine", defaults.deadLine()),
-                colorValue(props, "color.deadLineBackground", defaults.deadLineBackground()),
-                colorValue(props, "color.fontBackground", defaults.fontBackground()),
-                colorValue(props, "color.pointBarBackground", defaults.pointBarBackground()),
-                colorValue(props, "color.menuStandard", defaults.menuStandard()),
+                requireColor(props, "color.background"),
+                requireColor(props, "color.standard"),
+                requireColor(props, "color.winBlock"),
+                requireColor(props, "color.deadLine"),
+                requireColor(props, "color.deadLineBackground"),
+                requireColor(props, "color.fontBackground"),
+                requireColor(props, "color.pointBarBackground"),
+                requireColor(props, "color.menuStandard"),
                 players);
-    }
-
-    private static int intValue(Properties props, String key, int fallback) {
-        var raw = props.getProperty(key);
-        if (raw == null || raw.isBlank()) {
-            return fallback;
-        }
-        try {
-            return Integer.parseInt(raw.trim());
-        } catch (NumberFormatException _) {
-            log.warn("Invalid int for '{}'='{}'; using {}", key, raw, fallback);
-            return fallback;
-        }
     }
 
     /**
      * Resolves the master run seed: a parseable {@code game.seed} is used verbatim (reproducible run);
-     * a blank or absent key resolves to a fresh time-based seed (a different run each launch).
+     * a blank or absent key resolves to a fresh time-based seed (a different run each launch). This is the
+     * one numeric key whose ABSENCE is meaningful rather than fatal.
      */
     private static long resolveSeed(Properties props) {
         var raw = props.getProperty("game.seed");
@@ -267,62 +194,71 @@ public final class GameConfigLoader {
         }
         try {
             return Long.parseLong(raw.trim());
-        } catch (NumberFormatException _) {
-            log.warn("Invalid long for 'game.seed'='{}'; using a fresh time seed", raw);
-            return System.nanoTime();
+        } catch (NumberFormatException e) {
+            throw new ConfigException("Invalid long for 'game.seed': '" + raw + "'");
         }
     }
 
-    private static boolean boolValue(Properties props, String key, boolean fallback) {
+    // --- required-key accessors: a missing/blank/unparseable key is a fatal ConfigException ---------
+
+    private static String requireRaw(Properties props, String key) {
         var raw = props.getProperty(key);
         if (raw == null || raw.isBlank()) {
-            return fallback;
+            throw new ConfigException("Missing required property: '" + key + "'");
         }
-        return Boolean.parseBoolean(raw.trim());
+        return raw.trim();
     }
 
-    private static double doubleValue(Properties props, String key, double fallback) {
-        var raw = props.getProperty(key);
-        if (raw == null || raw.isBlank()) {
-            return fallback;
-        }
+    private static int requireInt(Properties props, String key) {
+        String raw = requireRaw(props, key);
         try {
-            return Double.parseDouble(raw.trim());
-        } catch (NumberFormatException _) {
-            log.warn("Invalid double for '{}'='{}'; using {}", key, raw, fallback);
-            return fallback;
+            return Integer.parseInt(raw);
+        } catch (NumberFormatException e) {
+            throw new ConfigException("Invalid int for '" + key + "': '" + raw + "'");
         }
     }
 
-    private static float floatValue(Properties props, String key, float fallback) {
-        var raw = props.getProperty(key);
-        if (raw == null || raw.isBlank()) {
-            return fallback;
-        }
+    private static double requireDouble(Properties props, String key) {
+        String raw = requireRaw(props, key);
         try {
-            return Float.parseFloat(raw.trim());
-        } catch (NumberFormatException _) {
-            log.warn("Invalid float for '{}'='{}'; using {}", key, raw, fallback);
-            return fallback;
+            return Double.parseDouble(raw);
+        } catch (NumberFormatException e) {
+            throw new ConfigException("Invalid double for '" + key + "': '" + raw + "'");
         }
     }
 
-    /** Parses an {@code r,g,b} or {@code r,g,b,a} CSV colour; falls back on any parse error. */
-    private static RgbColor colorValue(Properties props, String key, RgbColor fallback) {
-        var raw = props.getProperty(key);
-        if (raw == null || raw.isBlank()) {
-            return fallback;
-        }
+    private static float requireFloat(Properties props, String key) {
+        String raw = requireRaw(props, key);
         try {
-            var parts = raw.trim().split(",");
+            return Float.parseFloat(raw);
+        } catch (NumberFormatException e) {
+            throw new ConfigException("Invalid float for '" + key + "': '" + raw + "'");
+        }
+    }
+
+    private static boolean requireBool(Properties props, String key) {
+        String raw = requireRaw(props, key).toLowerCase();
+        if (raw.equals("true")) {
+            return true;
+        }
+        if (raw.equals("false")) {
+            return false;
+        }
+        throw new ConfigException("Invalid boolean for '" + key + "': '" + raw + "'");
+    }
+
+    /** Parses an {@code r,g,b} or {@code r,g,b,a} CSV colour (channels 0-255); a parse error is fatal. */
+    private static RgbColor requireColor(Properties props, String key) {
+        String raw = requireRaw(props, key);
+        try {
+            var parts = raw.split(",");
             int r = Integer.parseInt(parts[0].trim());
             int g = Integer.parseInt(parts[1].trim());
             int b = Integer.parseInt(parts[2].trim());
             int a = parts.length > 3 ? Integer.parseInt(parts[3].trim()) : 255;
             return new RgbColor(r, g, b, a);
-        } catch (RuntimeException _) {
-            log.warn("Invalid colour for '{}'='{}'; using {}", key, raw, fallback);
-            return fallback;
+        } catch (RuntimeException e) {
+            throw new ConfigException("Invalid colour for '" + key + "': '" + raw + "'");
         }
     }
 }

@@ -42,8 +42,14 @@ public sealed interface NetMessage
      * carry the host's menu-chosen round pacing so every peer builds an identical match (#7); {@code 0}
      * means "unset -> keep the local default" (back-compatible with the pre-#7 two-field form).
      */
-    record Start(long seed, int[] orderedSlots, int roundTimeSeconds, int roundLimit) implements NetMessage {
-        /** Back-compatible form without round pacing (used by tests/older callers); leaves both at 0 = unset. */
+    record Start(long seed, int[] orderedSlots, int roundTimeSeconds, int roundLimit,
+                 double discSpeed, int maxDiscBounces, int maxLaserBounces,
+                 double disruptionSeconds, double graceSeconds) implements NetMessage {
+        /** Round pacing only, no gameplay payload (pre-#4.8 form); gameplay fields default to 0 = unset. */
+        Start(long seed, int[] orderedSlots, int roundTimeSeconds, int roundLimit) {
+            this(seed, orderedSlots, roundTimeSeconds, roundLimit, 0.0, 0, 0, 0.0, 0.0);
+        }
+        /** Back-compatible form without round pacing (used by tests/older callers); leaves all at 0 = unset. */
         Start(long seed, int[] orderedSlots) {
             this(seed, orderedSlots, 0, 0);
         }

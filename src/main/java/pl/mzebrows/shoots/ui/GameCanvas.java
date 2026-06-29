@@ -27,6 +27,11 @@ public abstract class GameCanvas extends Canvas {
     int width;
     int height;
 
+    /** Uniform logical-unit -> pixel render scale applied each frame for elastic window scaling (1.0 = none). */
+    double renderScale = 1.0;
+    private int lastCanvasW = -1;
+    private int lastCanvasH = -1;
+
     // Timing
     @Getter @Setter boolean animationEnd = false;
     @Getter @Setter boolean animationElementEnd = false;
@@ -87,6 +92,39 @@ public abstract class GameCanvas extends Canvas {
     /** Restarts the menu-element animation timer. */
     public void restartAnimationTime() {
         animationTime = gameSettings.getRoundTime();
+    }
+
+    /** Sets the uniform render scale (logical units -> pixels) used by the elastic, scale-to-fit window. */
+    public void setRenderScale(double scale) {
+        this.renderScale = scale;
+    }
+
+    /**
+     * Recreates the {@link BufferStrategy} when the canvas pixel size has changed (e.g. after a window
+     * resize) so active rendering keeps matching the surface. A no-op until the canvas is displayable and
+     * sized, and while the size is unchanged -- so the fixed-size path is byte-identical to before.
+     */
+    void recreateStrategyIfResized() {
+        int w = getWidth();
+        int h = getHeight();
+        if (w <= 0 || h <= 0 || (w == lastCanvasW && h == lastCanvasH)) {
+            return;
+        }
+        lastCanvasW = w;
+        lastCanvasH = h;
+        try {
+            createBufferStrategy(2);
+            strategy = getBufferStrategy();
+        } catch (IllegalStateException | IllegalArgumentException ignored) {
+            // not displayable yet; retried on the next frame
+        }
+    }
+
+    /** Applies the active render scale to a freshly acquired Graphics2D (a no-op at scale 1.0). */
+    void applyRenderScale(Graphics2D g) {
+        if (renderScale != 1.0 && renderScale > 0.0) {
+            g.scale(renderScale, renderScale);
+        }
     }
 
     /**

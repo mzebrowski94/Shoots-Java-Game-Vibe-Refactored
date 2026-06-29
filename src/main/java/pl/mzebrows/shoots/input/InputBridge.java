@@ -24,6 +24,12 @@ public final class InputBridge implements KeyListener {
     private EnumSet<GameAction> current = EnumSet.noneOf(GameAction.class);
     private EnumSet<GameAction> previous = EnumSet.noneOf(GameAction.class);
 
+    // Text-entry capture for menu fields (host IP / port). The EDT appends typed characters via
+    // keyTyped; the game-loop thread drains them once per frame. Off by default so normal play is
+    // unaffected (digits/'.' are not bound to any GameAction, so they only flow through here).
+    private final StringBuilder edtTyped = new StringBuilder();
+    private volatile boolean capturingText = false;
+
     public InputBridge(Map<Integer, EnumSet<GameAction>> keyMap) {
         var copy = new HashMap<Integer, EnumSet<GameAction>>();
         keyMap.forEach((k, v) -> copy.put(k, EnumSet.copyOf(v)));
@@ -100,7 +106,39 @@ public final class InputBridge implements KeyListener {
     }
 
     @Override
-    public void keyTyped(KeyEvent e) { /* unused */ }
+    public void keyTyped(KeyEvent e) {
+        if (!capturingText) {
+            return;
+        }
+        char c = e.getKeyChar();
+        if (Character.isDigit(c) || c == '.' || c == '\b') {
+            synchronized (edtTyped) {
+                edtTyped.append(c);
+            }
+        }
+    }
+
+    /** Enables/disables raw text capture (menu IP/port fields); disabling also clears any pending text. */
+    public void setTextCapture(boolean on) {
+        capturingText = on;
+        if (!on) {
+            synchronized (edtTyped) {
+                edtTyped.setLength(0);
+            }
+        }
+    }
+
+    /** Drains characters typed since the last call -- digits, {@code '.'}, and {@code '\b'} (backspace). */
+    public String drainTypedText() {
+        synchronized (edtTyped) {
+            if (edtTyped.length() == 0) {
+                return "";
+            }
+            String text = edtTyped.toString();
+            edtTyped.setLength(0);
+            return text;
+        }
+    }
 
     /**
      * Human-readable name of the first key bound to {@code action} (e.g. {@code "Left"}, {@code "W"},

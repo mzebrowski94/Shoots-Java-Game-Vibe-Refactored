@@ -80,6 +80,23 @@ Root package `pl.mzebrows.shoots`. High-level layout:
 **Clean code**
 - `var` only where the type is obvious. Externalize tunables into config records / `game.properties`
   (logic) or `graphic.properties` (rendering) — **no magic numbers** in game logic or rendering.
+
+**Config / `.properties` (the two files are the single source of truth — NO code defaults)**
+- `GameConfigLoader` has **no `defaults()`**: every key it reads is **required**. A missing/unparseable key
+  throws `ConfigException`, which `ProjectShoots.main` logs before `System.exit(1)`. Same rule for
+  `GameplayLimits`. So adding a config field = add the key to the right `.properties` file too, or the game
+  won't start. The only fixed-in-code values are the map geometry constants (`GameConfigLoader.GRID_UNIT` /
+  `TABLE_SIZE`).
+- **`game.properties` = gameplay logic; `graphic.properties` = rendering/UI** (colours, window tiles, disc
+  geometry, menu layout/theme, object styles). The loader merges both, so a logic record may read a key that
+  physically lives in `graphic.properties` (e.g. `disc.bigRadius`).
+- **Keep comments minimal** in both files — short section headers only; the keys are self-describing.
+- **Order** `game.properties` by category: online + run/seed first, then round/match, then physics/gameplay
+  (disc, laser, power, disruption, collision, ai) last.
+- **Naming = dotted hierarchy** `<group>.<name>` (e.g. `round.timeSeconds`, `disc.speed`). A player-editable
+  GAMEPLAY-OPTIONS value carries its caps **inline beneath it** as `<key>.min` / `<key>.max` / `<key>.step`
+  (read by `GameplayLimits`). Power-shot speed/bounces are NOT separate options — they scale off the disc via
+  `power.speedFactor` / `power.maxBouncesFactor`.
 - One-line Javadoc on public classes/methods; minimal inline comments — code explains itself.
   No `@author` tags.
 - Tests: JUnit 5 + AssertJ + Mockito for key logic (targeting, scoring, determinism).

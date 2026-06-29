@@ -25,8 +25,8 @@ public enum MenuEnum {
     /** Choose the number of rounds. */
     ROUND_NUMBER_OPTION,
 
-    /** Choose the round duration. */
-    ROUND_TIME_OPTION,
+    /** Open the GAMEPLAY OPTIONS sub-screen (round time, disc speed/bounces, laser, disruption, host IP/port). */
+    GAMEPLAY_OPTIONS,
 
     /** Choose the number of AI players. */
     AI_NUMBER_OPTION,

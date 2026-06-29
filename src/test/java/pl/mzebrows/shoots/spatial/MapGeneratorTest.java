@@ -160,6 +160,17 @@ class MapGeneratorTest {
         assertThatThrownBy(() -> seeded().generate(5)).isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void centralWallBlocksTheLaneBetweenOpposingBases() {
+        // Feature #3: a wall sits at the map centre on every seed so two opposing bases (P1/P2 share
+        // column 12, P3/P4 share row 12) can never shoot each other on a straight, unbroken line.
+        int c = SIZE / 2;
+        for (long seed = 0; seed < 50; seed++) {
+            TileType[][] map = new MapGenerator(grid, new Random(seed)).generate(4);
+            assertThat(map[c][c]).as("centre tile is a wall (seed %d)", seed).isEqualTo(TileType.WALL);
+        }
+    }
+
     private int countTiles(TileType[][] map, TileType type) {
         int count = 0;
         for (TileType[] row : map) {

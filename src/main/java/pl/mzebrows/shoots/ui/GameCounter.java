@@ -80,10 +80,12 @@ public class GameCounter extends GameCanvas {
         if (strategy == null) {
             return;
         }
+        recreateStrategyIfResized();
         this.actualRoundState = roundState;
         do {
             do {
                 g2d = (Graphics2D) strategy.getDrawGraphics();
+                applyRenderScale(g2d);
                 g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
                 if (roundState == RoundEnum.ROUND_PAUSED) {

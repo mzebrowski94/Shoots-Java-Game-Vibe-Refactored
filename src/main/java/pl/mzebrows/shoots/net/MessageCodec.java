@@ -45,7 +45,10 @@ public final class MessageCodec {
                     "LOBBY" + SEP + "names=" + encodeNames(m.slotNames());
             case NetMessage.Start m ->
                     "START" + SEP + "seed=" + m.seed() + SEP + "slots=" + encodeInts(m.orderedSlots())
-                            + SEP + "rt=" + m.roundTimeSeconds() + SEP + "rl=" + m.roundLimit();
+                            + SEP + "rt=" + m.roundTimeSeconds() + SEP + "rl=" + m.roundLimit()
+                            + SEP + "ds=" + m.discSpeed() + SEP + "db=" + m.maxDiscBounces()
+                            + SEP + "lb=" + m.maxLaserBounces() + SEP + "dis=" + m.disruptionSeconds()
+                            + SEP + "gr=" + m.graceSeconds();
             case NetMessage.Pause m ->
                     "PAUSE" + SEP + "slot=" + m.slot() + SEP + "paused=" + m.paused();
         };
@@ -76,7 +79,10 @@ public final class MessageCodec {
             case "HASH" -> new NetMessage.Hash(longField(f, "frame"), longField(f, "hash"));
             case "LOBBY" -> new NetMessage.Lobby(decodeNames(f.getOrDefault("names", "")));
             case "START" -> new NetMessage.Start(longField(f, "seed"), decodeInts(f.getOrDefault("slots", "")),
-                    Integer.parseInt(f.getOrDefault("rt", "0")), Integer.parseInt(f.getOrDefault("rl", "0")));
+                    Integer.parseInt(f.getOrDefault("rt", "0")), Integer.parseInt(f.getOrDefault("rl", "0")),
+                    Double.parseDouble(f.getOrDefault("ds", "0")), Integer.parseInt(f.getOrDefault("db", "0")),
+                    Integer.parseInt(f.getOrDefault("lb", "0")), Double.parseDouble(f.getOrDefault("dis", "0")),
+                    Double.parseDouble(f.getOrDefault("gr", "0")));
             case "PAUSE" -> new NetMessage.Pause(intField(f, "slot"), Boolean.parseBoolean(require(f, "paused")));
             default -> throw new IllegalArgumentException("unknown message type: " + type);
         };

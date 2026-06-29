@@ -7,6 +7,8 @@ import pl.mzebrows.shoots.ai.AiDifficulty;
 import pl.mzebrows.shoots.config.GameConfig;
 import pl.mzebrows.shoots.config.MenuConfig;
 import pl.mzebrows.shoots.config.OnlineConfig;
+import pl.mzebrows.shoots.config.GameplayLimits;
+import pl.mzebrows.shoots.app.GameplayOptions;
 import pl.mzebrows.shoots.config.RoundConfig;
 import pl.mzebrows.shoots.input.GameAction;
 import pl.mzebrows.shoots.net.DiscoveredMatch;
@@ -56,16 +58,18 @@ public class GameMenu {
     boolean textBrighter = true;
     Color winTextColor;
 
-    private int roundTime;
-    private final int roundTimeLimit;
-    private final int roundTimeStep;
+    /** Live, in-memory gameplay tunables (shared with {@link GameSettings}); edited in the sub-screen below. */
+    private final GameplayOptions gameplayOptions;
+    /** Min/max/step caps for the gameplay options (from {@code game.properties}). */
+    private final GameplayLimits gameplayLimits;
+    /** True while the GAMEPLAY OPTIONS sub-screen is shown instead of the option list. */
+    boolean showingGameplayOptions = false;
+    /** Highlighted row in the GAMEPLAY OPTIONS sub-screen (0..{@link #GAMEPLAY_ROWS}-1). */
+    int gameplayIndex = 0;
 
     private final int playerLimit;
     private int playerNumber;
 
-    private int roundNumber;
-    private final int roundNumberLimit;
-    private final int roundNumberStep;
 
     private int aiNumber;
     AiDifficulty aiDifficulty = AiDifficulty.NORMAL;
@@ -74,8 +78,7 @@ public class GameMenu {
     String stringNewGame = "[ START NEW GAME ]";
     String stringPlayOnline = "[ PLAY ONLINE ]";
     String stringPlayerNumberText = "- Player Number -";
-    String stringRoundLimitText = "- Round Limit -";
-    String stringRoundTimeText = "- Round Time -";
+    String stringGameplayOptions = "[ GAMEPLAY OPTIONS ]";
     String stringQuit = "[ QUIT ]";
     String stringControls = "[ CONTROLS ]";
 
@@ -102,8 +105,6 @@ public class GameMenu {
     private int spinnerFrame;
 
     String stringPlayerNumber;
-    String stringRoundNumber;
-    String stringRoundTime;
     String stringAiNumberText = "- AI Players -";
     String stringAiNumber;
     String stringAiDifficultyText = "- AI Difficulty -";
@@ -131,19 +132,13 @@ public class GameMenu {
         this.menuFont = gameSettings.getMenuFont();
         this.winTextColor = gameSettings.getColorScheme().getBackgroundFontColor();
 
-        this.playerNumber = menuConfig.initialPlayers();
+        this.playerNumber = gameSettings.getConfig().playerNumber();
         this.playerLimit = menuConfig.maxPlayers();
-        this.roundTime = menuConfig.initialRoundTime();
-        this.roundTimeLimit = menuConfig.maxRoundTime();
-        this.roundTimeStep = menuConfig.roundTimeStep();
-        this.roundNumber = menuConfig.initialRoundLimit();
-        this.roundNumberLimit = menuConfig.maxRoundLimit();
-        this.roundNumberStep = menuConfig.roundLimitStep();
+        this.gameplayOptions = gameSettings.getGameplayOptions();
+        this.gameplayLimits = gameplayOptions.getLimits();
         this.aiNumber = menuConfig.initialAiPlayers();
 
         this.stringPlayerNumber = optionValue(playerNumber);
-        this.stringRoundNumber = optionValue(roundNumber);
-        this.stringRoundTime = optionValue(roundTime);
         this.stringAiNumber = optionValue(aiNumber);
         this.stringAiDifficulty = difficultyValue(aiDifficulty.getDisplayName());
     }
@@ -162,6 +157,11 @@ public class GameMenu {
 
         if (showingControls) {
             drawControls(g2d);
+            return;
+        }
+
+        if (showingGameplayOptions) {
+            drawGameplayOptions(g2d);
             return;
         }
 
@@ -184,14 +184,11 @@ public class GameMenu {
 
         shadowStringCentered(g2d, stringNewGame, rowY(ROW_NEW_GAME), label);
         shadowStringCentered(g2d, stringPlayOnline, rowY(ROW_PLAY_ONLINE), label);
+        // GAMEPLAY OPTIONS sits right under PLAY ONLINE; always gray while a match is in progress (locked, #5/#1.4).
+        Color gameplayColor = gameSettings.isMatchInProgress() ? menuSeparatorColor : label;
+        shadowStringCentered(g2d, stringGameplayOptions, rowY(ROW_GAMEPLAY_OPTIONS), gameplayColor);
         shadowStringCentered(g2d, stringPlayerNumberText, rowY(ROW_PLAYER_LABEL), sublabel);
         shadowStringCentered(g2d, stringPlayerNumber, rowY(ROW_PLAYER_VALUE), valueIdle);
-        shadowStringCentered(g2d, stringRoundLimitText, rowY(ROW_ROUND_LIMIT_LABEL), sublabel);
-        shadowStringCentered(g2d, stringRoundNumber, rowY(ROW_ROUND_LIMIT_VALUE), valueIdle);
-        shadowStringCentered(g2d, stringRoundTimeText, rowY(ROW_ROUND_TIME_LABEL), sublabel);
-        shadowStringCentered(g2d, stringRoundTime, rowY(ROW_ROUND_TIME_VALUE), valueIdle);
-        // AI section separator -- draws attention so players don't miss these options.
-        shadowStringCentered(g2d, "--- AI Settings ---", rowY(ROW_AI_SEPARATOR), menuSeparatorColor);
         shadowStringCentered(g2d, stringAiNumberText, rowY(ROW_AI_NUMBER_LABEL), sublabel);
         shadowStringCentered(g2d, stringAiNumber, rowY(ROW_AI_NUMBER_VALUE), valueIdle);
         shadowStringCentered(g2d, stringAiDifficultyText, rowY(ROW_AI_DIFFICULTY_LABEL), sublabel);
@@ -272,24 +269,21 @@ public class GameMenu {
     private static final int END_SCREEN_OPTION_OFFSET_ROWS = 2;
 
     // --- Option-block row layout, in nextLine units measured from menuHeight (row 0 = CONTINUE). ---
-    // START NEW GAME sits directly under CONTINUE (no blank row), freeing row 2 for PLAY ONLINE; the
-    // setup rows below are unchanged, so the panel height is identical to before.
+    // A blank row separates CONTINUE from START NEW GAME (#1.3); GAMEPLAY OPTIONS sits just under PLAY
+    // ONLINE (#1.1); round limit moved into GAMEPLAY OPTIONS and the AI-settings banner was removed (#1.2);
+    // another blank row separates the AI difficulty value from CONTROLS.
     private static final int ROW_CONTINUE = 0;
     private static final int ROW_NEW_GAME = 1;
     private static final int ROW_PLAY_ONLINE = 2;
-    private static final int ROW_PLAYER_LABEL = 3;
-    private static final int ROW_PLAYER_VALUE = 4;
-    private static final int ROW_ROUND_LIMIT_LABEL = 5;
-    private static final int ROW_ROUND_LIMIT_VALUE = 6;
-    private static final int ROW_ROUND_TIME_LABEL = 7;
-    private static final int ROW_ROUND_TIME_VALUE = 8;
-    private static final int ROW_AI_SEPARATOR = 9;
-    private static final int ROW_AI_NUMBER_LABEL = 10;
-    private static final int ROW_AI_NUMBER_VALUE = 11;
-    private static final int ROW_AI_DIFFICULTY_LABEL = 12;
-    private static final int ROW_AI_DIFFICULTY_VALUE = 13;
-    private static final int ROW_CONTROLS = 15;
-    private static final int ROW_QUIT = 16;
+    private static final int ROW_GAMEPLAY_OPTIONS = 4;
+    private static final int ROW_PLAYER_LABEL = 5;
+    private static final int ROW_PLAYER_VALUE = 6;
+    private static final int ROW_AI_NUMBER_LABEL = 7;
+    private static final int ROW_AI_NUMBER_VALUE = 8;
+    private static final int ROW_AI_DIFFICULTY_LABEL = 9;
+    private static final int ROW_AI_DIFFICULTY_VALUE = 10;
+    private static final int ROW_CONTROLS = 12;
+    private static final int ROW_QUIT = 13;
 
     /** Players are added/removed one at a time when cycling the player-count option. */
     private static final int PLAYER_STEP = 1;
@@ -302,9 +296,9 @@ public class GameMenu {
     private int menuRowsWidth(Graphics2D g2d) {
         FontMetrics fm = g2d.getFontMetrics(menuFont);
         int widest = 0;
-        for (String row : new String[]{stringContinue, stringNewGame, stringPlayOnline, stringPlayerNumberText,
-                stringRoundLimitText, stringRoundTimeText, stringAiNumberText, stringAiDifficultyText,
-                "--- AI Settings ---", stringQuit, "       WINNER(s) !     "}) {
+        for (String row : new String[]{stringContinue, stringNewGame, stringPlayOnline, stringGameplayOptions,
+                stringPlayerNumberText, stringAiNumberText, stringAiDifficultyText,
+                stringQuit, "       WINNER(s) !     "}) {
             widest = Math.max(widest, fm.stringWidth(row));
         }
         return widest + 2 * panelPadX();
@@ -324,6 +318,9 @@ public class GameMenu {
         }
         if (onlineScreen != OnlineScreen.NONE) {
             w = Math.max(w, onlineWidth(g2d));
+        }
+        if (showingGameplayOptions) {
+            w = Math.max(w, gameplayWidth(g2d));
         }
         if (gameSettings.isGameEnd()) {
             w = Math.max(w, scoreboardWidth(g2d));
@@ -425,8 +422,7 @@ public class GameMenu {
             case START_NEW_GAME -> ROW_NEW_GAME;
             case PLAY_ONLINE -> ROW_PLAY_ONLINE;
             case PLAYER_NUMBER_OPTION -> ROW_PLAYER_VALUE;
-            case ROUND_NUMBER_OPTION -> ROW_ROUND_LIMIT_VALUE;
-            case ROUND_TIME_OPTION -> ROW_ROUND_TIME_VALUE;
+            case GAMEPLAY_OPTIONS -> ROW_GAMEPLAY_OPTIONS;
             case AI_NUMBER_OPTION -> ROW_AI_NUMBER_VALUE;
             case AI_DIFFICULTY_OPTION -> ROW_AI_DIFFICULTY_VALUE;
             case CONTROLS -> ROW_CONTROLS;
@@ -525,6 +521,10 @@ public class GameMenu {
             return MenuEnum.NO_OPTION;
         }
 
+        if (showingGameplayOptions) {
+            return checkGameplayOptionsInput(input);
+        }
+
         // While any online sub-screen is open it captures all input and drives the lobby network state.
         if (onlineScreen != OnlineScreen.NONE) {
             return checkOnlineInput(input);
@@ -543,9 +543,9 @@ public class GameMenu {
         } else if (menuOption == MenuEnum.START_NEW_GAME) {
             if (input.isJustPressed(GameAction.CONFIRM)) {
                 choosenOption = MenuEnum.START_NEW_GAME;
-                gameSettings.setRoundTime(roundTime);
+                gameSettings.setRoundTime(gameplayOptions.getRoundTimeSeconds());
                 gameSettings.setPlayerNumber(playerNumber);
-                gameSettings.setRoundLimit(roundNumber);
+                gameSettings.setRoundLimit(gameplayOptions.getRoundLimit());
                 gameSettings.setAiNumber(Math.min(aiNumber, playerNumber));
                 gameSettings.setAiDifficulty(aiDifficulty);
             }
@@ -558,14 +558,12 @@ public class GameMenu {
             playerNumber = changeNumber(input, playerNumber, playerLimit, PLAYER_STEP);
             stringPlayerNumber = optionValue(playerNumber);
             choosenOption = MenuEnum.PLAYER_NUMBER_OPTION;
-        } else if (menuOption == MenuEnum.ROUND_TIME_OPTION) {
-            roundTime = changeNumber(input, roundTime, roundTimeLimit, roundTimeStep);
-            stringRoundTime = optionValue(roundTime);
-            choosenOption = MenuEnum.ROUND_TIME_OPTION;
-        } else if (menuOption == MenuEnum.ROUND_NUMBER_OPTION) {
-            roundNumber = changeNumber(input, roundNumber, roundNumberLimit, roundNumberStep);
-            stringRoundNumber = optionValue(roundNumber);
-            choosenOption = MenuEnum.ROUND_NUMBER_OPTION;
+        } else if (menuOption == MenuEnum.GAMEPLAY_OPTIONS) {
+            // #5: GAMEPLAY OPTIONS may only be opened when no match is in progress (locked while paused mid-game).
+            if (input.isJustPressed(GameAction.CONFIRM) && !gameSettings.isMatchInProgress()) {
+                openGameplayOptions();
+                choosenOption = MenuEnum.GAMEPLAY_OPTIONS;
+            }
         } else if (menuOption == MenuEnum.AI_NUMBER_OPTION) {
             aiNumber = changeAiNumber(input, aiNumber);
             stringAiNumber = optionValue(aiNumber);
@@ -595,6 +593,16 @@ public class GameMenu {
     public void selectContinue() {
         menuOption = MenuEnum.CONTINUE;
         showingControls = false;
+        showingGameplayOptions = false;
+        gameSettings.getInputBridge().setTextCapture(false);
+    }
+
+    /** Moves the menu selection to START NEW GAME and closes any overlay (used after abandoning a match, #6). */
+    public void selectStartNewGame() {
+        menuOption = MenuEnum.START_NEW_GAME;
+        showingControls = false;
+        showingGameplayOptions = false;
+        gameSettings.getInputBridge().setTextCapture(false);
     }
 
     /** The currently highlighted menu option (exposed for state wiring/tests). */
@@ -603,11 +611,8 @@ public class GameMenu {
     /** Current player count selected in the menu. */
     public int getPlayerNumber() { return playerNumber; }
 
-    /** Current round limit selected in the menu. */
-    public int getRoundNumber() { return roundNumber; }
-
-    /** Current round time (seconds) selected in the menu. */
-    public int getRoundTime() { return roundTime; }
+    /** Current round time (seconds) -- sourced from the live gameplay options. */
+    public int getRoundTime() { return gameplayOptions.getRoundTimeSeconds(); }
 
     /** Current AI-player count selected in the menu. */
     public int getAiNumber() { return aiNumber; }
@@ -677,12 +682,10 @@ public class GameMenu {
         } else if (menuOption == MenuEnum.START_NEW_GAME) {
             menuOption = MenuEnum.PLAY_ONLINE;
         } else if (menuOption == MenuEnum.PLAY_ONLINE) {
+            menuOption = MenuEnum.GAMEPLAY_OPTIONS;
+        } else if (menuOption == MenuEnum.GAMEPLAY_OPTIONS) {
             menuOption = MenuEnum.PLAYER_NUMBER_OPTION;
         } else if (menuOption == MenuEnum.PLAYER_NUMBER_OPTION) {
-            menuOption = MenuEnum.ROUND_NUMBER_OPTION;
-        } else if (menuOption == MenuEnum.ROUND_NUMBER_OPTION) {
-            menuOption = MenuEnum.ROUND_TIME_OPTION;
-        } else if (menuOption == MenuEnum.ROUND_TIME_OPTION) {
             menuOption = MenuEnum.AI_NUMBER_OPTION;
         } else if (menuOption == MenuEnum.AI_NUMBER_OPTION) {
             menuOption = MenuEnum.AI_DIFFICULTY_OPTION;
@@ -713,14 +716,12 @@ public class GameMenu {
             }
         } else if (menuOption == MenuEnum.PLAY_ONLINE) {
             menuOption = MenuEnum.START_NEW_GAME;
-        } else if (menuOption == MenuEnum.PLAYER_NUMBER_OPTION) {
+        } else if (menuOption == MenuEnum.GAMEPLAY_OPTIONS) {
             menuOption = MenuEnum.PLAY_ONLINE;
-        } else if (menuOption == MenuEnum.ROUND_NUMBER_OPTION) {
-            menuOption = MenuEnum.PLAYER_NUMBER_OPTION;
-        } else if (menuOption == MenuEnum.ROUND_TIME_OPTION) {
-            menuOption = MenuEnum.ROUND_NUMBER_OPTION;
+        } else if (menuOption == MenuEnum.PLAYER_NUMBER_OPTION) {
+            menuOption = MenuEnum.GAMEPLAY_OPTIONS;
         } else if (menuOption == MenuEnum.AI_NUMBER_OPTION) {
-            menuOption = MenuEnum.ROUND_TIME_OPTION;
+            menuOption = MenuEnum.PLAYER_NUMBER_OPTION;
         } else if (menuOption == MenuEnum.AI_DIFFICULTY_OPTION) {
             menuOption = MenuEnum.AI_NUMBER_OPTION;
         } else if (menuOption == MenuEnum.CONTROLS) {
@@ -746,10 +747,9 @@ public class GameMenu {
             shadowStringCentered(g2d, stringPlayOnline, rowY(ROW_PLAY_ONLINE), Color.green);
         } else if (menuOption == MenuEnum.PLAYER_NUMBER_OPTION) {
             shadowStringCentered(g2d, stringPlayerNumber, rowY(ROW_PLAYER_VALUE), Color.yellow);
-        } else if (menuOption == MenuEnum.ROUND_NUMBER_OPTION) {
-            shadowStringCentered(g2d, stringRoundNumber, rowY(ROW_ROUND_LIMIT_VALUE), Color.yellow);
-        } else if (menuOption == MenuEnum.ROUND_TIME_OPTION) {
-            shadowStringCentered(g2d, stringRoundTime, rowY(ROW_ROUND_TIME_VALUE), Color.yellow);
+        } else if (menuOption == MenuEnum.GAMEPLAY_OPTIONS) {
+            Color gp = gameSettings.isMatchInProgress() ? Color.gray : Color.green;
+            shadowStringCentered(g2d, stringGameplayOptions, rowY(ROW_GAMEPLAY_OPTIONS), gp);
         } else if (menuOption == MenuEnum.AI_NUMBER_OPTION) {
             shadowStringCentered(g2d, stringAiNumber, rowY(ROW_AI_NUMBER_VALUE), Color.yellow);
         } else if (menuOption == MenuEnum.AI_DIFFICULTY_OPTION) {
@@ -923,7 +923,7 @@ public class GameMenu {
             // #7: size the lobby by the menu's selected player count (online needs >= 2), and carry the menu's
             // round time / limit into the hosted match via the base config.
             int onlinePlayers = Math.max(2, Math.min(menuConfig.maxPlayers(), playerNumber));
-            lobby = OnlineLobby.host(onlineBaseConfig(), onlinePlayers, onlineConfig.port(), playerName);
+            lobby = OnlineLobby.host(onlineBaseConfig(), onlinePlayers, gameplayOptions.getHostPort(), playerName);
             onlineScreen = OnlineScreen.HOST_LOBBY;
             onlineError = null;
         } catch (IOException e) {
@@ -931,19 +931,19 @@ public class GameMenu {
         }
     }
 
-    /** The base game config with the menu-selected round time / limit overlaid, for an online match (#7). */
+    /**
+     * The host's base game config for an online match: the live GAMEPLAY OPTIONS (disc speed/bounces, laser,
+     * disruption/grace timings, round time) overlaid onto the loaded config, plus the menu-selected round
+     * limit. Every client rebuilds the identical match from this (propagated via START), so the host's
+     * gameplay options govern the whole lobby (#4.8 / #7).
+     */
     private GameConfig onlineBaseConfig() {
-        GameConfig base = gameSettings.getConfig();
-        RoundConfig defaults = base.round();
-        if (roundNumber == defaults.roundLimit() && roundTime == defaults.roundTimeSeconds()) {
-            return base;
-        }
-        return base.withRound(new RoundConfig(roundTime, roundNumber, defaults.roundEndDelay(), defaults.animationTime()));
+        return gameplayOptions.applyTo(gameSettings.getConfig());
     }
 
     private void startLanSearch() {
         try {
-            lanSearch = new LanSearch(onlineConfig.port());
+            lanSearch = new LanSearch(gameplayOptions.getHostPort());
             joiner = null;
             onlineScreen = OnlineScreen.JOIN_LAN_SEARCH;
             onlineError = null;
@@ -953,7 +953,7 @@ public class GameMenu {
     }
 
     private void startOnlineSearch() {
-        joiner = new LobbyJoiner(gameSettings.getConfig(), onlineConfig.host(), onlineConfig.port(), playerName);
+        joiner = new LobbyJoiner(gameSettings.getConfig(), gameplayOptions.getHostIp(), gameplayOptions.getHostPort(), playerName);
         onlineScreen = OnlineScreen.JOIN_ONLINE_SEARCH;
         onlineError = null;
     }
@@ -1116,7 +1116,7 @@ public class GameMenu {
             shadowStringCentered(g2d, CONNECT_ROWS[i], y + (2 + i) * nextLine, c);
         }
         // Read-only JOIN ONLINE target (edited via game.properties, not in-menu).
-        shadowStringCentered(g2d, "target: " + onlineConfig.host() + ":" + onlineConfig.port(),
+        shadowStringCentered(g2d, "target: " + gameplayOptions.getHostIp() + ":" + gameplayOptions.getHostPort(),
                 y + 5 * nextLine, dim);
         if (onlineError != null) {
             shadowStringCentered(g2d, onlineError, y + 6 * nextLine, Color.red);
@@ -1142,7 +1142,7 @@ public class GameMenu {
         Color label = gameSettings.getColorScheme().getBackgroundFontColor();
         int y = panelTop() + PANEL_TOP_ROWS * nextLine;
         shadowStringCentered(g2d, "Match code: " + lobby.matchCode(), y, label);
-        shadowStringCentered(g2d, "Port: " + onlineConfig.port(), y + nextLine, menuSublabelColor);
+        shadowStringCentered(g2d, "Port: " + gameplayOptions.getHostPort(), y + nextLine, menuSublabelColor);
         drawSlots(g2d, y + 3 * nextLine, lobby.roster(), lobby.localSlot());
         shadowStringCentered(g2d, "Waiting for host to start...", y + 8 * nextLine, menuSublabelColor);
         shadowStringCentered(g2d, "[ ESC to return ]", y + 10 * nextLine, label);
@@ -1170,14 +1170,14 @@ public class GameMenu {
         boolean connecting = joiner != null && joiner.status() == LobbyJoiner.Status.CONNECTING;
         if (lan) {
             shadowStringCentered(g2d, "Searching LAN game at", captionY, label);
-            shadowStringCentered(g2d, "port: " + onlineConfig.port(), captionY + nextLine, menuSublabelColor);
+            shadowStringCentered(g2d, "port: " + gameplayOptions.getHostPort(), captionY + nextLine, menuSublabelColor);
             if (connecting) {
                 shadowStringCentered(g2d, "host found - connecting...", captionY + 2 * nextLine, menuValueColor);
             }
         } else {
             shadowStringCentered(g2d, "Searching online game at", captionY, label);
-            shadowStringCentered(g2d, "ip number: " + onlineConfig.host(), captionY + nextLine, menuSublabelColor);
-            shadowStringCentered(g2d, "port: " + onlineConfig.port(), captionY + 2 * nextLine, menuSublabelColor);
+            shadowStringCentered(g2d, "ip number: " + gameplayOptions.getHostIp(), captionY + nextLine, menuSublabelColor);
+            shadowStringCentered(g2d, "port: " + gameplayOptions.getHostPort(), captionY + 2 * nextLine, menuSublabelColor);
         }
         if (onlineError != null) {
             shadowStringCentered(g2d, onlineError, captionY + 4 * nextLine, Color.red);
@@ -1199,5 +1199,191 @@ public class GameMenu {
         g2d.setColor(Color.green);
         g2d.drawArc(cx - SPINNER_RADIUS, cy - SPINNER_RADIUS, d, d, start, 80);
         g2d.setStroke(old);
+    }
+
+    // -------------------------------------------------------------------------
+    // GAMEPLAY OPTIONS (#4): a live sub-screen editing the in-memory GameplayOptions. Numeric rows use
+    // LEFT/RIGHT (stepped + clamped to the configured caps); the host IP / port rows accept typed digits
+    // (and '.') via the InputBridge text-capture channel. Every change is applied to GameplayOptions
+    // immediately -- there is no save button; ESC/ENTER just returns to the menu (finalising the port).
+
+    private static final int GP_ROUND_TIME = 0;
+    private static final int GP_ROUND_LIMIT = 1;
+    private static final int GP_DISC_SPEED = 2;
+    private static final int GP_DISC_BOUNCES = 3;
+    private static final int GP_LASER = 4;
+    private static final int GP_DISTORTION = 5;
+    private static final int GP_GUARD = 6;
+    private static final int GP_HOST_IP = 7;
+    private static final int GP_HOST_PORT = 8;
+    private static final int GAMEPLAY_ROWS = 9;
+
+    /** Human labels for the gameplay-option rows, in display order. */
+    private static final String[] GAMEPLAY_LABELS = {
+            "Round time", "Round limit", "Disc speed", "Max disc bounces", "Max laser projections",
+            "Distortion time", "Shield time", "Host IP", "Host port"};
+
+    /** Working text buffer for the host-port row while typing (synced to the live option on entry/exit). */
+    private String portText = "";
+
+    /** Opens the GAMEPLAY OPTIONS sub-screen at the first row. */
+    private void openGameplayOptions() {
+        showingGameplayOptions = true;
+        gameplayIndex = 0;
+        portText = String.valueOf(gameplayOptions.getHostPort());
+    }
+
+    /** Closes the sub-screen, disables text capture, and finalises the typed port value. */
+    private void closeGameplayOptions(InputBridge input) {
+        finalizePort();
+        input.setTextCapture(false);
+        showingGameplayOptions = false;
+    }
+
+    /** Drives the GAMEPLAY OPTIONS sub-screen each tick: navigation, value edits, and IP/port typing. */
+    private MenuEnum checkGameplayOptionsInput(InputBridge input) {
+        boolean textRow = gameplayIndex == GP_HOST_IP || gameplayIndex == GP_HOST_PORT;
+        input.setTextCapture(textRow);
+
+        if (input.isJustPressed(GameAction.PAUSE) || input.isJustPressed(GameAction.CONFIRM)) {
+            closeGameplayOptions(input);
+            return MenuEnum.NO_OPTION;
+        }
+        if (input.isJustPressed(GameAction.NAVIGATE_DOWN)) {
+            finalizePort();
+            gameplayIndex = (gameplayIndex + 1) % GAMEPLAY_ROWS;
+            portText = String.valueOf(gameplayOptions.getHostPort());
+        } else if (input.isJustPressed(GameAction.NAVIGATE_UP)) {
+            finalizePort();
+            gameplayIndex = (gameplayIndex - 1 + GAMEPLAY_ROWS) % GAMEPLAY_ROWS;
+            portText = String.valueOf(gameplayOptions.getHostPort());
+        }
+        int dir = input.isJustPressed(GameAction.NAVIGATE_RIGHT) ? 1
+                : input.isJustPressed(GameAction.NAVIGATE_LEFT) ? -1 : 0;
+        if (dir != 0) {
+            adjustGameplayNumeric(gameplayIndex, dir);
+        }
+        if (textRow) {
+            applyTypedText(input);
+        }
+        return MenuEnum.NO_OPTION;
+    }
+
+    /** Applies a LEFT/RIGHT step to the numeric option on {@code row} (text rows have no stepping). */
+    private void adjustGameplayNumeric(int row, int dir) {
+        switch (row) {
+            case GP_ROUND_TIME -> gameplayOptions.adjustRoundTime(dir);
+            case GP_ROUND_LIMIT -> gameplayOptions.adjustRoundLimit(dir);
+            case GP_DISC_SPEED -> gameplayOptions.adjustDiscSpeed(dir);
+            case GP_DISC_BOUNCES -> gameplayOptions.adjustDiscBounces(dir);
+            case GP_LASER -> gameplayOptions.adjustLaserBounces(dir);
+            case GP_DISTORTION -> gameplayOptions.adjustDisruptionSeconds(dir);
+            case GP_GUARD -> gameplayOptions.adjustGraceSeconds(dir);
+            case GP_HOST_PORT -> {
+                gameplayOptions.adjustPort(dir);
+                portText = String.valueOf(gameplayOptions.getHostPort());
+            }
+            default -> { /* host IP: edited by typing only */ }
+        }
+    }
+
+    /** Applies typed characters (digits, '.', backspace) to the host IP or port field for the current row. */
+    private void applyTypedText(InputBridge input) {
+        String typed = input.drainTypedText();
+        if (typed.isEmpty()) {
+            return;
+        }
+        if (gameplayIndex == GP_HOST_IP) {
+            var sb = new StringBuilder(gameplayOptions.getHostIp() == null ? "" : gameplayOptions.getHostIp());
+            for (char c : typed.toCharArray()) {
+                if (c == '\b') {
+                    if (sb.length() > 0) {
+                        sb.deleteCharAt(sb.length() - 1);
+                    }
+                } else if ((Character.isDigit(c) || c == '.') && sb.length() < 15) {
+                    sb.append(c);
+                }
+            }
+            gameplayOptions.setHostIp(sb.toString());
+        } else {
+            var sb = new StringBuilder(portText);
+            for (char c : typed.toCharArray()) {
+                if (c == '\b') {
+                    if (sb.length() > 0) {
+                        sb.deleteCharAt(sb.length() - 1);
+                    }
+                } else if (Character.isDigit(c) && sb.length() < 5) {
+                    sb.append(c);
+                }
+            }
+            portText = sb.toString();
+            if (!portText.isEmpty()) {
+                try {
+                    gameplayOptions.setHostPort(Integer.parseInt(portText));
+                } catch (NumberFormatException ignored) {
+                    // keep the previous valid port; the buffer is reconciled on finalize
+                }
+            }
+        }
+    }
+
+    /** Commits the typed port buffer to a clamped value (empty buffer keeps the current port). */
+    private void finalizePort() {
+        if (portText != null && !portText.isEmpty()) {
+            try {
+                gameplayOptions.setHostPort(Integer.parseInt(portText));
+            } catch (NumberFormatException ignored) {
+                // leave the port unchanged on an unparseable buffer
+            }
+        }
+        portText = String.valueOf(gameplayOptions.getHostPort());
+    }
+
+    /** Display value for a gameplay-option row (chevrons on numeric rows; a caret on the active text row). */
+    private String gameplayValue(int row, boolean selected) {
+        return switch (row) {
+            case GP_ROUND_TIME -> "< " + gameplayOptions.getRoundTimeSeconds() + "s >";
+            case GP_ROUND_LIMIT -> "< " + gameplayOptions.getRoundLimit() + " >";
+            case GP_DISC_SPEED -> "< " + String.format(java.util.Locale.ROOT, "%.2f", gameplayOptions.getDiscSpeed()) + " >";
+            case GP_DISC_BOUNCES -> "< " + gameplayOptions.getMaxDiscBounces() + " >";
+            case GP_LASER -> "< " + gameplayOptions.getMaxLaserBounces() + " >";
+            case GP_DISTORTION -> "< " + String.format(java.util.Locale.ROOT, "%.1f", gameplayOptions.getDisruptionSeconds()) + "s >";
+            case GP_GUARD -> "< " + String.format(java.util.Locale.ROOT, "%.1f", gameplayOptions.getGraceSeconds()) + "s >";
+            case GP_HOST_IP -> {
+                String ip = gameplayOptions.getHostIp() == null ? "" : gameplayOptions.getHostIp();
+                yield ip + (selected ? "_" : "") + (gameplayOptions.isHostIpValid() ? "" : "  (invalid)");
+            }
+            case GP_HOST_PORT -> portText + (selected ? "_" : "");
+            default -> "";
+        };
+    }
+
+    /** Backdrop width needed to hold the widest gameplay-option row plus padding. */
+    private int gameplayWidth(Graphics2D g2d) {
+        FontMetrics fm = g2d.getFontMetrics(menuFont);
+        int widest = fm.stringWidth("GAMEPLAY OPTIONS");
+        widest = Math.max(widest, fm.stringWidth("[ arrows: change   ESC/ENTER: done ]"));
+        for (int i = 0; i < GAMEPLAY_ROWS; i++) {
+            widest = Math.max(widest, fm.stringWidth(GAMEPLAY_LABELS[i] + ":  " + gameplayValue(i, false) + "_"));
+        }
+        return widest + 2 * panelPadX();
+    }
+
+    /** Renders the GAMEPLAY OPTIONS sub-screen over the centred menu backdrop. */
+    private void drawGameplayOptions(Graphics2D g2d) {
+        g2d.setFont(menuFont);
+        drawMenuBackdrop(g2d);
+        Color title = gameSettings.getColorScheme().getBackgroundFontColor();
+        int y = panelTop() + PANEL_TOP_ROWS * nextLine;
+        shadowStringCentered(g2d, "GAMEPLAY OPTIONS", y, title);
+        for (int i = 0; i < GAMEPLAY_ROWS; i++) {
+            boolean sel = i == gameplayIndex;
+            Color c = sel ? Color.yellow : menuValueColor;
+            if (i == GP_HOST_IP && !gameplayOptions.isHostIpValid()) {
+                c = sel ? Color.orange : Color.red;
+            }
+            shadowStringCentered(g2d, GAMEPLAY_LABELS[i] + ":  " + gameplayValue(i, sel), y + (2 + i) * nextLine, c);
+        }
+        shadowStringCentered(g2d, "[ arrows: change   ESC/ENTER: done ]", y + (3 + GAMEPLAY_ROWS) * nextLine, title);
     }
 }
