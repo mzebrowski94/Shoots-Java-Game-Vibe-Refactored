@@ -1,8 +1,6 @@
 // pl/mzebrows/shoots/ui/GameFrame.java
 package pl.mzebrows.shoots.ui;
 
-import pl.mzebrows.shoots.app.GameSettings;
-
 import java.awt.BorderLayout;
 import java.awt.Container;
 import java.awt.Dimension;
@@ -17,6 +15,7 @@ import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
+import javax.swing.WindowConstants;
 
 import lombok.Getter;
 
@@ -87,7 +86,7 @@ public class GameFrame extends JFrame {
         addKeyListener(gameSettings.getInputBridge());
 
         setIgnoreRepaint(true);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         pack();
         fitAndCenterToScreen();
 

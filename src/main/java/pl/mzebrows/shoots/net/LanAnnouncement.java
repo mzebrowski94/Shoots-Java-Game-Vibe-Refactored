@@ -69,7 +69,7 @@ public record LanAnnouncement(String matchCode, String hostName, int port, int p
                 return null;
             }
             return new LanAnnouncement(code, name, port, players, joinable);
-        } catch (RuntimeException malformed) {
+        } catch (RuntimeException _) {
             return null;
         }
     }

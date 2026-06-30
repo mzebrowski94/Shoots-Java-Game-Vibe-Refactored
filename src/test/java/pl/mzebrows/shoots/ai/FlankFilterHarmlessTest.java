@@ -22,7 +22,6 @@ import pl.mzebrows.shoots.world.PlayWorld;
  */
 class FlankFilterHarmlessTest {
 
-    private static final long SEED = 4242L;
     private static final double AIM_LIMIT = 110.0;
 
     private static PlayWorld world(int players, long seed) {

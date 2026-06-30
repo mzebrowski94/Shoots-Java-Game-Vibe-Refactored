@@ -17,7 +17,6 @@ class EntityTest {
         e.setX(10);
         e.setY(20);
         e.setBounces(3);
-        e.setMovementStrategy(new BounceMovementStrategy());
 
         e.reset();
 
@@ -28,7 +27,6 @@ class EntityTest {
         assertThat(e.getBounces()).isZero();
         assertThat(e.getOwnerId()).isEqualTo(-1);
         assertThat(e.getDirectionX()).isEqualTo(1);
-        assertThat(e.getMovementStrategy()).isNull();
     }
 
     @Test

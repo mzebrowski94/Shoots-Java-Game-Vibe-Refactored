@@ -93,6 +93,6 @@ public final class ImageCache {
 
     /** Convenience for window icons: the underlying {@link Image} if present. */
     public Optional<Image> icon(String resourcePath) {
-        return get(resourcePath).map(img -> (Image) img);
+        return get(resourcePath).map(Image.class::cast);
     }
 }

@@ -35,7 +35,7 @@ public final class LaserRenderer implements MapObjectRenderer {
             Color base = world.playerColor(p);
             double segAlpha = 255.0;
             for (int i = 0; i + 1 < n; i++) {
-                int a = Math.max(0, Math.min(255, (int) Math.round(segAlpha)));
+                int a = Math.clamp(Math.round(segAlpha), 0, 255);
                 g2d.setColor(new Color(base.getRed(), base.getGreen(), base.getBlue(), a));
                 g2d.drawLine(laserX[i], laserY[i], laserX[i + 1], laserY[i + 1]);
                 segAlpha *= falloff;

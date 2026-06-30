@@ -10,7 +10,6 @@ import java.awt.event.KeyEvent;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import pl.mzebrows.shoots.app.GameSettings;
 import pl.mzebrows.shoots.input.InputBridge;
 
 /**

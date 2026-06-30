@@ -1,25 +1,18 @@
-// src/main/java/pl/mzebrows/shoots/system/CombatSystem.java
-package pl.mzebrows.shoots.system;
+// src/main/java/pl/mzebrows/shoots/system/DiscSpawner.java
+package pl.mzebrows.shoots.entity;
 
 import pl.mzebrows.shoots.config.DiscConfig;
 import pl.mzebrows.shoots.config.PowerShotConfig;
-import pl.mzebrows.shoots.entity.BounceMovementStrategy;
-import pl.mzebrows.shoots.entity.Entity;
-import pl.mzebrows.shoots.entity.EntitySpawner;
-import pl.mzebrows.shoots.entity.EntityType;
-import pl.mzebrows.shoots.entity.MovementStrategy;
-import pl.mzebrows.shoots.pool.ObjectPool;
 
 /**
  * Owns disc lifecycle: spawns pooled discs (as an {@link EntitySpawner}) and retires spent ones.
  *
- * <p>Constructor-injected with the disc pool, disc config, charged-shot config, and the shared
- * movement strategy, so no collaborators are created in hot paths and disc tuning lives entirely in
+ * <p>Constructor-injected with the disc pool, disc config, and charged-shot config, so no collaborators are created in hot paths and disc tuning lives entirely in
  * {@link DiscConfig}/{@link PowerShotConfig}. A normal disc and a power disc differ only in the
  * config-derived stats stamped onto the pooled entity at spawn (speed, bounce budget, capture
  * strength, acceleration cap, and the powered/glow flag) -- there is no special-cased physics.
  */
-public final class CombatSystem implements EntitySpawner {
+public final class DiscSpawner implements EntitySpawner {
 
     /** Power config used by the back-compat constructors that predate the charged shot (disabled). */
     private static final PowerShotConfig POWER_DISABLED = new PowerShotConfig(false, 1.0, 1.0, 1.0, 1);
@@ -27,22 +20,15 @@ public final class CombatSystem implements EntitySpawner {
     private final ObjectPool<Entity> discPool;
     private final DiscConfig discConfig;
     private final PowerShotConfig powerConfig;
-    private final MovementStrategy discMovement;
 
-    public CombatSystem(ObjectPool<Entity> discPool, DiscConfig discConfig) {
-        this(discPool, discConfig, POWER_DISABLED, new BounceMovementStrategy());
+    public DiscSpawner(ObjectPool<Entity> discPool, DiscConfig discConfig) {
+        this(discPool, discConfig, POWER_DISABLED);
     }
 
-    public CombatSystem(ObjectPool<Entity> discPool, DiscConfig discConfig, PowerShotConfig powerConfig) {
-        this(discPool, discConfig, powerConfig, new BounceMovementStrategy());
-    }
-
-    public CombatSystem(ObjectPool<Entity> discPool, DiscConfig discConfig, PowerShotConfig powerConfig,
-                        MovementStrategy discMovement) {
+    public DiscSpawner(ObjectPool<Entity> discPool, DiscConfig discConfig, PowerShotConfig powerConfig) {
         this.discPool = discPool;
         this.discConfig = discConfig;
         this.powerConfig = powerConfig;
-        this.discMovement = discMovement;
     }
 
     @Override
@@ -74,7 +60,6 @@ public final class CombatSystem implements EntitySpawner {
         disc.setPowered(asPower);
         disc.setBounces(0);
         disc.setMaxBounces(maxBounces);
-        disc.setMovementStrategy(discMovement);
         return disc;
     }
 

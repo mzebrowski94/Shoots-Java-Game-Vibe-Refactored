@@ -10,7 +10,7 @@ import pl.mzebrows.shoots.ui.GameCounter;
 import pl.mzebrows.shoots.ui.GameFrame;
 import pl.mzebrows.shoots.ui.GamePointer;
 import pl.mzebrows.shoots.ui.GameScreen;
-import pl.mzebrows.shoots.app.GameSettings;
+import pl.mzebrows.shoots.ui.GameSettings;
 import pl.mzebrows.shoots.ui.RoundEnum;
 import pl.mzebrows.shoots.input.GameAction;
 import pl.mzebrows.shoots.input.InputBridge;
@@ -34,6 +34,9 @@ import pl.mzebrows.shoots.world.PlayWorld;
 public final class PlayingState implements GameState {
 
     private static final Logger log = LoggerFactory.getLogger(PlayingState.class);
+
+    /** Shown when a CLIENT loses the host mid-match (round intro/play/outro). */
+    private static final String HOST_LEFT_MESSAGE = "Host left the game";
 
     private final GameSettings settings;
     private final GameScreen screen;
@@ -230,7 +233,7 @@ public final class PlayingState implements GameState {
                 doRestartGame();
                 restartRequested = false;
             } else {
-                settings.startNewRound(screen);
+                settings.startNewRound();
             }
             world.resetRound();
             rebuildAiForCurrentMap();
@@ -245,7 +248,7 @@ public final class PlayingState implements GameState {
             requestNextPhase = false;
             phaseJustEntered = true;
         } else if (online != null && online.mode() == GameMode.CLIENT && !online.isConnected()) {
-            return abortToOnlineMenu("Host left the game"); // host vanished during the round intro (#5)
+            return abortToOnlineMenu(HOST_LEFT_MESSAGE); // host vanished during the round intro (#5)
         }
         return this;
     }
@@ -287,7 +290,7 @@ public final class PlayingState implements GameState {
         online.pump(); // refresh pause/connection + drain control even on a frozen/stalled tick
 
         if (online.mode() == GameMode.CLIENT && !online.isConnected()) {
-            return abortToOnlineMenu("Host left the game");
+            return abortToOnlineMenu(HOST_LEFT_MESSAGE);
         }
 
         int pausedBy = online.pausedBy();
@@ -392,7 +395,7 @@ public final class PlayingState implements GameState {
             }
             case STAY -> {
                 if (online != null && online.mode() == GameMode.CLIENT && !online.isConnected()) {
-                    return abortToOnlineMenu("Host left the game"); // host vanished during the round outro (#5)
+                    return abortToOnlineMenu(HOST_LEFT_MESSAGE); // host vanished during the round outro (#5)
                 }
             }
         }
@@ -468,7 +471,7 @@ public final class PlayingState implements GameState {
         world.resetMatch();
         pointer.restartGamePointer();
         counter.restartAnimationTime();
-        settings.startNewRound(screen);
+        settings.startNewRound();
         log.info("Game restarted");
     }
 
@@ -491,7 +494,7 @@ public final class PlayingState implements GameState {
         // Overlay the live GAMEPLAY OPTIONS (disc speed/bounces, laser, disruption/grace timings, round
         // time) onto the loaded defaults first, then apply the menu's player count + round limit on top.
         GameConfig base = settings.getGameplayOptions().applyTo(GameConfigLoader.load());
-        int selected = Math.max(1, Math.min(4, settings.getPlayerNumber()));
+        int selected = Math.clamp(settings.getPlayerNumber(), 1, 4);
         RoundConfig round = applySelectedRoundSettings(base.round(),
                 settings.getRoundLimit(), settings.getRoundTime());
         if (selected != base.playerNumber()) {

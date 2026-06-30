@@ -1,5 +1,5 @@
 // src/test/java/pl/mzebrows/shoots/pool/ObjectPoolTest.java
-package pl.mzebrows.shoots.pool;
+package pl.mzebrows.shoots.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

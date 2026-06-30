@@ -1,5 +1,5 @@
 // pl/mzebrows/shoots/app/GameSettings.java
-package pl.mzebrows.shoots.app;
+package pl.mzebrows.shoots.ui;
 
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -9,11 +9,10 @@ import pl.mzebrows.shoots.ai.AiDifficulty;
 import pl.mzebrows.shoots.config.GameConfig;
 import pl.mzebrows.shoots.config.GameConfigLoader;
 import pl.mzebrows.shoots.config.GameplayLimits;
+import pl.mzebrows.shoots.config.GameplayOptions;
 import pl.mzebrows.shoots.config.GraphicsConfig;
 import pl.mzebrows.shoots.config.OnlineConfig;
 import pl.mzebrows.shoots.input.InputBridge;
-import pl.mzebrows.shoots.ui.ColorScheme;
-import pl.mzebrows.shoots.ui.GameScreen;
 
 import java.awt.Font;
 import java.awt.FontFormatException;
@@ -80,6 +79,7 @@ public class GameSettings {
     private final int unit;
 
     private int roundTime;
+    @Setter(AccessLevel.NONE)
     private ArrayList<Round> roundList;
     private int actualRoundNumber;
     private boolean playerKeyboardAvailable;
@@ -160,10 +160,10 @@ public class GameSettings {
      * Starts a new round: bumps the round number and tracks the new {@link Round} for timing. The map,
      * discs, and scoring are owned by the live model and reset there ({@code PlayWorld.resetRound()}).
      */
-    public void startNewRound(GameScreen gameScreen) {
+    public void startNewRound() {
         actualRoundNumber++;
         var newRound = new Round(this, actualRoundNumber);
-        if (roundList != null && !roundList.isEmpty()) {
+        if (!roundList.isEmpty()) {
             previousRound = roundList.getLast();
         }
         roundList.add(newRound);

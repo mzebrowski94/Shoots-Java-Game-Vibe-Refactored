@@ -31,7 +31,6 @@ public final class LanDiscovery implements AutoCloseable {
     private final long ttlNanos;
     private final Map<String, DiscoveredMatch> byKey = new ConcurrentHashMap<>();
     private DatagramSocket socket;
-    private Thread listener;
     private volatile boolean running;
 
     public LanDiscovery(long ttlMillis) {
@@ -77,7 +76,7 @@ public final class LanDiscovery implements AutoCloseable {
         socket.bind(new InetSocketAddress(port));
         running = true;
         log.info("LAN discovery listening for host beacons on UDP port {}", socket.getLocalPort());
-        listener = new Thread(this::listenLoop, "lan-discovery");
+        var listener = new Thread(this::listenLoop, "lan-discovery");
         listener.setDaemon(true);
         listener.start();
     }

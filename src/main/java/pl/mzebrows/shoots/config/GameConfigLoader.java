@@ -194,7 +194,7 @@ public final class GameConfigLoader {
         }
         try {
             return Long.parseLong(raw.trim());
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             throw new ConfigException("Invalid long for 'game.seed': '" + raw + "'");
         }
     }
@@ -213,7 +213,7 @@ public final class GameConfigLoader {
         String raw = requireRaw(props, key);
         try {
             return Integer.parseInt(raw);
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             throw new ConfigException("Invalid int for '" + key + "': '" + raw + "'");
         }
     }
@@ -222,7 +222,7 @@ public final class GameConfigLoader {
         String raw = requireRaw(props, key);
         try {
             return Double.parseDouble(raw);
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             throw new ConfigException("Invalid double for '" + key + "': '" + raw + "'");
         }
     }
@@ -231,7 +231,7 @@ public final class GameConfigLoader {
         String raw = requireRaw(props, key);
         try {
             return Float.parseFloat(raw);
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             throw new ConfigException("Invalid float for '" + key + "': '" + raw + "'");
         }
     }
@@ -257,7 +257,7 @@ public final class GameConfigLoader {
             int b = Integer.parseInt(parts[2].trim());
             int a = parts.length > 3 ? Integer.parseInt(parts[3].trim()) : 255;
             return new RgbColor(r, g, b, a);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException _) {
             throw new ConfigException("Invalid colour for '" + key + "': '" + raw + "'");
         }
     }

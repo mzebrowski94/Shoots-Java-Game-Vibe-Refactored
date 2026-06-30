@@ -1,5 +1,5 @@
-// pl/mzebrows/shoots/app/GameLoop.java
-package pl.mzebrows.shoots.app;
+// pl/mzebrows/shoots/engine/GameLoop.java
+package pl.mzebrows.shoots.engine;
 
 import pl.mzebrows.shoots.ui.GameFrame;
 import pl.mzebrows.shoots.ui.RoundEnum;
@@ -7,7 +7,7 @@ import pl.mzebrows.shoots.ui.RoundEnum;
 import java.awt.GraphicsConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import pl.mzebrows.shoots.loop.FixedTimestep;
+import pl.mzebrows.shoots.ui.GameSettings;
 import pl.mzebrows.shoots.render.AwtRenderer;
 import pl.mzebrows.shoots.render.ImageCache;
 import pl.mzebrows.shoots.render.Renderer;
@@ -36,7 +36,6 @@ public final class GameLoop implements Runnable {
     private GameStateMachine stateMachine;
     private PlayingState playingState;
     private Renderer renderer;
-    private Thread loopThread;
 
     /** Wires the object graph but does not start the loop; call {@link #start()} to run it. */
     public GameLoop() {
@@ -47,7 +46,7 @@ public final class GameLoop implements Runnable {
 
     /** Starts the simulation on a dedicated game-loop thread (AWT input still fires on the EDT). */
     public void start() {
-        loopThread = new Thread(this, "game-loop");
+        var loopThread = new Thread(this, "game-loop");
         loopThread.start();
     }
 

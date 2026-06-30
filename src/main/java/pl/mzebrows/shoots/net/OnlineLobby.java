@@ -62,7 +62,7 @@ public final class OnlineLobby implements AutoCloseable {
     /** Opens a host waiting room: starts the listen server and LAN beacon; the world waits for START. */
     public static OnlineLobby host(GameConfig base, int maxPlayers, int port, String name) throws IOException {
         var lobby = new OnlineLobby(GameMode.HOST, base, name);
-        lobby.maxPlayers = Math.max(MIN_PLAYERS, Math.min(DEFAULT_MAX_PLAYERS, maxPlayers));
+        lobby.maxPlayers = Math.clamp(maxPlayers, MIN_PLAYERS, DEFAULT_MAX_PLAYERS);
         lobby.seed = new Random().nextLong();
         lobby.matchCode = MatchCode.generate();
         lobby.localSlot = TcpServer.HOST_SLOT;

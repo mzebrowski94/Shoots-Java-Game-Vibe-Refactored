@@ -1,5 +1,5 @@
 // src/main/java/pl/mzebrows/shoots/loop/FixedTimestep.java
-package pl.mzebrows.shoots.loop;
+package pl.mzebrows.shoots.engine;
 
 /**
  * AWT-free fixed-timestep accumulator: decouples simulation steps from frame timing.

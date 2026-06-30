@@ -27,7 +27,7 @@ public final class BlockHitRenderer implements MapObjectRenderer {
                 g2d.setColor(new Color(g, g, g));
             } else {
                 Color owner = world.playerColor(e.ownerId());
-                int a = Math.max(0, Math.min(255, e.colorAlpha()));
+                int a = Math.clamp(e.colorAlpha(), 0, 255);
                 g2d.setColor(new Color(owner.getRed(), owner.getGreen(), owner.getBlue(), a));
             }
             g2d.fillRect(px, py, unit, unit);

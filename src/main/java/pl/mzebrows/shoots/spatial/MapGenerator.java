@@ -14,12 +14,10 @@ import pl.mzebrows.shoots.config.GridConfig;
  */
 public final class MapGenerator {
 
-    private final GridConfig grid;
     private final Random random;
     private final int size;
 
     public MapGenerator(GridConfig grid, Random random) {
-        this.grid = grid;
         this.random = random;
         this.size = grid.tableSize();
     }
@@ -182,7 +180,7 @@ public final class MapGenerator {
         // another base or its flanks: first carve every base box + forward firing lane, THEN stamp the
         // bases and flanking blocks.
         for (int p = 0; p < playerNumber; p++) {
-            carveBaseArea(tiles, BASE_CENTRES[p][0], BASE_CENTRES[p][1], p >= 2);
+            carveBaseArea(tiles, BASE_CENTRES[p][0], BASE_CENTRES[p][1]);
         }
         for (int p = 0; p < playerNumber; p++) {
             stampBase(tiles, BASE_CENTRES[p][0], BASE_CENTRES[p][1], p >= 2);
@@ -192,10 +190,9 @@ public final class MapGenerator {
     /**
      * Clears only the small box around the base spawn so no stray block traps the player. The firing
      * lane is intentionally NOT cleared across the map: indirect bounce shots off blocks are the core
-     * mechanic, so the path ahead of the base must keep its blocks. {@code horizontalLane} is unused
-     * now but kept for symmetry with {@link #stampBase}.
+     * mechanic, so the path ahead of the base must keep its blocks.
      */
-    private void carveBaseArea(TileType[][] tiles, int cx, int cy, boolean horizontalLane) {
+    private void carveBaseArea(TileType[][] tiles, int cx, int cy) {
         clearBox(tiles, cx, cy);
     }
 

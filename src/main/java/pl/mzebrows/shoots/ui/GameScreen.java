@@ -3,7 +3,6 @@ package pl.mzebrows.shoots.ui;
 
 import lombok.Getter;
 import lombok.Setter;
-import pl.mzebrows.shoots.app.GameSettings;
 import pl.mzebrows.shoots.config.ObjectStyle;
 import pl.mzebrows.shoots.render.object.BaseRenderer;
 import pl.mzebrows.shoots.render.object.BlockHitRenderer;
@@ -204,5 +203,6 @@ public class GameScreen extends GameCanvas {
 
     @Override
     public void initializeLayout() {
+        // No dynamic layout: the play-field panel is fixed logical size, set in the constructor.
     }
 }

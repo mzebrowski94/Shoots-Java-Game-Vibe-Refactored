@@ -1,8 +1,7 @@
 // src/main/java/pl/mzebrows/shoots/system/DiscSystem.java
-package pl.mzebrows.shoots.system;
+package pl.mzebrows.shoots.entity;
 
 import java.util.List;
-import pl.mzebrows.shoots.entity.Entity;
 import pl.mzebrows.shoots.spatial.GridPathTracer;
 
 /**
@@ -16,7 +15,7 @@ import pl.mzebrows.shoots.spatial.GridPathTracer;
  * speed is multiplied by its {@code speedGainPerBounce} (capped at {@code maxMoveSpeed}); acceleration
  * only changes how far the disc travels per frame, never the geometry of its path.
  *
- * <p>Constructor-injected with the tracer and the {@link CombatSystem} (retirement back to the pool).
+ * <p>Constructor-injected with the tracer and the {@link DiscSpawner} (retirement back to the pool).
  * A caller-supplied {@link DiscEventSink} receives capture-point hits and retirements so scoring/audio
  * stay decoupled from disc physics. Reuses one {@link GridPathTracer.Ray} and visitor: no allocation.
  */
@@ -53,13 +52,13 @@ public final class DiscSystem {
     };
 
     private GridPathTracer tracer;
-    private final CombatSystem combatSystem;
+    private final DiscSpawner discSpawner;
     private final GridPathTracer.Ray ray = new GridPathTracer.Ray();
     private final DiscVisitor visitor = new DiscVisitor();
 
-    public DiscSystem(GridPathTracer tracer, CombatSystem combatSystem) {
+    public DiscSystem(GridPathTracer tracer, DiscSpawner discSpawner) {
         this.tracer = tracer;
-        this.combatSystem = combatSystem;
+        this.discSpawner = discSpawner;
     }
 
     /** Rebinds the tracer, e.g. when the world regenerates its map between rounds. */
@@ -129,8 +128,8 @@ public final class DiscSystem {
             return;
         }
 
-        if (visitor.consumed || combatSystem.isSpent(disc)) {
-            combatSystem.retire(disc);
+        if (visitor.consumed || discSpawner.isSpent(disc)) {
+            discSpawner.retire(disc);
             sink.onDiscRetired(disc);
         }
     }

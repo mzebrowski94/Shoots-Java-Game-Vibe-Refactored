@@ -56,10 +56,6 @@ public final class Entity {
     private int bounces;
     private int maxBounces;
 
-    private MovementStrategy movementStrategy;
-    private AttackStrategy attackStrategy;
-    private AiStrategy aiStrategy;
-
     /** Returns position on the given axis component interpolated toward the current step. */
     public double interpolatedX(double alpha) {
         return prevX + (x - prevX) * alpha;
@@ -94,8 +90,5 @@ public final class Entity {
         parked = false;
         bounces = 0;
         maxBounces = 0;
-        movementStrategy = null;
-        attackStrategy = null;
-        aiStrategy = null;
     }
 }

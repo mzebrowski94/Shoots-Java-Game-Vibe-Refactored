@@ -143,10 +143,7 @@ public final class AiSkillsFactory {
     }
 
     private static double clampUnit(double v) {
-        if (v < 0.0) {
-            return 0.0;
-        }
-        return Math.min(v, 1.0);
+        return Math.clamp(v, 0.0, 1.0);
     }
 
     /** Mixes the match seed with the player slot so each AI gets an independent, reproducible stream. */

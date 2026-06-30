@@ -11,7 +11,6 @@ import java.awt.event.KeyEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import pl.mzebrows.shoots.app.GameSettings;
 import pl.mzebrows.shoots.input.InputBridge;
 
 /**

@@ -40,8 +40,6 @@ public final class PlayerAiController {
     // Cached decision state between re-evaluations.
     private double targetAngle;
     private boolean hasTarget;
-    private int targetTileX = -1;
-    private int targetTileY = -1;
     /** Bounce-path length of the cached target; drives the "long range -> power shot" decision. */
     private int targetBounces = 0;
     /** Whether the cached target is an opponent base (disruption shot) rather than a capture point. */
@@ -104,8 +102,6 @@ public final class PlayerAiController {
 
         double bestScore = Double.NEGATIVE_INFINITY;
         double bestAngle = Double.NaN;
-        int bestTileX = -1;
-        int bestTileY = -1;
         int bestBounces = 0;
         boolean bestIsBase = false;
         boolean found = false;
@@ -155,8 +151,6 @@ public final class PlayerAiController {
             if (score > bestScore) {
                 bestScore = score;
                 bestAngle = angle;
-                bestTileX = reach.tileX();
-                bestTileY = reach.tileY();
                 bestBounces = reach.bounces();
                 bestIsBase = reach.base();
                 found = true;
@@ -168,8 +162,6 @@ public final class PlayerAiController {
             // low-accuracy AI genuinely sends discs off-target rather than just firing less often.
             double error = rng.nextGaussian() * (1.0 - skills.accuracy()) * MAX_AIM_ERROR_DEG;
             this.targetAngle = bestAngle + error;
-            this.targetTileX = bestTileX;
-            this.targetTileY = bestTileY;
             this.targetBounces = bestBounces;
             this.targetIsBase = bestIsBase;
             this.hasTarget = true;

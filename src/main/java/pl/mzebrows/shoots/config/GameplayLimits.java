@@ -36,14 +36,14 @@ public record GameplayLimits(
     /** Inclusive integer range with a cycling step. */
     public record IntRange(int min, int max, int step) {
         public int clamp(int v) {
-            return Math.max(min, Math.min(max, v));
+            return Math.clamp(v, min, max);
         }
     }
 
     /** Inclusive floating-point range with a step (values are kept on the step grid by the menu). */
     public record DoubleRange(double min, double max, double step) {
         public double clamp(double v) {
-            return Math.max(min, Math.min(max, v));
+            return Math.clamp(v, min, max);
         }
     }
 
@@ -89,7 +89,7 @@ public record GameplayLimits(
         String raw = require(p, key);
         try {
             return Integer.parseInt(raw);
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             throw new ConfigException("Invalid int for '" + key + "': '" + raw + "'");
         }
     }
@@ -98,7 +98,7 @@ public record GameplayLimits(
         String raw = require(p, key);
         try {
             return Double.parseDouble(raw);
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             throw new ConfigException("Invalid double for '" + key + "': '" + raw + "'");
         }
     }

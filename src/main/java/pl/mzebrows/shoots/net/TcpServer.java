@@ -35,7 +35,6 @@ public final class TcpServer implements AutoCloseable {
     private final String matchCode;
     private final List<Client> clients = new CopyOnWriteArrayList<>();
     private volatile boolean running = true;
-    private Thread acceptThread;
 
     /** Binds the server (use {@code port == 0} for an OS-assigned ephemeral port). */
     public TcpServer(int port, int playerCount, long seed, String matchCode) throws IOException {
@@ -56,7 +55,7 @@ public final class TcpServer implements AutoCloseable {
 
     /** Starts the daemon accept loop. */
     public void start() {
-        acceptThread = new Thread(this::acceptLoop, "net-accept");
+        var acceptThread = new Thread(this::acceptLoop, "net-accept");
         acceptThread.setDaemon(true);
         acceptThread.start();
     }
@@ -182,7 +181,7 @@ public final class TcpServer implements AutoCloseable {
         running = false;
         try {
             serverSocket.close();
-        } catch (IOException ignored) {
+        } catch (IOException _) {
             // best-effort close
         }
         for (Client c : clients) {
@@ -199,7 +198,7 @@ public final class TcpServer implements AutoCloseable {
             }
             try {
                 Thread.sleep(2);
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
                 break;
             }

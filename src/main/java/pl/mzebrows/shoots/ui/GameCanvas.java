@@ -1,8 +1,6 @@
 // pl/mzebrows/shoots/ui/GameCanvas.java
 package pl.mzebrows.shoots.ui;
 
-import pl.mzebrows.shoots.app.GameSettings;
-
 import java.awt.Canvas;
 import java.awt.Color;
 import java.awt.Font;
@@ -131,21 +129,21 @@ public abstract class GameCanvas extends Canvas {
      * Draws the panel for the given round state.
      * @param roundState the current round phase
      */
-    abstract public void drawUpdate(RoundEnum roundState);
+    public abstract void drawUpdate(RoundEnum roundState);
 
     /** Draws the panel while the game is paused. */
-    abstract public void drawRoundPaused();
+    public abstract void drawRoundPaused();
 
     /** Draws the panel while a round is in progress. */
-    abstract public void drawRoundContinues();
+    public abstract void drawRoundContinues();
 
     /** Draws the panel during the round-begin phase. */
-    abstract public void drawRoundBegining();
+    public abstract void drawRoundBegining();
 
     /** Draws the panel during the round-end phase. */
-    abstract public void drawRoundEnding();
+    public abstract void drawRoundEnding();
 
     /** Initialises the panel's layout/geometry. */
-    abstract public void initializeLayout();
+    public abstract void initializeLayout();
 
 }

@@ -67,7 +67,7 @@ public final class BaseRenderer implements MapObjectRenderer {
             double denom = Math.max(1e-6, 1.0 - glowThreshold);
             int glowAlpha = (int) (90 * ((progress - glowThreshold) / denom));
             g2d.setStroke(new BasicStroke(3.0f));
-            g2d.setColor(new Color(255, 255, 255, Math.max(0, Math.min(120, glowAlpha))));
+            g2d.setColor(new Color(255, 255, 255, Math.clamp(glowAlpha, 0, 120)));
             g2d.drawOval(cx - gr, cy - gr, 2 * gr, 2 * gr);
         }
         g2d.setStroke(old);

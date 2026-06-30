@@ -34,7 +34,7 @@ public final class AiPlayers {
      */
     public static AiPlayers build(PlayWorld world, int aiCount, AiDifficulty difficulty, int scanAngles) {
         int players = world.playerCount();
-        int clamped = Math.max(0, Math.min(aiCount, players));
+        int clamped = Math.clamp(aiCount, 0, players);
         if (clamped == 0) {
             return none();
         }

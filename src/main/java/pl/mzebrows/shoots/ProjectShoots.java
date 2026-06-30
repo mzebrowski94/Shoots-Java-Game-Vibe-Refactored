@@ -3,7 +3,7 @@ package pl.mzebrows.shoots;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import pl.mzebrows.shoots.app.GameLoop;
+import pl.mzebrows.shoots.engine.GameLoop;
 import pl.mzebrows.shoots.config.ConfigException;
 
 /** Application entry point: constructs the game loop and starts it on its own thread. */

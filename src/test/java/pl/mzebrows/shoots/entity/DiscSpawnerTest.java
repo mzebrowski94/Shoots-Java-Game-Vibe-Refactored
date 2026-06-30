@@ -1,16 +1,13 @@
-// src/test/java/pl/mzebrows/shoots/system/CombatSystemTest.java
-package pl.mzebrows.shoots.system;
+// src/test/java/pl/mzebrows/shoots/system/DiscSpawnerTest.java
+package pl.mzebrows.shoots.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 import pl.mzebrows.shoots.config.DiscConfig;
-import pl.mzebrows.shoots.entity.Entity;
-import pl.mzebrows.shoots.entity.EntityType;
-import pl.mzebrows.shoots.pool.ObjectPool;
 
 /** Verifies disc spawning from the pool, config-driven stats, exhaustion, and retirement. */
-class CombatSystemTest {
+class DiscSpawnerTest {
 
     private static final DiscConfig DISC = new DiscConfig(18, 10, 2.0, 7, 3, 3, 4);
 
@@ -20,7 +17,7 @@ class CombatSystemTest {
 
     @Test
     void spawnsActiveDiscWithConfigDrivenStats() {
-        var combat = new CombatSystem(pool(2), DISC);
+        var combat = new DiscSpawner(pool(2), DISC);
 
         Entity disc = combat.spawnDisc(100, 200, 45, 3);
 
@@ -34,12 +31,11 @@ class CombatSystemTest {
         assertThat(disc.getMoveSpeed()).isEqualTo(2.0);
         assertThat(disc.getRadius()).isEqualTo(18);
         assertThat(disc.getMaxBounces()).isEqualTo(7);
-        assertThat(disc.getMovementStrategy()).isNotNull();
     }
 
     @Test
     void returnsNullWhenPoolExhausted() {
-        var combat = new CombatSystem(pool(1), DISC);
+        var combat = new DiscSpawner(pool(1), DISC);
 
         assertThat(combat.spawnDisc(0, 0, 0, 0)).isNotNull();
         assertThat(combat.spawnDisc(0, 0, 0, 0)).isNull();
@@ -47,7 +43,7 @@ class CombatSystemTest {
 
     @Test
     void isSpentReflectsBounceBudget() {
-        var combat = new CombatSystem(pool(1), DISC);
+        var combat = new DiscSpawner(pool(1), DISC);
         Entity disc = combat.spawnDisc(0, 0, 0, 0);
 
         assertThat(combat.isSpent(disc)).isFalse();
@@ -58,7 +54,7 @@ class CombatSystemTest {
     @Test
     void retireDeactivatesAndReturnsDiscToPool() {
         var pool = pool(1);
-        var combat = new CombatSystem(pool, DISC);
+        var combat = new DiscSpawner(pool, DISC);
         Entity disc = combat.spawnDisc(0, 0, 0, 0);
         assertThat(pool.available()).isZero();
 

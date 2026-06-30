@@ -131,7 +131,7 @@ public final class InputBridge implements KeyListener {
     /** Drains characters typed since the last call -- digits, {@code '.'}, and {@code '\b'} (backspace). */
     public String drainTypedText() {
         synchronized (edtTyped) {
-            if (edtTyped.length() == 0) {
+            if (edtTyped.isEmpty()) {
                 return "";
             }
             String text = edtTyped.toString();

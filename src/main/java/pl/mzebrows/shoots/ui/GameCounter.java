@@ -1,8 +1,6 @@
 // pl/mzebrows/shoots/ui/GameCounter.java
 package pl.mzebrows.shoots.ui;
 
-import pl.mzebrows.shoots.app.GameSettings;
-
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;

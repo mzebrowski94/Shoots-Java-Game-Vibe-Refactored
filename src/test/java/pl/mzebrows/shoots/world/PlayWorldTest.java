@@ -162,7 +162,7 @@ class PlayWorldTest {
         int unit = world.unit();
         disc.setX(1.2 * unit);          // inside tile column 1, near the left border (column 0)
         disc.setY(12 * unit + unit / 2.0);
-        disc.setAngle(90);              // BounceMovementStrategy: X = dirX*speed*sin(-90) = -speed -> -X
+        disc.setAngle(90);              // disc step: X = dirX*speed*sin(-90) = -speed -> -X
         disc.setDirectionX(1);
         disc.setDirectionY(1);
         disc.setMoveSpeed(2 * unit);    // one step crosses into the border tile (index <= 0)

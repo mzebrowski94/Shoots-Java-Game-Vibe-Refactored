@@ -2,7 +2,7 @@
 package pl.mzebrows.shoots.state;
 
 import pl.mzebrows.shoots.ui.GameScreen;
-import pl.mzebrows.shoots.app.GameSettings;
+import pl.mzebrows.shoots.ui.GameSettings;
 import pl.mzebrows.shoots.input.InputBridge;
 
 /**

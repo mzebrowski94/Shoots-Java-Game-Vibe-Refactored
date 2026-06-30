@@ -1,5 +1,5 @@
 // src/test/java/pl/mzebrows/shoots/loop/FixedTimestepTest.java
-package pl.mzebrows.shoots.loop;
+package pl.mzebrows.shoots.engine;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

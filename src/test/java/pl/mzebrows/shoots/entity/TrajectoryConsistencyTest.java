@@ -1,5 +1,5 @@
 // src/test/java/pl/mzebrows/shoots/system/TrajectoryConsistencyTest.java
-package pl.mzebrows.shoots.system;
+package pl.mzebrows.shoots.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -9,9 +9,6 @@ import org.junit.jupiter.api.Test;
 import pl.mzebrows.shoots.config.CollisionConfig;
 import pl.mzebrows.shoots.config.DiscConfig;
 import pl.mzebrows.shoots.config.GridConfig;
-import pl.mzebrows.shoots.entity.Entity;
-import pl.mzebrows.shoots.entity.LaserPredictor;
-import pl.mzebrows.shoots.pool.ObjectPool;
 import pl.mzebrows.shoots.spatial.GridPathTracer;
 import pl.mzebrows.shoots.spatial.TileType;
 import pl.mzebrows.shoots.spatial.UniformGridCollider;
@@ -57,7 +54,7 @@ class TrajectoryConsistencyTest {
 
     private List<Long> bounceTiles(double startX, double startY, double angle, double speed, int frames) {
         var tracer = tracer();
-        var combat = new CombatSystem(new ObjectPool<>(2, Entity::new, Entity::reset), DISC);
+        var combat = new DiscSpawner(new ObjectPool<>(2, Entity::new, Entity::reset), DISC);
         var system = new DiscSystem(tracer, combat);
         Entity disc = combat.spawnDisc(startX, startY, angle, 1);
         disc.setMoveSpeed(speed);
@@ -124,7 +121,7 @@ class TrajectoryConsistencyTest {
         // bank a phantom bounce at each, blow past the 9-bounce budget and make the disc vanish within a
         // few frames. With the analytic tracer it only bounces off real walls, so it stays alive.
         var tracer = tracer();
-        var combat = new CombatSystem(new ObjectPool<>(2, Entity::new, Entity::reset),
+        var combat = new DiscSpawner(new ObjectPool<>(2, Entity::new, Entity::reset),
                 new DiscConfig(18, 10, 3.0, 9, 3, 3, 4)); // the live default bounce budget of 9
         var system = new DiscSystem(tracer, combat);
         Entity disc = combat.spawnDisc(12 * UNIT + UNIT / 2.0, 12 * UNIT + UNIT / 2.0, -45, 1);

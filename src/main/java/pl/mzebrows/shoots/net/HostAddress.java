@@ -33,7 +33,7 @@ public record HostAddress(String host, int port) {
         int port;
         try {
             port = Integer.parseInt(trimmed.substring(colon + 1).trim());
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             throw new IllegalArgumentException("invalid port in: " + text);
         }
         return new HostAddress(host, port);

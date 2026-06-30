@@ -1,5 +1,5 @@
 // src/test/java/pl/mzebrows/shoots/system/DiscAccelerationTest.java
-package pl.mzebrows.shoots.system;
+package pl.mzebrows.shoots.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -9,8 +9,6 @@ import pl.mzebrows.shoots.config.CollisionConfig;
 import pl.mzebrows.shoots.config.DiscConfig;
 import pl.mzebrows.shoots.config.GridConfig;
 import pl.mzebrows.shoots.config.PowerShotConfig;
-import pl.mzebrows.shoots.entity.Entity;
-import pl.mzebrows.shoots.pool.ObjectPool;
 import pl.mzebrows.shoots.spatial.GridPathTracer;
 import pl.mzebrows.shoots.spatial.TileType;
 import pl.mzebrows.shoots.spatial.UniformGridCollider;
@@ -54,7 +52,7 @@ class DiscAccelerationTest {
     void discSpeedsUpAfterWallBouncesAndIsCappedAndNeverTunnels() {
         // gain 1.5/bounce, cap at 3x the launch speed (9.0); a very high bounce budget so it survives.
         var disc = new DiscConfig(18, 10, 3.0, 100_000, 3, 3, 4, 1.5, 3.0);
-        var combat = new CombatSystem(pool(), disc);
+        var combat = new DiscSpawner(pool(), disc);
         var system = new DiscSystem(tracer(corridorField()), combat);
 
         // Launch along +X (angle -90) inside the corridor, between the two walls.
@@ -79,7 +77,7 @@ class DiscAccelerationTest {
     void fastPowerDiscDoesNotTunnelThroughWalls() {
         var disc = new DiscConfig(18, 10, 3.0, 100_000, 3, 3, 4, 1.0, 1.0);
         var power = new PowerShotConfig(true, 0.5, 3.0, 100_000, 2);  // launch speed 9 px/step
-        var combat = new CombatSystem(pool(), disc, power);
+        var combat = new DiscSpawner(pool(), disc, power);
         var system = new DiscSystem(tracer(corridorField()), combat);
 
         Entity e = combat.spawnDisc(12 * UNIT + UNIT / 2.0, 12 * UNIT + UNIT / 2.0, -90, 1, true);

@@ -81,7 +81,7 @@ final class TcpConnection implements AutoCloseable {
         open = false;
         try {
             socket.close();
-        } catch (IOException ignored) {
+        } catch (IOException _) {
             // best-effort close
         }
     }

@@ -82,7 +82,7 @@ public final class TcpClientTransport implements AutoCloseable {
     private static void sleepBriefly() {
         try {
             Thread.sleep(2);
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
         }
     }

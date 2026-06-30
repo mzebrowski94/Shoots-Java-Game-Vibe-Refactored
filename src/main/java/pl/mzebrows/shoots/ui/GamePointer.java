@@ -1,8 +1,6 @@
 // pl/mzebrows/shoots/ui/GamePointer.java
 package pl.mzebrows.shoots.ui;
 
-import pl.mzebrows.shoots.app.GameSettings;
-
 import pl.mzebrows.shoots.score.CapturePoint;
 import pl.mzebrows.shoots.world.PlayWorld;
 

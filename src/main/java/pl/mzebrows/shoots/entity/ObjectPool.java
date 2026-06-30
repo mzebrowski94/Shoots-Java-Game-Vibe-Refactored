@@ -1,5 +1,5 @@
 // src/main/java/pl/mzebrows/shoots/pool/ObjectPool.java
-package pl.mzebrows.shoots.pool;
+package pl.mzebrows.shoots.entity;
 
 import java.util.function.Consumer;
 import java.util.function.Supplier;

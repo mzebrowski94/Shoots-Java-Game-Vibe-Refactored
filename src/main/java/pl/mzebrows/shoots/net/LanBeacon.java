@@ -92,7 +92,7 @@ public final class LanBeacon implements AutoCloseable {
                 }
                 ticks++;
                 Thread.sleep(intervalMillis);
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
                 return;
             } catch (IOException e) {
@@ -152,7 +152,7 @@ public final class LanBeacon implements AutoCloseable {
         }
         try {
             targets.add(InetAddress.getByName("255.255.255.255"));
-        } catch (UnknownHostException ignored) {
+        } catch (UnknownHostException _) {
             // 255.255.255.255 is always resolvable; this is unreachable in practice.
         }
         return targets;
@@ -161,7 +161,7 @@ public final class LanBeacon implements AutoCloseable {
     private String safeMatchCode() {
         try {
             return supplier.get().matchCode();
-        } catch (RuntimeException e) {
+        } catch (RuntimeException _) {
             return "?";
         }
     }

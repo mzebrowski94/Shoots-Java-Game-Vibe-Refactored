@@ -1,5 +1,5 @@
 // pl/mzebrows/shoots/app/Round.java
-package pl.mzebrows.shoots.app;
+package pl.mzebrows.shoots.ui;
 
 import lombok.Getter;
 import lombok.Setter;

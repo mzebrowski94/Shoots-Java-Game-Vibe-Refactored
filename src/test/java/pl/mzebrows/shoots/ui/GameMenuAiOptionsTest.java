@@ -11,7 +11,6 @@ import java.awt.event.KeyEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import pl.mzebrows.shoots.ai.AiDifficulty;
-import pl.mzebrows.shoots.app.GameSettings;
 import pl.mzebrows.shoots.input.InputBridge;
 
 /** Navigation + value tests for the AI-player count and AI-difficulty menu options (logic only). */

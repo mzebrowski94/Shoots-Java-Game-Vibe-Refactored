@@ -1,13 +1,9 @@
 // src/test/java/pl/mzebrows/shoots/app/GameplayOptionsTest.java
-package pl.mzebrows.shoots.app;
+package pl.mzebrows.shoots.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
-import pl.mzebrows.shoots.config.GameConfig;
-import pl.mzebrows.shoots.config.GameConfigLoader;
-import pl.mzebrows.shoots.config.GameplayLimits;
-import pl.mzebrows.shoots.config.OnlineConfig;
 
 /** Unit tests for the in-memory GAMEPLAY OPTIONS holder: clamping, IP validation, and config overlay. */
 class GameplayOptionsTest {

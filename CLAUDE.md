@@ -33,26 +33,28 @@ performant, testable engine.
 established contract live there. Consult it before designing anything, and reuse existing
 contracts instead of redesigning them.
 
-Root package `pl.mzebrows.shoots`. High-level layout:
+Root package `pl.mzebrows.shoots`. The AWT-free, deterministic simulation packages
+(`world`/`entity`/`spatial`/`score`/`ai`) sit alongside the application shell + engine:
 
-- `config` — immutable config records + `GameConfigLoader` (loads `game.properties` + `graphic.properties`).
+- `config` — immutable config records + `GameConfigLoader` (loads `game.properties` + `graphic.properties`);
+  plus player-editable `GameplayOptions` (live tunables) + `GameplayLimits` (their caps).
 - `input` — `GameAction` enum + `InputBridge` (EDT writes, loop reads via `poll()`).
 - `state` — `GameStateMachine` + `PlayingState`/`PausedState`/`GameOverState`.
-- `loop` / `render` — `FixedTimestep`; `Renderer`/`AwtRenderer`/`ImageCache`. `render.object` —
-  per-map-object renderers (`MapObjectRenderer`) driven by `GameScreen`; add a renderer to add a map object.
-- `entity` — pooled `Entity` + Strategy interfaces (`MovementStrategy`/`AttackStrategy`/
-  `AiStrategy`), `AimController`, `DiscAttackStrategy`, `LaserPredictor`.
-- `pool` — `ObjectPool<T>` (array-backed, `reset()` on release).
-- `system` — `MovementSystem`/`CombatSystem`/`DiscSystem` (ECS-style, tick over entities).
-- `spatial` — `SpatialCollider`/`UniformGridCollider`, `TileType`, `MapGenerator`.
+- `engine` — `GameLoop` (heartbeat thread + composition root) + `FixedTimestep` (fixed-step accumulator).
+- `render` — `Renderer`/`AwtRenderer`/`ImageCache`. `render.object` — per-map-object renderers
+  (`MapObjectRenderer`) driven by `GameScreen`; add a renderer to add a map object.
+- `ui` — AWT shell (`GameFrame`/`GameCanvas`/`GameMenu`/...) + session state (`GameSettings`/`Round`).
+  Draws from `PlayWorld`.
+- `net` — online multiplayer (host-authoritative lockstep); see `OnlineMode.md`.
+- `world` — **`PlayWorld` facade** (headless, AWT-free, tested; main entry over entities/collider/scoring)
+  + `PlayInput` adapter + `MatchFlow`; per-mechanic subsystems it owns + delegates to: `DisruptionSystem`,
+  `ChargeController`, `BlockHitEffects` (+ the `BlockHitEffect` data record).
+- `entity` — pooled `Entity`/`EntityType` + `ObjectPool<T>`; `AimController`, `AttackStrategy`/`DiscAttackStrategy`,
+  `LaserPredictor`, `EntitySpawner`; disc lifecycle `DiscSpawner` (spawn/retire) + `DiscSystem` (per-tick advance/collide).
+- `spatial` — `SpatialCollider`/`UniformGridCollider`, `TileType`, `MapGenerator`, `GridPathTracer`.
 - `score` — `CapturePoint`, `CaptureScoring`, `PlayerScore`, `MatchScorer`.
-- `world` — **`PlayWorld` facade** (headless, AWT-free, tested) + `PlayInput` adapter +
-  `MatchFlow`. This is the main entry point over the systems/collider/scoring.
-- `ui` / `app` — AWT shell (`GameFrame`/`GameCanvas`/`GameMenu`/...) and lifecycle
-  (`GameLoop`/`GameSettings`/`Round`). Draws from `PlayWorld`.
-- `ai` — AI players: `AiDifficulty`/`AiSkills`/`AiSkillsFactory`, `PlayerAiController`,
-  `AiTargeting`, `AiPlayers`. An AI is **just another input source** — it drives the same
-  `PlayWorld.applyInput`/`fire` API a human does; nothing special-cases it in the hot loop.
+- `ai` — `AiDifficulty`/`AiSkills`/`AiSkillsFactory`, `PlayerAiController`, `AiTargeting`, `AiPlayers`.
+  An AI is **just another input source** — it drives the same `PlayWorld.applyInput`/`fire` API a human does.
 
 ## Conventions (the non-obvious ones that apply to NEW-feature work)
 

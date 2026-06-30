@@ -1,5 +1,5 @@
 // src/test/java/pl/mzebrows/shoots/system/DiscSystemTest.java
-package pl.mzebrows.shoots.system;
+package pl.mzebrows.shoots.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
@@ -11,8 +11,6 @@ import org.junit.jupiter.api.Test;
 import pl.mzebrows.shoots.config.CollisionConfig;
 import pl.mzebrows.shoots.config.DiscConfig;
 import pl.mzebrows.shoots.config.GridConfig;
-import pl.mzebrows.shoots.entity.Entity;
-import pl.mzebrows.shoots.pool.ObjectPool;
 import pl.mzebrows.shoots.spatial.GridPathTracer;
 import pl.mzebrows.shoots.spatial.TileType;
 import pl.mzebrows.shoots.spatial.UniformGridCollider;
@@ -48,7 +46,7 @@ class DiscSystemTest {
 
     @Test
     void movesActiveDiscByOneStep() {
-        var combat = new CombatSystem(pool(), DISC);
+        var combat = new DiscSpawner(pool(), DISC);
         var system = new DiscSystem(tracer(emptyField()), combat);
         Entity disc = combat.spawnDisc(12 * UNIT + UNIT / 2.0, 12 * UNIT, 0, 1); // +Y travel
 
@@ -61,7 +59,7 @@ class DiscSystemTest {
 
     @Test
     void skipsInactiveDiscs() {
-        var combat = new CombatSystem(pool(), DISC);
+        var combat = new DiscSpawner(pool(), DISC);
         var system = new DiscSystem(tracer(emptyField()), combat);
         var sink = mock(DiscSystem.DiscEventSink.class);
         var inactive = new Entity(); // active == false
@@ -77,7 +75,7 @@ class DiscSystemTest {
     void reportsCapturePointHit() {
         var tiles = emptyField();
         tiles[12][13] = TileType.CAPTURE_POINT;
-        var combat = new CombatSystem(pool(), DISC);
+        var combat = new DiscSpawner(pool(), DISC);
         var system = new DiscSystem(tracer(tiles), combat);
         var sink = mock(DiscSystem.DiscEventSink.class);
         // Disc spawned inside the capture tile (12,13): a +Y step keeps it there, hit is reported.
@@ -90,7 +88,7 @@ class DiscSystemTest {
 
     @Test
     void retiringDiscsMidUpdateDoesNotCorruptIteration() {
-        var combat = new CombatSystem(pool(), DISC);
+        var combat = new DiscSpawner(pool(), DISC);
         var system = new DiscSystem(tracer(emptyField()), combat);
         var discs = new java.util.ArrayList<Entity>();
         for (int k = 0; k < 4; k++) {
@@ -112,7 +110,7 @@ class DiscSystemTest {
     void discRetiresWhenCaptureHitIsConsumed() {
         var tiles = emptyField();
         tiles[12][13] = TileType.CAPTURE_POINT;
-        var combat = new CombatSystem(pool(), DISC);
+        var combat = new DiscSpawner(pool(), DISC);
         var system = new DiscSystem(tracer(tiles), combat);
         Entity disc = combat.spawnDisc(12 * UNIT + UNIT / 2.0, 13 * UNIT + UNIT / 2.0, 0, 1);
         var discs = new java.util.ArrayList<Entity>();
@@ -132,7 +130,7 @@ class DiscSystemTest {
     void discPassesThroughWhenCaptureHitChangesNothing() {
         var tiles = emptyField();
         tiles[12][13] = TileType.CAPTURE_POINT;
-        var combat = new CombatSystem(pool(), DISC);
+        var combat = new DiscSpawner(pool(), DISC);
         var system = new DiscSystem(tracer(tiles), combat);
         Entity disc = combat.spawnDisc(12 * UNIT + UNIT / 2.0, 13 * UNIT + UNIT / 2.0, 0, 1);
         var discs = new java.util.ArrayList<Entity>();
@@ -150,7 +148,7 @@ class DiscSystemTest {
 
     @Test
     void retiresSpentDiscAndReportsIt() {
-        var combat = new CombatSystem(pool(), DISC);
+        var combat = new DiscSpawner(pool(), DISC);
         var system = new DiscSystem(tracer(emptyField()), combat);
         var sink = mock(DiscSystem.DiscEventSink.class);
         Entity disc = combat.spawnDisc(12 * UNIT + UNIT / 2.0, 12 * UNIT + UNIT / 2.0, 0, 1);

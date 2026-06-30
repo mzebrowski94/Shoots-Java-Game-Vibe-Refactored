@@ -1,15 +1,10 @@
 // pl/mzebrows/shoots/ui/GameMenu.java
 package pl.mzebrows.shoots.ui;
 
-import pl.mzebrows.shoots.app.GameSettings;
-
 import pl.mzebrows.shoots.ai.AiDifficulty;
 import pl.mzebrows.shoots.config.GameConfig;
 import pl.mzebrows.shoots.config.MenuConfig;
-import pl.mzebrows.shoots.config.OnlineConfig;
-import pl.mzebrows.shoots.config.GameplayLimits;
-import pl.mzebrows.shoots.app.GameplayOptions;
-import pl.mzebrows.shoots.config.RoundConfig;
+import pl.mzebrows.shoots.config.GameplayOptions;
 import pl.mzebrows.shoots.input.GameAction;
 import pl.mzebrows.shoots.net.DiscoveredMatch;
 import pl.mzebrows.shoots.net.LanSearch;
@@ -60,8 +55,6 @@ public class GameMenu {
 
     /** Live, in-memory gameplay tunables (shared with {@link GameSettings}); edited in the sub-screen below. */
     private final GameplayOptions gameplayOptions;
-    /** Min/max/step caps for the gameplay options (from {@code game.properties}). */
-    private final GameplayLimits gameplayLimits;
     /** True while the GAMEPLAY OPTIONS sub-screen is shown instead of the option list. */
     boolean showingGameplayOptions = false;
     /** Highlighted row in the GAMEPLAY OPTIONS sub-screen (0..{@link #GAMEPLAY_ROWS}-1). */
@@ -89,8 +82,6 @@ public class GameMenu {
     OnlineScreen onlineScreen = OnlineScreen.NONE;
     /** Highlighted row in the connect sub-screen: 0 HOST, 1 JOIN LAN, 2 JOIN ONLINE. */
     int connectIndex = 0;
-    /** Connection defaults (port + default JOIN ONLINE IP) read from {@code game.properties}. */
-    private final OnlineConfig onlineConfig = OnlineConfig.load();
     /** Local player display name advertised to peers. */
     private final String playerName = System.getProperty("user.name", "Player");
     /** Live host/client waiting room (null until HOST/JOIN selected); LAN search + background connect handles. */
@@ -135,7 +126,6 @@ public class GameMenu {
         this.playerNumber = gameSettings.getConfig().playerNumber();
         this.playerLimit = menuConfig.maxPlayers();
         this.gameplayOptions = gameSettings.getGameplayOptions();
-        this.gameplayLimits = gameplayOptions.getLimits();
         this.aiNumber = menuConfig.initialAiPlayers();
 
         this.stringPlayerNumber = optionValue(playerNumber);
@@ -770,6 +760,7 @@ public class GameMenu {
     };
 
     /** Header for the controls table; player rows are formatted to align beneath these columns. */
+    private static final String ESC_TO_RETURN = "[ ESC to return ]";
     private static final String CONTROLS_HEADER = "Player   Left   Right   Shoot";
     /** Fixed-width row format so the key columns line up under {@link #CONTROLS_HEADER}. */
     private static final String CONTROLS_ROW_FORMAT = "  P%d     %-6s %-6s %-6s";
@@ -1082,7 +1073,7 @@ public class GameMenu {
         int widest = 0;
         for (String s : new String[]{"Searching online game at", "[ JOIN ONLINE ]",
                 "Match code: ABCXYZ", "Slot 4:  " + sampleName(), "ip number: 000.000.000.000",
-                "[ START GAME ]   ", "[ ESC to return ]"}) {
+                "[ START GAME ]   ", ESC_TO_RETURN}) {
             widest = Math.max(widest, fm.stringWidth(s));
         }
         return widest + 2 * panelPadX();
@@ -1121,7 +1112,7 @@ public class GameMenu {
         if (onlineError != null) {
             shadowStringCentered(g2d, onlineError, y + 6 * nextLine, Color.red);
         }
-        shadowStringCentered(g2d, "[ ESC to return ]", y + 8 * nextLine, label);
+        shadowStringCentered(g2d, ESC_TO_RETURN, y + 8 * nextLine, label);
     }
 
     private void drawHostLobby(Graphics2D g2d) {
@@ -1135,7 +1126,7 @@ public class GameMenu {
         Color startColor = canStart ? Color.green : menuSublabelColor;
         String startText = canStart ? "[ START GAME ]" : "[ START GAME ]  (need 2 players)";
         shadowStringCentered(g2d, startText, y + 8 * nextLine, startColor);
-        shadowStringCentered(g2d, "[ ESC to return ]", y + 10 * nextLine, label);
+        shadowStringCentered(g2d, ESC_TO_RETURN, y + 10 * nextLine, label);
     }
 
     private void drawClientLobby(Graphics2D g2d) {
@@ -1145,7 +1136,7 @@ public class GameMenu {
         shadowStringCentered(g2d, "Port: " + gameplayOptions.getHostPort(), y + nextLine, menuSublabelColor);
         drawSlots(g2d, y + 3 * nextLine, lobby.roster(), lobby.localSlot());
         shadowStringCentered(g2d, "Waiting for host to start...", y + 8 * nextLine, menuSublabelColor);
-        shadowStringCentered(g2d, "[ ESC to return ]", y + 10 * nextLine, label);
+        shadowStringCentered(g2d, ESC_TO_RETURN, y + 10 * nextLine, label);
     }
 
     /** Draws the four (or fewer) player slots; the local player is tagged "(you)", empty slots read OPEN. */
@@ -1182,7 +1173,7 @@ public class GameMenu {
         if (onlineError != null) {
             shadowStringCentered(g2d, onlineError, captionY + 4 * nextLine, Color.red);
         }
-        shadowStringCentered(g2d, "[ ESC to return ]", captionY + 5 * nextLine, label);
+        shadowStringCentered(g2d, ESC_TO_RETURN, captionY + 5 * nextLine, label);
     }
 
     /**

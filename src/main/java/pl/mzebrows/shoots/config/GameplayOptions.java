@@ -1,14 +1,8 @@
 // pl/mzebrows/shoots/app/GameplayOptions.java
-package pl.mzebrows.shoots.app;
+package pl.mzebrows.shoots.config;
 
 import lombok.Getter;
 import lombok.Setter;
-import pl.mzebrows.shoots.config.DiscConfig;
-import pl.mzebrows.shoots.config.DisruptionConfig;
-import pl.mzebrows.shoots.config.GameConfig;
-import pl.mzebrows.shoots.config.GameplayLimits;
-import pl.mzebrows.shoots.config.OnlineConfig;
-import pl.mzebrows.shoots.config.RoundConfig;
 
 import java.util.regex.Pattern;
 

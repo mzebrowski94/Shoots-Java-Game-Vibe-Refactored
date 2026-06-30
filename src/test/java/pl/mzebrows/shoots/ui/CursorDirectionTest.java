@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
 import org.junit.jupiter.api.Test;
-import pl.mzebrows.shoots.entity.BounceMovementStrategy;
 import pl.mzebrows.shoots.entity.Entity;
 
 /**
@@ -21,7 +20,7 @@ class CursorDirectionTest {
         return new double[]{Math.sin(a), Math.cos(a)};
     }
 
-    /** The actual disc step direction from BounceMovementStrategy for unit speed, dir +1/+1. */
+    /** The actual disc step direction from the disc-step formula for unit speed, dir +1/+1. */
     private static double[] discStep(double angleDeg) {
         var e = new Entity();
         e.setX(0);
@@ -30,7 +29,9 @@ class CursorDirectionTest {
         e.setMoveSpeed(1.0);
         e.setDirectionX(1);
         e.setDirectionY(1);
-        new BounceMovementStrategy().move(e);
+        double radians = Math.toRadians(-angleDeg);
+        e.setX(e.getX() + e.getDirectionX() * e.getMoveSpeed() * Math.sin(radians));
+        e.setY(e.getY() + e.getDirectionY() * e.getMoveSpeed() * Math.cos(radians));
         return new double[]{e.getX(), e.getY()};
     }
 

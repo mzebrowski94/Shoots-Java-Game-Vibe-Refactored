@@ -28,7 +28,7 @@ public record OnlineConfig(String host, int port) {
             if (in != null) {
                 props.load(in);
             }
-        } catch (IOException ignored) {
+        } catch (IOException _) {
             // fall back to defaults below
         }
         String host = props.getProperty("online.host", "").trim();
@@ -41,7 +41,7 @@ public record OnlineConfig(String host, int port) {
     private static int parsePort(String raw) {
         try {
             return Integer.parseInt(raw.trim());
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return DEFAULT_PORT;
         }
     }
