@@ -2,6 +2,7 @@
 package pl.mzebrows.shoots.net;
 
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.Random;
 
 import lombok.extern.slf4j.Slf4j;
@@ -14,15 +15,25 @@ import pl.mzebrows.shoots.world.PlayWorld;
  * A live online match for ONE peer: it bootstraps the host (server + LAN beacon + {@link OnlineHost}) or
  * a client ({@link TcpClientTransport} + {@link OnlineClient}), builds the shared {@link PlayWorld} from
  * the master seed (the host's own / the client's from {@code WELCOME}), and advances the match one
- * command frame per {@link #advance} call. It is step-driven and AWT-free, so the game loop calls
+ * sim sub-step per {@link #advance} call. It is step-driven and AWT-free, so the game loop calls
  * {@link #advance} each tick and renders {@link #world()}; the engine pieces underneath are the
  * fully-tested F1-F5 stack. See OnlineMode.md (F6).
  *
- * <p>Lockstep runs with a small <b>input delay</b> ({@link #INPUT_DELAY_FRAMES}): the input sampled at
- * apply-frame {@code f} is scheduled for frame {@code f + delay}, and frames {@code [0, delay)} are
- * pre-seeded with neutral input. This keeps every peer's input buffered a few frames ahead, so a peer
- * advances without waiting a full network round-trip per frame -- the game then runs at real-time speed
- * on localhost/LAN instead of stalling to the round-trip rate (which made the whole match crawl).
+ * <p><b>Cadence:</b> the sim runs at 120 Hz and the network is consulted at ~30 Hz -- one
+ * <em>command frame</em> = {@link #STEPS_PER_FRAME} (4) held sim steps, per the original ADR ("run a
+ * command frame at ~30 Hz (4 sim steps per frame)"). {@link #advance} is called once per real (120 Hz)
+ * game-loop tick and steps the world exactly ONE sub-step of the current command frame each call, only
+ * consulting the network at a command-frame boundary (every {@code STEPS_PER_FRAME} calls) to release or
+ * receive the next frame. So the sim advances smoothly at the full 120 Hz -- the same pacing as offline --
+ * while the network still only syncs ~30x/s. Syncing 4x less often means 4x fewer chances per second for a
+ * single jitter spike to cause a stall, and a stall then costs at most one command frame; see
+ * {@link #advanceWith}.
+ *
+ * <p>Lockstep also runs with a small <b>input delay</b> ({@link #INPUT_DELAY_FRAMES}, in COMMAND frames):
+ * the input sampled for command frame {@code f} is scheduled for frame {@code f + delay}, and frames
+ * {@code [0, delay)} are pre-seeded with neutral input. This keeps every peer's input buffered a few
+ * command frames ahead, so a peer advances without waiting a full network round-trip per command frame --
+ * the game then runs at real-time speed instead of stalling to the round-trip rate of the slowest peer.
  */
 @Slf4j
 public final class OnlineSession implements AutoCloseable {
@@ -30,10 +41,24 @@ public final class OnlineSession implements AutoCloseable {
     private static final long WELCOME_TIMEOUT_MS = 5000;
 
     /**
+     * Sim steps held per command frame (120 Hz sim / 30 Hz command frame, per {@code OnlineMode.md}).
+     * {@link LockstepApplier} re-applies the SAME held input over all of them, so it is bit-identical to
+     * {@code STEPS_PER_FRAME} normal per-tick updates -- see its javadoc.
+     */
+    static final int STEPS_PER_FRAME = 4;
+
+    /**
      * Command frames of input delay. The local input read at apply-frame {@code f} takes effect at frame
-     * {@code f + delay}; frames {@code [0, delay)} use neutral input. A few frames of buffer hide the
-     * localhost/LAN round-trip so {@link #advance} returns {@code true} every tick (real-time pacing);
-     * the cost is ~{@code delay/120 s} of input latency, imperceptible at this small a value.
+     * {@code f + delay}; frames {@code [0, delay)} use neutral input. This buffer is what hides network
+     * round-trip jitter so {@link #advance} returns {@code true} every tick (real-time pacing) instead of
+     * stalling the whole match to the round-trip rate of the slowest peer.
+     *
+     * <p>At {@code STEPS_PER_FRAME} sim steps per command frame (30 command frames/s), {@code delay}
+     * frames buy {@code delay / 30 s} of slack: 3 frames ~= 100 ms, matching {@code OnlineMode.md}'s
+     * design target (accepted as imperceptible for this aim-and-shoot genre). Before command frames were
+     * batched, this same field held sim-tick units (12 frames @ 120 Hz was the equivalent ~100 ms); now
+     * that a "frame" is a command frame again, 3 is the right number -- don't reintroduce the old 120 Hz
+     * unit by accident when tuning this. Tune further with real latency data per the ADR's open item.
      */
     private static final int INPUT_DELAY_FRAMES = 3;
 
@@ -51,9 +76,21 @@ public final class OnlineSession implements AutoCloseable {
     private final LanBeacon beacon;         // HOST mode
     private final TcpClientTransport transport; // CLIENT mode
 
-    private long frame;
-    private boolean dispatched; // local input already sent/submitted for the current frame
+    private long frame;         // command frames FULLY applied so far (advances only at a frame boundary)
+    private boolean dispatched; // local input already sent/submitted for the current command frame
     private boolean primed;     // the neutral input for the delay window [0, delay) has been dispatched
+    // The command frame currently being applied one sub-step at a time, and how many of its
+    // STEPS_PER_FRAME sub-steps are still to run. subStepsRemaining == 0 means "at a command-frame
+    // boundary: consult the network for the next frame". Spreading the sub-steps across real ticks is what
+    // lets the sim render at the full 120 Hz while the network only syncs once per command frame (~30 Hz).
+    private InputFrame heldFrame;
+    private int subStepsRemaining;
+    // CLIENT: authoritative frames received from the host but not yet consumed -- drained off the transport
+    // each tick (so control/pause stay live) and applied one command frame at a time, in arrival order.
+    private final ArrayDeque<InputFrame> pendingFrames = new ArrayDeque<>();
+    // Whether the last advanceWith that returned false was a genuine network stall (a command-frame
+    // boundary reached with no next frame ready). The game loop refunds real time only on a stall.
+    private boolean lastStalled;
 
     private OnlineSession(GameMode mode, PlayWorld world, int localSlot, String matchCode,
                           OnlineHost host, OnlineClient client,
@@ -83,7 +120,7 @@ public final class OnlineSession implements AutoCloseable {
         var beacon = LanBeacon.broadcast(1000,
                 () -> new LanAnnouncement(code, playerName, server.port(), playerNumber, true));
         beacon.start();
-        var onlineHost = new OnlineHost(world, server, 1, 0);
+        var onlineHost = new OnlineHost(world, server, STEPS_PER_FRAME, 0);
         log.info("Hosting match {} on port {} ({} players)", code, server.port(), playerNumber);
         return new OnlineSession(GameMode.HOST, world, TcpServer.HOST_SLOT, code,
                 onlineHost, null, server, beacon, null);
@@ -96,7 +133,7 @@ public final class OnlineSession implements AutoCloseable {
         NetMessage.Welcome welcome = transport.awaitWelcome(WELCOME_TIMEOUT_MS);
         GameConfig cfg = base.withPlayerNumber(welcome.playerCount()).withSeed(welcome.seed());
         var world = new PlayWorld(cfg);
-        var onlineClient = new OnlineClient(world, transport, 1);
+        var onlineClient = new OnlineClient(world, transport, STEPS_PER_FRAME);
         log.info("Joined match {} as slot {} ({} players)",
                 welcome.matchCode(), welcome.slot(), welcome.playerCount());
         return new OnlineSession(GameMode.CLIENT, world, welcome.slot(), welcome.matchCode(),
@@ -109,7 +146,7 @@ public final class OnlineSession implements AutoCloseable {
      * {@link OnlineHost} (world aggregator) is created here. Called when the host presses START.
      */
     static OnlineSession startedHost(PlayWorld world, TcpServer server, LanBeacon beacon, String matchCode) {
-        var onlineHost = new OnlineHost(world, server, 1, 0);
+        var onlineHost = new OnlineHost(world, server, STEPS_PER_FRAME, 0);
         return new OnlineSession(GameMode.HOST, world, TcpServer.HOST_SLOT, matchCode,
                 onlineHost, null, server, beacon, null);
     }
@@ -121,7 +158,7 @@ public final class OnlineSession implements AutoCloseable {
      */
     static OnlineSession startedClient(PlayWorld world, TcpClientTransport transport, int playerSlot,
                                        String matchCode) {
-        var onlineClient = new OnlineClient(world, transport, 1);
+        var onlineClient = new OnlineClient(world, transport, STEPS_PER_FRAME);
         return new OnlineSession(GameMode.CLIENT, world, playerSlot, matchCode,
                 null, onlineClient, null, null, transport);
     }
@@ -133,33 +170,90 @@ public final class OnlineSession implements AutoCloseable {
         return advanceWith(localInput(input));
     }
 
-    /** Advances one command frame from an explicit local input (used by tests); returns whether stepped. */
+    /**
+     * Advances one REAL (120 Hz) tick from an explicit local input (used by tests); returns whether the
+     * world stepped this call (it does every tick except a genuine network stall).
+     *
+     * <p><b>Cadence.</b> A command frame authorises {@link #STEPS_PER_FRAME} sim sub-steps of the same held
+     * input. Rather than apply them all in one call (which made online motion update in 30 Hz bursts), this
+     * applies exactly ONE sub-step per call and only consults the network at a command-frame boundary
+     * ({@code subStepsRemaining == 0}) to release/receive the next frame. So the sim advances one step per
+     * tick -- identical pacing to the offline path, smooth at the full 120 Hz -- while the network still
+     * only syncs once per command frame (~30 Hz), preserving the jitter tolerance that keeps one slow peer
+     * from stalling the others.
+     *
+     * <p>The only tick that does not step is a genuine stall: a boundary reached with no next frame ready
+     * ({@link #lastAdvanceStalled()} true). It returns {@code false} so the game loop refunds the tick's
+     * real time and freezes with the sim until the peer's input arrives.
+     */
     boolean advanceWith(TickInput local) {
         prime();
-        if (mode == GameMode.HOST) {
+        lastStalled = false;
+        if (subStepsRemaining == 0) {
+            // At a command-frame boundary: schedule our own (delayed) input once, then fetch the next frame.
             if (!dispatched) {
-                host.submitLocalInput(frame + INPUT_DELAY_FRAMES, local);
+                dispatchLocal(frame + INPUT_DELAY_FRAMES, local);
                 dispatched = true;
             }
-            host.pumpInbound();
-            if (host.tryAdvance() != null) {
-                frame++;
-                dispatched = false;
-                return true;
+            InputFrame next = nextCommandFrame();
+            if (next == null) {
+                lastStalled = true; // no frame ready -> real lockstep stall; the loop refunds this tick
+                return false;
             }
-            return false;
+            heldFrame = next;
+            subStepsRemaining = STEPS_PER_FRAME;
         }
-        if (!dispatched) {
-            client.sendLocalInput(frame + INPUT_DELAY_FRAMES, local);
-            dispatched = true;
-        }
-        client.pump();
-        if (client.lastAppliedFrame() >= frame) {
+        LockstepApplier.applyStep(world, heldFrame);
+        if (--subStepsRemaining == 0) {
+            // Command frame fully applied: hash it at the boundary (desync check) and count it complete.
+            if (mode == GameMode.HOST) {
+                host.recordFrameHash(heldFrame.frame());
+            }
             frame++;
             dispatched = false;
-            return true;
         }
-        return false;
+        return true;
+    }
+
+    /**
+     * Whether the last {@link #advanceWith} that returned {@code false} was a genuine network stall -- a
+     * command-frame boundary reached with no next frame ready. Every other tick steps the sim and consumes
+     * its real time; only a stall refunds it (freezing wall-clock progress with the frozen sim), so online
+     * wall-clock speed matches offline. See {@link GameLoop}/{@code PlayingState}.
+     */
+    public boolean lastAdvanceStalled() {
+        return lastStalled;
+    }
+
+    /**
+     * The next command frame to apply, or {@code null} if it is not ready yet. HOST: drains client input
+     * and releases the frame once every slot has reported it (broadcasting it to the clients). CLIENT:
+     * returns the next host-broadcast frame from the pending queue (kept filled off the transport).
+     */
+    private InputFrame nextCommandFrame() {
+        if (mode == GameMode.HOST) {
+            host.pumpInbound();
+            return host.tryReleaseFrame();
+        }
+        drainClientFrames();
+        return pendingFrames.pollFirst();
+    }
+
+    /** Drains the client transport: applies host {@code CONTROL}s/pauses and queues authoritative frames. */
+    private void drainClientFrames() {
+        InputFrame f;
+        while ((f = client.nextFrame()) != null) {
+            pendingFrames.addLast(f);
+        }
+    }
+
+    /** Sends/submits this peer's input for command frame {@code frameNumber}. */
+    private void dispatchLocal(long frameNumber, TickInput local) {
+        if (mode == GameMode.HOST) {
+            host.submitLocalInput(frameNumber, local);
+        } else {
+            client.sendLocalInput(frameNumber, local);
+        }
     }
 
     /**
@@ -207,7 +301,10 @@ public final class OnlineSession implements AutoCloseable {
         if (mode == GameMode.HOST) {
             host.pumpInbound();
         } else {
-            client.pump();
+            // Keep control/pause state live and BUFFER any frames that arrived, without stepping here --
+            // advanceWith applies them one sub-step per tick. Draining (not applying) is what stops a
+            // frozen or non-playing tick from silently advancing the world.
+            drainClientFrames();
         }
     }
 
@@ -220,6 +317,18 @@ public final class OnlineSession implements AutoCloseable {
             host.setLocalPaused(paused);
         } else {
             client.sendPause(localSlot, paused);
+        }
+    }
+
+    /**
+     * HOST: freeze ({@code false}) or unfreeze ({@code true}) player input in the authoritative frames the
+     * host broadcasts, mirroring the offline keyboard-disable so firing (and aiming) stops on every peer for
+     * the round-end disc-settle window. No-op on a CLIENT -- its input is suppressed at the host. Called with
+     * {@code false} when the round timer expires and {@code true} when a new round's play phase begins.
+     */
+    public void setFireEnabled(boolean enabled) {
+        if (mode == GameMode.HOST) {
+            host.setFireDisabled(!enabled);
         }
     }
 

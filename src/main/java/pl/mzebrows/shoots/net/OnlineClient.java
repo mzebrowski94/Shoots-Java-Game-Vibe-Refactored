@@ -48,22 +48,38 @@ public final class OnlineClient {
     }
 
     /**
-     * Applies everything the host has broadcast since the last call: authoritative {@link InputFrame}s
-     * (advance the world) and round-flow {@code CONTROL}s (queued for the CLIENT {@link RoundFlow} to
-     * follow). Frames arrive in order over TCP, so they apply in order.
+     * Drains round-flow {@code CONTROL}s and pause requests, and returns the NEXT authoritative
+     * {@link InputFrame} to apply (or {@code null} if none is queued) WITHOUT stepping the world. At most
+     * one frame is returned per call -- further queued frames wait for the next call -- matching the host's
+     * one-frame-per-command-frame contract. The caller advances the sim one sub-step per tick via
+     * {@link LockstepApplier#applyStep}, so the client renders every sub-step while the host only sends a
+     * frame once per command frame. Frames arrive in order over TCP, so they surface in order.
      */
-    public void pump() {
+    public InputFrame nextFrame() {
         NetMessage message;
         while ((message = transport.poll()) != null) {
             switch (message) {
                 case NetMessage.Frame f -> {
-                    LockstepApplier.apply(world, new InputFrame(f.frame(), f.bySlot()), stepsPerFrame);
                     lastAppliedFrame = f.frame();
+                    return new InputFrame(f.frame(), f.bySlot());
                 }
                 case NetMessage.Control c -> inboundControl.send(new ControlEvent(c.frame(), c.kind()));
                 case NetMessage.Pause p -> pausedBy = p.paused() ? p.slot() : -1;
                 default -> { /* WELCOME consumed at connect; JOIN/Input are server-bound */ }
             }
+        }
+        return null;
+    }
+
+    /**
+     * Drains controls/pauses and applies AT MOST ONE authoritative frame (all its sub-steps) to the world.
+     * Convenience for direct-drive callers and tests; the live session uses {@link #nextFrame} plus per-tick
+     * {@link LockstepApplier#applyStep} instead, so it can render every sub-step.
+     */
+    public void pump() {
+        InputFrame frame = nextFrame();
+        if (frame != null) {
+            LockstepApplier.apply(world, frame, stepsPerFrame);
         }
     }
 

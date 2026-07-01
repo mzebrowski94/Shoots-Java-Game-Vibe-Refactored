@@ -40,6 +40,11 @@ public final class OnlineHost {
     /** Slot of the player who paused the match, or {@code -1} when running (the host is the pause authority). */
     private int pausedBy = -1;
 
+    /** True once the round timer has expired: the host neutralises the input in every frame it releases so
+     *  firing (and aiming) stops on every peer during the disc-settle window, exactly like the offline
+     *  keyboard-disable. Reset when the next round's play phase begins (see {@link #setFireDisabled}). */
+    private boolean fireDisabled;
+
     public OnlineHost(PlayWorld world, TcpServer server, int stepsPerFrame, int inputDelayFrames) {
         this.world = world;
         this.server = server;
@@ -83,19 +88,61 @@ public final class OnlineHost {
     }
 
     /**
-     * If every slot has reported the next command frame, releases it: broadcasts it to all clients,
-     * applies it to the host world, and returns it. Returns {@code null} while still waiting on a slot
-     * (the lockstep stall).
+     * Freezes ({@code true}) or unfreezes ({@code false}) player input in the frames this host releases, for
+     * the round-end disc-settle window. While frozen, every released frame is neutralised before broadcast,
+     * so firing and aiming stop identically on every peer -- the online equivalent of the offline
+     * keyboard-disable. Discs already in flight are unaffected and finish settling as usual.
      */
-    public InputFrame tryAdvance() {
+    public void setFireDisabled(boolean disabled) {
+        this.fireDisabled = disabled;
+    }
+
+    /**
+     * If every slot has reported the next command frame, releases it: broadcasts it to all clients, marks
+     * it as the last released frame, and returns it WITHOUT stepping the host world. The caller advances
+     * the sim one sub-step per tick via {@link LockstepApplier#applyStep} (so the host renders every
+     * sub-step while the network only syncs once per command frame), then calls {@link #recordFrameHash}
+     * once all the frame's sub-steps are applied. Returns {@code null} while still waiting on a slot.
+     */
+    public InputFrame tryReleaseFrame() {
         coverAbsentSlots();
         InputFrame frame = coordinator.tryRelease();
         if (frame == null) {
             return null;
         }
+        if (fireDisabled) {
+            frame = neutralized(frame); // round time is up: freeze all input so no new discs are fired
+        }
         server.broadcast(new NetMessage.Frame(frame.frame(), frame.bySlot()));
-        LockstepApplier.apply(world, frame, stepsPerFrame);
         lastReleasedFrame = frame.frame();
+        return frame;
+    }
+
+    /** A copy of {@code frame} with every slot reset to neutral input (no aim, no fire), used to freeze
+     *  player input across all peers once the round timer has expired. */
+    private static InputFrame neutralized(InputFrame frame) {
+        TickInput[] slots = new TickInput[frame.slots()];
+        java.util.Arrays.fill(slots, NEUTRAL);
+        return new InputFrame(frame.frame(), slots);
+    }
+
+    /** Records the host world's hash for {@code frame} (all its sub-steps applied) for the desync check. */
+    public void recordFrameHash(long frame) {
+        recordHash(frame);
+    }
+
+    /**
+     * Releases the next command frame AND fully applies it (all {@code stepsPerFrame} sub-steps) to the
+     * host world in one call, returning it or {@code null}. Convenience for direct-drive callers and tests;
+     * the live session drives {@link #tryReleaseFrame} plus per-tick {@link LockstepApplier#applyStep}
+     * instead, so it can render every sub-step.
+     */
+    public InputFrame tryAdvance() {
+        InputFrame frame = tryReleaseFrame();
+        if (frame == null) {
+            return null;
+        }
+        LockstepApplier.apply(world, frame, stepsPerFrame);
         recordHash(frame.frame());
         return frame;
     }

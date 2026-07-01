@@ -103,8 +103,11 @@ class OnlineLobbyTest {
                     }
                     Thread.sleep(0, 200_000);
                 }
-                // Input delay lets the host run a few frames ahead; align to a common frame before comparing.
-                long target = Math.max(hostSession.frame(), clientSession.frame());
+                // Input delay lets the host run a few frames ahead; align before comparing. The sim now
+                // steps one sub-step per advance, so a peer can sit part-way through a command frame; aligning
+                // to max()+1 lands BOTH on a command-frame boundary -- the only point lockstep guarantees
+                // bit-identical state (a mid-command-frame peer would differ by a sub-step or two).
+                long target = Math.max(hostSession.frame(), clientSession.frame()) + 1;
                 while (hostSession.frame() < target || clientSession.frame() < target) {
                     if (hostSession.frame() < target) {
                         hostSession.advanceWith(tick(0, hostSession.frame()));

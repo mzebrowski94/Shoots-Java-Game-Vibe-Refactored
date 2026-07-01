@@ -23,17 +23,28 @@ public final class LockstepApplier {
         if (stepsPerFrame < 1) {
             throw new IllegalArgumentException("stepsPerFrame must be >= 1: " + stepsPerFrame);
         }
+        for (int step = 0; step < stepsPerFrame; step++) {
+            applyStep(world, frame);
+        }
+    }
+
+    /**
+     * Applies {@code frame}'s held input for every slot and advances the simulation exactly ONE sub-step.
+     * Re-applying the same held input on each sub-step keeps a command frame bit-identical to
+     * {@code stepsPerFrame} normal per-step updates, whether those sub-steps run back-to-back in one
+     * {@link #apply} call or are spread one-per-tick across a command frame by the online session -- which
+     * is what lets the sim render at the full 120 Hz while the network only syncs at the command-frame rate.
+     */
+    public static void applyStep(PlayWorld world, InputFrame frame) {
         if (frame.slots() < world.playerCount()) {
             throw new IllegalArgumentException(
                     "frame has " + frame.slots() + " slots, world needs " + world.playerCount());
         }
-        for (int step = 0; step < stepsPerFrame; step++) {
-            for (int slot = 0; slot < world.playerCount(); slot++) {
-                TickInput in = frame.slot(slot);
-                world.applyInput(slot, in.aim(), false);
-                world.applyShoot(slot, in.shootHeld());
-            }
-            world.step();
+        for (int slot = 0; slot < world.playerCount(); slot++) {
+            TickInput in = frame.slot(slot);
+            world.applyInput(slot, in.aim(), false);
+            world.applyShoot(slot, in.shootHeld());
         }
+        world.step();
     }
 }

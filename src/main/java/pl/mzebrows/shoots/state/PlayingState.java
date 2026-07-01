@@ -68,6 +68,12 @@ public final class PlayingState implements GameState {
      *  remote pause. The game loop reads this to avoid draining real time while the world is frozen (#1). */
     private boolean steppedThisUpdate = true;
 
+    /** Whether the loop should REFUND this update's fixed-timestep step (and stop catching up). True only when
+     *  the world is genuinely frozen -- an online network stall or a remote pause -- so real time freezes with
+     *  it. Every stepped online tick applies exactly one sim sub-step and consumes its real time normally, so
+     *  online wall-clock speed matches offline; only a real freeze refunds (#1). */
+    private boolean refundThisUpdate = false;
+
     // Round-timing diagnostics (#1): wall-clock start of the current play phase + a one-shot expiry log guard.
     private long roundStartNanos;
     private boolean roundExpiryLogged;
@@ -188,7 +194,8 @@ public final class PlayingState implements GameState {
 
     @Override
     public GameState update(InputBridge input) {
-        steppedThisUpdate = true; // assume real progress; the online path clears it on a stall/pause
+        steppedThisUpdate = true;  // assume real progress; the online path clears it on a stall/pause
+        refundThisUpdate = false;  // and only the online path sets this on a genuine freeze (stall/pause)
         // Returned from our own pause menu: tell peers to resume so everyone unfreezes together (#3).
         if (online != null && localPauseInitiated) {
             online.requestPause(false);
@@ -256,6 +263,9 @@ public final class PlayingState implements GameState {
     private GameState updateContinues(InputBridge input) {
         if (phaseJustEntered) {
             settings.setPlayerKeyboardAvailable(true);
+            if (online != null) {
+                online.setFireEnabled(true); // fresh round: let the host broadcast live input again (offline uses the flag above)
+            }
             phaseJustEntered = false;
             stepsSinceRoundSecond = 0;
             roundStartNanos = System.nanoTime();
@@ -297,22 +307,39 @@ public final class PlayingState implements GameState {
         if (pausedBy >= 0 && pausedBy != online.localSlot()) {
             // A different player paused: hold the round timer and the simulation, and show who paused.
             screen.setOnlinePauseNotice("PLAYER " + (pausedBy + 1) + " PAUSED");
-            steppedThisUpdate = false; // frozen: no real time should be consumed by the loop
+            steppedThisUpdate = false;  // frozen: no sim progress this tick
+            refundThisUpdate = true;    // ...and no real time should be consumed while frozen
             return this;
         }
         screen.setOnlinePauseNotice(null);
 
         boolean stepped = advanceOnline(input);
         if (stepped) {
-            counter.tick(); // advance the round-timer bar in lockstep with the simulation, not wall-clock
+            // A stepped advance now applies exactly one sim sub-step (the command frame's sub-steps are
+            // spread one-per-tick), so tick the round-timer bar once, in lockstep with the sim at the full
+            // 120 Hz -- matching the offline cadence so the bar and the round clock stay together (#2/#3).
+            counter.tick();
         }
-        steppedThisUpdate = stepped; // a lockstep stall (false) tells the loop to refund the consumed step (#1)
+        steppedThisUpdate = stepped;
+        // Refund (freeze real time) only on a genuine lockstep stall; every stepped tick consumes its real
+        // time, keeping online wall-clock speed identical to offline (#1).
+        refundThisUpdate = !stepped && online.lastAdvanceStalled();
         return this;
     }
 
     /** Whether the last {@link #update} advanced the simulation (false on an online stall/pause); see {@link GameLoop}. */
     public boolean lastUpdateAdvancedSim() {
         return steppedThisUpdate;
+    }
+
+    /**
+     * Whether the game loop should refund this update's fixed-timestep step and stop catching up -- true
+     * only when the world is genuinely frozen (an online network stall or a remote pause). A between-
+     * command-frame pacing skip returns {@code false} here so the loop consumes its real time, keeping the
+     * online wall-clock speed identical to offline (#1). See {@link GameLoop}.
+     */
+    public boolean lastUpdateShouldRefund() {
+        return refundThisUpdate;
     }
 
     /**
@@ -348,10 +375,11 @@ public final class PlayingState implements GameState {
     }
 
     /**
-     * Online advance: the {@link OnlineSession} exchanges this command frame and steps the shared world
-     * only once every peer's input is in (lockstep). The round clock + frame counter advance only on a
-     * real step; AI is not run online. Phase transitions still flow through the session's host-driven
-     * {@code flow} (a CLIENT follows the broadcast CONTROLs).
+     * Online advance: the {@link OnlineSession} steps the shared world one sim sub-step per call (lockstep;
+     * only once every peer's input is in). A stepped call now advances exactly one sim step -- the command
+     * frame's {@link OnlineSession#STEPS_PER_FRAME} sub-steps are spread one-per-tick -- so the round clock
+     * + frame counter advance by one per step, identically to the offline path; AI is not run online. Phase
+     * transitions still flow through the session's host-driven {@code flow} (a CLIENT follows the CONTROLs).
      */
     private boolean advanceOnline(InputBridge input) {
         boolean stepped = online.advance(input);
@@ -431,6 +459,12 @@ public final class PlayingState implements GameState {
                 settings.getActualRound().getRoundTime(), settings.getRoundTime(), countActiveDiscs());
         if (settings.getActualRound().isRoundEnd()) {
             settings.setPlayerKeyboardAvailable(false);
+            if (online != null) {
+                // Online: the offline flag above is bypassed by the network input path, so tell the host to
+                // neutralise the input in the frames it broadcasts -- firing stops on every peer while the
+                // remaining discs settle, exactly like offline (host-only; a CLIENT never reaches here).
+                online.setFireEnabled(false);
+            }
             if (!roundExpiryLogged) {
                 roundExpiryLogged = true;
                 log.info("Round {} timer hit {}s after {} ms wall-clock; waiting for {} disc(s) to settle",
