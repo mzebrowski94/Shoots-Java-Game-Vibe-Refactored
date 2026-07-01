@@ -28,8 +28,11 @@ import pl.mzebrows.shoots.config.RoundConfig;
 class BaseDisruptionTest {
 
     private static final long SEED = 3L;
-    /** Aim angle (deg) that sends a P0 disc on a bounce path into P1's base on this seed's map. */
-    private static final double STRAIGHT_UP = 187.0;
+    /**
+     * Aim angle (deg) that sends a P0 disc on a bounce path into P1's base on this seed's map
+     * (re-tuned from 187.0 after the diagonal shooting-prevention walls changed seeded layouts).
+     */
+    private static final double STRAIGHT_UP = 160.0;
     /** 1.0s disruption + 0.5s grace at 120 steps/s -> 120 and 60 ticks. */
     private static final DisruptionConfig DISRUPT = new DisruptionConfig(true, 1.0, 0.5);
     private static final int DISRUPT_TICKS = 120;

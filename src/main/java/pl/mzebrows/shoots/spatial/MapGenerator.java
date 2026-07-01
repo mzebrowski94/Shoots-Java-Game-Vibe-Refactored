@@ -19,7 +19,7 @@ public final class MapGenerator {
 
     public MapGenerator(GridConfig grid, Random random) {
         this.random = random;
-        this.size = grid.tableSize();
+        this.size = MapSize.fromTableSize(grid.tableSize()).tableSize();
     }
 
     /** Convenience constructor with a fresh, time-seeded {@link Random}. */
@@ -43,18 +43,19 @@ public final class MapGenerator {
         }
         addBorderWalls(tiles);
         addCornerBlocks(tiles);
+        addDiagonalWalls(tiles);
         addBlocks(tiles);
-        addCapturePoints(tiles);
         addPlayerBases(tiles, playerNumber);
         addCenterWall(tiles);
+        addCapturePoints(tiles); // LAST: no later step may bury or erase a capture point
         return tiles;
     }
 
     /**
      * Stamps a wall block at the map centre so two opposing bases can never shoot each other on a
      * straight, unbroken line of sight (a problem on maps where the central lane stayed open). Applied
-     * AFTER every random step so it overrides whatever tile landed there without perturbing the seed's
-     * RNG sequence (the rest of the map is byte-for-byte identical to before for a given seed). A base
+     * after all random block placement so it overrides whatever tile landed there; capture points are
+     * placed later still, and since they require an EMPTY tile they can never be buried by it. A base
      * tile is never overwritten -- bases sit at the borders, far from the centre. The block size is a
      * single tile today but is expressed via {@link #CENTER_WALL_HALF} so a larger central obstacle is a
      * one-line change should a future map want one.
@@ -90,14 +91,61 @@ public final class MapGenerator {
         tiles[size - 2][size - 2] = TileType.WALL;
     }
 
+    /** Tile extent of one block macro-cell: blocks are placed one per 3x3 cell of an 8x8 macro grid. */
+    private static final int BLOCK_MACRO = 3;
+
+    /**
+     * Fixed wall tiles that break the straight line of sight between DIAGONAL base pairs (e.g. P1
+     * bottom vs P3 left), mirroring what {@link #addCenterWall} does for opposing pairs. One per map
+     * quarter, midway along the base-to-base line. Tile choice (authored for {@link MapSize#NORMAL}):
+     * each diagonal line between base centres crosses these tiles exactly corner-to-corner, so any
+     * disc (positive radius) flying that line hits them. Placed BEFORE the random blocks so the
+     * {@link #touchesWall} rule keeps random blocks off their sides (diagonal contact only), and their
+     * macro-cells are skipped in {@link #addBlocks} so the total block count stays unchanged.
+     */
+    private static final int[][] DIAGONAL_WALLS = {
+            {6, 7},   // between P2 (top)    and P3 (left)
+            {18, 7},  // between P2 (top)    and P4 (right)
+            {6, 17},  // between P1 (bottom) and P3 (left)
+            {18, 17}, // between P1 (bottom) and P4 (right)
+    };
+
+    private void addDiagonalWalls(TileType[][] tiles) {
+        for (int[] wall : DIAGONAL_WALLS) {
+            tiles[wall[0]][wall[1]] = TileType.WALL;
+        }
+    }
+
+    /** True when the given block macro-cell already holds one of the fixed {@link #DIAGONAL_WALLS}. */
+    private static boolean holdsDiagonalWall(int macroX, int macroY) {
+        for (int[] wall : DIAGONAL_WALLS) {
+            if (wall[0] / BLOCK_MACRO == macroX && wall[1] / BLOCK_MACRO == macroY) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * One block per 3x3 macro-cell of an 8x8 macro grid, so blocks are evenly distributed: each map
+     * quarter gets exactly 16 (4x4 macro-cells), one of which is its fixed diagonal wall -- those
+     * cells are skipped here to keep the total block count unchanged.
+     */
     private void addBlocks(TileType[][] tiles) {
         for (int i = 0; i < 8; i++) {
             for (int j = 0; j < 8; j++) {
-                insertBlock(tiles, i, j);
+                if (!holdsDiagonalWall(i, j)) {
+                    insertBlock(tiles, i, j);
+                }
             }
         }
     }
 
+    /**
+     * One capture point per unmasked 6x6 macro-cell of a 4x4 macro grid: the mask keeps 8 cells, 2 in
+     * each map quarter, so capture points are evenly distributed. Runs LAST in {@link #generate} so no
+     * wall, base, or centre-wall stamp can bury or erase one (it also only ever claims EMPTY tiles).
+     */
     private void addCapturePoints(TileType[][] tiles) {
         for (int i = 0; i < 4; i++) {
             for (int j = 0; j < 4; j++) {
@@ -118,8 +166,8 @@ public final class MapGenerator {
 
     private void insertBlock(TileType[][] tiles, int macroX, int macroY) {
         while (true) {
-            int x = macroX * 3 + random.nextInt(3);
-            int y = macroY * 3 + random.nextInt(3);
+            int x = macroX * BLOCK_MACRO + random.nextInt(BLOCK_MACRO);
+            int y = macroY * BLOCK_MACRO + random.nextInt(BLOCK_MACRO);
             if (!touchesWall(tiles, x, y) && x != 0 && x != size && y != 0 && y != size - 1) {
                 tiles[x][y] = TileType.WALL;
                 return;

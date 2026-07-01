@@ -25,7 +25,8 @@ The AWT-free deterministic simulation (`world`/`entity`/`spatial`/`score`/`ai`) 
   `BlockHitEffects` (wall-flash list; + the `BlockHitEffect` data record).
 - `entity` — pooled `Entity`/`EntityType` + `ObjectPool<T>`; `AimController`, `AttackStrategy`/`DiscAttackStrategy`,
   `LaserPredictor`, `EntitySpawner`; disc lifecycle `DiscSpawner` (spawn/retire) + `DiscSystem` (per-tick, index loops).
-- `spatial` — `SpatialCollider`/`UniformGridCollider` (tile queries), `TileType`, `MapGenerator`, `GridPathTracer`.
+- `spatial` — `SpatialCollider`/`UniformGridCollider` (tile queries), `TileType`, `MapGenerator`, `MapSize`
+  (fixed list of permissible map sizes; only NORMAL 25x25 for now), `GridPathTracer`.
 - `score` — `CapturePoint`, `CaptureScoring`, `PlayerScore`, `MatchScorer`.
 - `ai` — `AiDifficulty`/`TargetMode`/`AiSkills`(+`AiSkillsFactory`)/`AiTargeting`/`PlayerAiController`/`AiPlayers`.
   An AI is just another input source: it drives `PlayWorld.applyInput`/`fire`; nothing special-cases it in the loop.

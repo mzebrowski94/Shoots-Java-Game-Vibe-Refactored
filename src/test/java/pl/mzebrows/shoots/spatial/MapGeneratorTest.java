@@ -171,6 +171,80 @@ class MapGeneratorTest {
         }
     }
 
+    @Test
+    void diagonalWallsBlockTheLaneBetweenDiagonalBases() {
+        // Feature: a fixed wall sits midway on each straight line between DIAGONAL base pairs (one per
+        // map quarter) so e.g. P1 (bottom) and P3 (left) can never shoot each other directly.
+        int[][] walls = {{6, 7}, {18, 7}, {6, 17}, {18, 17}};
+        for (long seed = 0; seed < 50; seed++) {
+            TileType[][] map = new MapGenerator(grid, new Random(seed)).generate(4);
+            for (int[] w : walls) {
+                assertThat(map[w[0]][w[1]]).as("diagonal wall (%d,%d), seed %d", w[0], w[1], seed)
+                        .isEqualTo(TileType.WALL);
+            }
+        }
+    }
+
+    @Test
+    void diagonalWallCentresLieExactlyOnTheDiagonalShootingLines() {
+        // Geometry check (no RNG): each wall tile's centre is collinear with the two base centres it
+        // separates, i.e. it really intersects the direct shooting line.
+        int[][][] pairs = { // {wall, baseA, baseB}
+                {{6, 7}, {12, 1}, {1, 12}},    // P2-P3
+                {{18, 7}, {12, 1}, {23, 12}},  // P2-P4
+                {{6, 17}, {12, 23}, {1, 12}},  // P1-P3
+                {{18, 17}, {12, 23}, {23, 12}} // P1-P4
+        };
+        for (int[][] p : pairs) {
+            double wx = p[0][0] + 0.5, wy = p[0][1] + 0.5;
+            double ax = p[1][0] + 0.5, ay = p[1][1] + 0.5;
+            double bx = p[2][0] + 0.5, by = p[2][1] + 0.5;
+            double cross = (bx - ax) * (wy - ay) - (by - ay) * (wx - ax);
+            assertThat(cross).as("wall (%d,%d) collinear with its base pair", p[0][0], p[0][1]).isZero();
+        }
+    }
+
+    @Test
+    void noRandomBlockSitsSideBySideWithADiagonalWall() {
+        // Blocks may only touch diagonally, never side by side -- the fixed diagonal walls must obey
+        // the same rule, so their four orthogonal neighbours stay wall-free on every seed.
+        int[][] walls = {{6, 7}, {18, 7}, {6, 17}, {18, 17}};
+        for (long seed = 0; seed < 50; seed++) {
+            TileType[][] map = new MapGenerator(grid, new Random(seed)).generate(4);
+            for (int[] w : walls) {
+                assertThat(map[w[0] - 1][w[1]]).isNotEqualTo(TileType.WALL);
+                assertThat(map[w[0] + 1][w[1]]).isNotEqualTo(TileType.WALL);
+                assertThat(map[w[0]][w[1] - 1]).isNotEqualTo(TileType.WALL);
+                assertThat(map[w[0]][w[1] + 1]).isNotEqualTo(TileType.WALL);
+            }
+        }
+    }
+
+    @Test
+    void capturePointsAreEvenlyDistributedAcrossQuarters() {
+        // 8 capture points total, exactly 2 per map quarter, on every seed. Placing them LAST in the
+        // pipeline also means no base/centre-wall stamp can ever bury one (count would drop below 8).
+        for (long seed = 0; seed < 50; seed++) {
+            TileType[][] map = new MapGenerator(grid, new Random(seed)).generate(4);
+            int[] quarters = new int[4]; // TL, TR, BL, BR (split at tile 12)
+            for (int x = 0; x < SIZE; x++) {
+                for (int y = 0; y < SIZE; y++) {
+                    if (map[x][y] == TileType.CAPTURE_POINT) {
+                        quarters[(x < 12 ? 0 : 1) + (y < 12 ? 0 : 2)]++;
+                    }
+                }
+            }
+            assertThat(quarters).as("capture points per quarter, seed %d", seed).containsOnly(2);
+        }
+    }
+
+    @Test
+    void rejectsUnsupportedMapSize() {
+        assertThatThrownBy(() -> new MapGenerator(new GridConfig(UNIT, 21), new Random(1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unsupported map size");
+    }
+
     private int countTiles(TileType[][] map, TileType type) {
         int count = 0;
         for (TileType[] row : map) {

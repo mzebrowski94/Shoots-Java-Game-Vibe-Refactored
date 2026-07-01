@@ -25,8 +25,9 @@ import pl.mzebrows.shoots.world.PlayWorld;
 class AiAggressivenessTest {
 
     // A seed whose generated map gives the bottom AI (P0) a workable bounce path to the top base (P1),
-    // so an aggressive AI lands a disruption within the test horizon (deterministic for this seed).
-    private static final long SEED = 22L;
+    // so an aggressive AI lands a disruption within the test horizon (deterministic for this seed;
+    // re-picked from 22 after the diagonal shooting-prevention walls changed seeded layouts).
+    private static final long SEED = 15L;
 
     private static ColorPalette palette() {
         return new ColorPalette(

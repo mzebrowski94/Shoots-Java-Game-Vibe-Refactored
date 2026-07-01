@@ -51,7 +51,7 @@ Root package `pl.mzebrows.shoots`. The AWT-free, deterministic simulation packag
   `ChargeController`, `BlockHitEffects` (+ the `BlockHitEffect` data record).
 - `entity` — pooled `Entity`/`EntityType` + `ObjectPool<T>`; `AimController`, `AttackStrategy`/`DiscAttackStrategy`,
   `LaserPredictor`, `EntitySpawner`; disc lifecycle `DiscSpawner` (spawn/retire) + `DiscSystem` (per-tick advance/collide).
-- `spatial` — `SpatialCollider`/`UniformGridCollider`, `TileType`, `MapGenerator`, `GridPathTracer`.
+- `spatial` — `SpatialCollider`/`UniformGridCollider`, `TileType`, `MapGenerator`, `MapSize`, `GridPathTracer`.
 - `score` — `CapturePoint`, `CaptureScoring`, `PlayerScore`, `MatchScorer`.
 - `ai` — `AiDifficulty`/`AiSkills`/`AiSkillsFactory`, `PlayerAiController`, `AiTargeting`, `AiPlayers`.
   An AI is **just another input source** — it drives the same `PlayWorld.applyInput`/`fire` API a human does.
